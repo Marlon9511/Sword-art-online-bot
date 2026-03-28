@@ -85,26 +85,48 @@ const PREFIX = '$';
 const DATA_PATH = './data';
 const LOG_FILE = './logs.txt';
 
-if (!fs.existsSync(DATA_PATH)) fs.mkdirSync(DATA_PATH, { recursive: true });
-
-// persistent files
-const FILES = {
-  users: 'users.json',
-  bans: 'bans.json',
-  joinreq: 'joinreq.json',
-  pets: 'pets.json',
-  tickets: 'tickets.json',
-  ranks: 'ranks.json',
-  broadcastSettings: 'broadcast-settings.json',
-  deleted: 'deleted.json'
-  , owner: 'owner.json'
-  , teamTodos: 'team-todos.json'
-  , groupInvites: 'group-invites.json'
-  , groupSettings: 'group-settings.json'
+// FILE SYSTEM SETUP
+const ensureDir = (dir) => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
 };
-Object.values(FILES).forEach(f => {
-  const p = path.join(DATA_PATH, f);
-  if (!fs.existsSync(p)) fs.writeFileSync(p, '{}');
+const ensureFile = (filePath, defaultData = {}) => {
+  if (!fs.existsSync(filePath)) {
+    fs.writeFileSync(filePath, JSON.stringify(defaultData, null, 2));
+  } else {
+    try {
+      JSON.parse(fs.readFileSync(filePath));
+    } catch {
+      fs.writeFileSync(filePath, JSON.stringify(defaultData, null, 2));
+    }
+  }
+};
+
+ensureDir('./sessions');
+ensureDir('./data');
+
+ensureFile('./data/users.json', { registeredUsers: {} });
+ensureFile('./data/restart.json', {});
+ensureFile('./logs.txt', "");
+
+const FILES = {
+  users: { file: 'users.json', default: {} },
+  bans: { file: 'bans.json', default: {} },
+  joinreq: { file: 'joinreq.json', default: {} },
+  pets: { file: 'pets.json', default: {} },
+  tickets: { file: 'tickets.json', default: {} },
+  ranks: { file: 'ranks.json', default: {} },
+  broadcastSettings: { file: 'broadcast-settings.json', default: {} },
+  deleted: { file: 'deleted.json', default: {} },
+  owner: { file: 'owner.json', default: {} },
+  teamTodos: { file: 'team-todos.json', default: {} },
+  groupInvites: { file: 'group-invites.json', default: {} },
+  groupSettings: { file: 'group-settings.json', default: {} }
+};
+
+Object.values(FILES).forEach(({ file, default: def }) => {
+  ensureFile(path.join('./data', file), def);
 });
 
 // Bot state file (persist whether bot is offline for non-owners)
