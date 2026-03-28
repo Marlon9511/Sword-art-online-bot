@@ -237,31 +237,6 @@ function checkCooldown(userId, command) {
   return null;
 }
 
-// Prüft ob ein Ollama-Modell installiert ist
-async function isModelInstalled(modelName) {
-  try {
-    const models = await listModels();
-    return models.some(m => m.toLowerCase() === modelName.toLowerCase());
-  } catch (e) {
-    console.error('Error checking model:', e);
-    return false;
-  }
-}
-
-// Installiert ein Ollama-Modell
-async function installModel(modelName, send) {
-  try {
-    await send(`🔄 Modell "${modelName}" wird heruntergeladen... Dies kann einige Minuten dauern.`);
-    await pullModel(modelName);
-    await send(`✅ Modell "${modelName}" wurde erfolgreich installiert!`);
-    return true;
-  } catch (e) {
-    console.error('Error installing model:', e);
-    await send(`❌ Fehler beim Installieren von "${modelName}": ${e.message}`);
-    return false;
-  }
-}
-
 const load = f => {
   try { return JSON.parse(fs.readFileSync(path.join(DATA_PATH, f), 'utf8') || '{}'); } catch { return {}; }
 };
