@@ -15,27 +15,35 @@ const ensureDir = (dir) => {
 
 const ensureFile = (filePath, defaultData = {}) => {
   if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, JSON.stringify(defaultData, null, 2));
+    fs.writeFileSync(
+      filePath,
+      typeof defaultData === "string" ? defaultData : JSON.stringify(defaultData, null, 2)
+    );
   } else {
     try {
       const data = fs.readFileSync(filePath, 'utf-8');
       if (data.trim() === "") throw new Error("Empty file");
       JSON.parse(data);
     } catch {
-      fs.writeFileSync(filePath, JSON.stringify(defaultData, null, 2));
+      fs.writeFileSync(
+        filePath,
+        typeof defaultData === "string" ? defaultData : JSON.stringify(defaultData, null, 2)
+      );
     }
   }
 };
 
-const SESSIONS_DIR = './sessions';
-const DATA_PATH = './data';
+const BASE_DIR = path.resolve('./');
+
+const SESSIONS_DIR = path.join(BASE_DIR, 'sessions');
+const DATA_PATH = path.join(BASE_DIR, 'data');
 
 ensureDir(SESSIONS_DIR);
 ensureDir(DATA_PATH);
 
 const USERS_FILE = path.join(DATA_PATH, 'users.json');
 const RESTART_FILE = path.join(DATA_PATH, 'restart.json');
-const LOG_FILE = './logs.txt';
+const LOG_FILE = path.join(BASE_DIR, 'logs.txt');
 
 ensureFile(USERS_FILE, { registeredUsers: {} });
 ensureFile(RESTART_FILE, {});
@@ -62,8 +70,8 @@ Object.values(FILES).forEach(({ file, default: def }) => {
 
 const activeSessions = new Map();
 
+const registeredUsers = JSON.parse(fs.readFileSync(USERS_FILE, 'utf-8')).registeredUsers;
 
-const registeredUsers = JSON.parse(fs.readFileSync(USERS_FILE)).registeredUsers;
 
 const DSGVO_TEXT = `
 Datenschutzerklärung und Einwilligung:
