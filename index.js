@@ -48,45 +48,9 @@ if (!fs.existsSync(RESTART_FILE)) {
   fs.writeFileSync(RESTART_FILE, JSON.stringify({}));
 }
 
-// KI-Konfiguration mit Ollama
-import { generateCompletion, listModels, pullModel } from 'ollama';
 
-const AI_CONFIG = {
-  defaultModel: 'mistral', // Standard Modell
-  models: {
-    mistral: {
-      name: 'mistral',
-      description: '🚀 Schnell & Präzise',
-      maxTokens: 4096
-    },
-    llama2: {
-      name: 'llama2',
-      description: '🧠 Vielseitig & Ausgewogen',
-      maxTokens: 4096
-    },
-    codellama: {
-      name: 'codellama',
-      description: 'Optimiert für Code',
-      maxTokens: 4096
-    },
-    tinyllama: {
-      name: 'tinyllama',
-      description: 'sehr klein kann nur english',
-      maxTokens: 4096  
-    }
-  },
-  settings: {
-    temperature: 0.7,
-    enabled: true,
-    ownerOnly: false,
-    groupsEnabled: true
-  }
-};
-
-let currentModel = AI_CONFIG.defaultModel;
-const MAX_TOKENS = parseInt(process.env.MAX_TOKENS) || AI_CONFIG.models[currentModel].maxTokens;
-const TEMPERATURE = parseFloat(process.env.TEMPERATURE) || AI_CONFIG.settings.temperature;
-
+      
+     
 
 // ========== CONFIG ==========
 
