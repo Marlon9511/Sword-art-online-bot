@@ -1682,7 +1682,7 @@ ${modelStatus}
 
           // Start a PM2-managed process for this session using the bootstrapper
           try {
-            const pm2Name = `raptor-${sessionName}`;
+            const pm2Name = `Sword-art-online-${sessionName}`;
             // Start the session via PM2; pass the sessionName as an arg to the bootstrap script
             exec(`pm2 start session-bootstrap.mjs --name ${pm2Name} -- ${sessionName}`, { cwd: process.cwd() }, (err, stdout, stderr) => {
               if (err) {
@@ -1760,7 +1760,7 @@ ${modelStatus}
                     for (const proc of list) {
                       const pmName = proc.name;
                       const status = proc.pm2_env && proc.pm2_env.status;
-                      if (pmName && pmName.startsWith('raptor-') && status === 'online') {
+                      if (pmName && pmName.startsWith('Sword-art-online-') && status === 'online') {
                         console.log(`Restarting pm2 process ${pmName}`);
                         exec(`pm2 restart ${pmName}`, (rerr, rout, rerrout) => {
                           if (rerr) console.error(`Failed to restart ${pmName}:`, rerr, rerrout);
