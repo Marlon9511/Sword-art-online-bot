@@ -49,7 +49,7 @@ if (!fs.existsSync(RESTART_FILE)) {
 }
 
 // KI-Konfiguration mit Ollama
-import { generateCompletion, listModels, pullModel } from './lib/ollama.mjs';
+import { generateCompletion, listModels, pullModel } from './lib/ollama.js';
 
 const AI_CONFIG = {
   defaultModel: 'mistral', // Standard Modell
