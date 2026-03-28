@@ -116,7 +116,6 @@ ROLES.COOWNER.push(COOWNER_LID);
 // Prefix
 const PREFIX = '$';
 
-// Bot state file (persist whether bot is offline for non-owners)
 const BOT_STATE_FILE = path.join(DATA_PATH, 'bot-state.json');
 let BOT_OFFLINE = false;
 try {
@@ -127,45 +126,40 @@ try {
 } catch (e) { console.error('Failed to load bot state:', e); }
 
 const saveBotState = () => {
-  try { fs.writeFileSync(BOT_STATE_FILE, JSON.stringify({ offline: !!BOT_OFFLINE }, null, 2)); } catch (e) { console.error('Failed to save bot state:', e); }
+  try {
+    fs.writeFileSync(BOT_STATE_FILE, JSON.stringify({ offline: !!BOT_OFFLINE }, null, 2));
+  } catch (e) { console.error('Failed to save bot state:', e); }
 };
 
-// Ensure team todos file exists (added after FILES declaration)
-const _teamTodosPath = path.join(DATA_PATH, FILES.teamTodos);
+const _teamTodosPath = path.join(DATA_PATH, FILES.teamTodos.file);
 if (!fs.existsSync(_teamTodosPath)) fs.writeFileSync(_teamTodosPath, '{}');
-// Ensure group invites file exists
-const _groupInvitesPath = path.join(DATA_PATH, FILES.groupInvites);
+
+const _groupInvitesPath = path.join(DATA_PATH, FILES.groupInvites.file);
 if (!fs.existsSync(_groupInvitesPath)) fs.writeFileSync(_groupInvitesPath, '{}');
 
-// ========== HELPERS ==========
 const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-// Create backup of all data
 async function createBackup() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupPath = `./backup_${timestamp}.zip`;
   
   return new Promise((resolve, reject) => {
     const output = fs.createWriteStream(backupPath);
-    const archive = archiver('zip', {
-      zlib: { level: 9 } // Maximum compression
-    });
+    const archive = archiver('zip', { zlib: { level: 9 } });
 
     output.on('close', () => resolve(backupPath));
     archive.on('error', err => reject(err));
 
     archive.pipe(output);
 
-    // Add all data files
-    Object.values(FILES).forEach(file => {
-      const filePath = path.join(DATA_PATH, file);
+    Object.values(FILES).forEach(fileObj => {
+      const filePath = path.join(DATA_PATH, fileObj.file);
       if (fs.existsSync(filePath)) {
-        archive.file(filePath, { name: file });
+        archive.file(filePath, { name: fileObj.file });
       }
     });
 
-    // Add session data
     if (fs.existsSync(SESSIONS_DIR)) {
       archive.directory(SESSIONS_DIR, 'sessions');
     }
@@ -174,8 +168,7 @@ async function createBackup() {
   });
 }
 
-// VIP System
-const vipExpiry = new Map(); // Speichert VIP-Ablaufzeiten
+const vipExpiry = new Map();
 
 function addVip(jid, durationStr) {
   const duration = parseDuration(durationStr);
@@ -188,7 +181,6 @@ function addVip(jid, durationStr) {
     ROLES.VIP.push(jid);
   }
   
-  // Plane automatisches Entfernen
   setTimeout(() => {
     ROLES.VIP = ROLES.VIP.filter(id => id !== jid);
     vipExpiry.delete(jid);
@@ -219,8 +211,7 @@ function isVip(jid) {
   return Date.now() < expiry;
 }
 
-// Command cooldown system
-const COOLDOWN_TIME = 10 * 60 * 1000; // 10 Minuten in Millisekunden
+const COOLDOWN_TIME = 10 * 60 * 1000;
 const commandCooldowns = new Map();
 
 function checkCooldown(userId, command) {
@@ -232,7 +223,6 @@ function checkCooldown(userId, command) {
   const lastUsage = userCooldowns.get(command);
   const now = Date.now();
   
-  // VIPs haben halbe Cooldown-Zeit
   const effectiveCooldown = isVip(userId) ? COOLDOWN_TIME / 2 : COOLDOWN_TIME;
   
   if (lastUsage && now - lastUsage < effectiveCooldown) {
@@ -259,57 +249,37 @@ const prettyRank = r => ({
   MOD:'⚔ Moderator', 
   VIP:'💎 VIP',
   SUPPORTER: '🌟 Supporter',
-  TEST_SUPPORTER: '🔰 Test-Supporter', 
-  SUPPORTER: '🌟 Supporter',
   TEST_SUPPORTER: '🔰 Test-Supporter',
   USER:'👤 Nutzer' 
 }[r]||'👤 Nutzer');
 
-// normalize simple phone/jid formats to full whatsapp jid
 function normalizeJid(jid){
   if(!jid) return jid;
   jid = String(jid);
-  
-  // Strip @ prefix if present
-  if (jid.startsWith('@')) {
-    jid = jid.substring(1);
-  }
-  
-  // If it's a pure number, convert to whatsapp format
-  if (/^\d+$/.test(jid)) {
-    return `${jid}@s.whatsapp.net`;
-  }
-  
-  // Keep existing JIDs as-is
-  if (jid.includes('@')) {
-    return jid;
-  }
-  
-  // For anything else, try to extract digits and make whatsapp JID
+  if (jid.startsWith('@')) jid = jid.substring(1);
+  if (/^\d+$/.test(jid)) return `${jid}@s.whatsapp.net`;
+  if (jid.includes('@')) return jid;
   const num = jid.replace(/\D+/g, '');
   return num ? `${num}@s.whatsapp.net` : jid;
 }
 
-// convert various jid forms to the participant jid expected by group APIs
 function toParticipantJid(jid){
   if(!jid) return jid;
   const n = normalizeJid(jid);
   if (!n) return n;
-  // if it's already the whatsapp participant domain, return as-is
   if (n.endsWith('@s.whatsapp.net')) return n;
-  // convert @lid style to @s.whatsapp.net (extract digits)
   if (n.endsWith('@lid')) {
     const num = n.replace(/\D+/g, '');
     return num ? `${num}@s.whatsapp.net` : n;
   }
-  // fallback
   return n;
 }
+
 function isSameJid(a,b){
   if(!a || !b) return false;
   return normalizeJid(a) === normalizeJid(b);
 }
-// Normalize all object keys (simple migration for older data)
+
 function normalizeDataKeys(obj){
   const out = {};
   for(const k of Object.keys(obj||{})){
@@ -318,68 +288,56 @@ function normalizeDataKeys(obj){
   return out;
 }
 
-// permission helper: checks ranks and explicitly assigned JIDs
-// Check if user has admin-level permissions (OWNER, COOWNER, ADMIN)
 function hasAdminPerms(jid) {
   return isAuthorized(jid, ['OWNER', 'COOWNER', 'ADMIN']);
 }
 
 function isAuthorized(jid, allowedRoles) {
   const normalizedJid = normalizeJid(jid);
-  
-  // First check stored rank
   const role = ranks[normalizedJid] || users[normalizedJid]?.rank || 'USER';
   if (Array.isArray(allowedRoles) && allowedRoles.includes(role)) return true;
-  
-  // Then check if JID is explicitly assigned to any of the allowed roles
   return allowedRoles.some(role => ROLES[role]?.some(roleJid => isSameJid(normalizedJid, roleJid)));
 }
 
-// ========== PERSISTENT DATA ==========
-let users = normalizeDataKeys(load(FILES.users));
-let bans = normalizeDataKeys(load(FILES.bans));
-let joinreqs = normalizeDataKeys(load(FILES.joinreq));
-let pets = normalizeDataKeys(load(FILES.pets));
-let tickets = normalizeDataKeys(load(FILES.tickets));
-let ranks = normalizeDataKeys(load(FILES.ranks));
+let users = normalizeDataKeys(load(FILES.users.file));
+let bans = normalizeDataKeys(load(FILES.bans.file));
+let joinreqs = normalizeDataKeys(load(FILES.joinreq.file));
+let pets = normalizeDataKeys(load(FILES.pets.file));
+let tickets = normalizeDataKeys(load(FILES.tickets.file));
+let ranks = normalizeDataKeys(load(FILES.ranks.file));
 
-// Debug output for ranks
 console.log('Loaded ranks:', ranks);
-// Create default ranks if empty
+
 if (Object.keys(ranks).length === 0) {
   console.log('No ranks found, creating defaults...');
   ranks = {
     [normalizeJid(OWNER_LID)]: 'OWNER',
     [normalizeJid(COOWNER_LID)]: 'COOWNER'
   };
-  save(FILES.ranks, ranks);
+  save(FILES.ranks.file, ranks);
   console.log('Created default ranks:', ranks);
 }
-let groupSettings = normalizeDataKeys(load(FILES.groupSettings));
 
-// Ticket counter
+let groupSettings = normalizeDataKeys(load(FILES.groupSettings.file));
 let ticketCounter = Object.keys(tickets).length;
-// Team todos
-let teamTodos = load(FILES.teamTodos) || {};
+let teamTodos = load(FILES.teamTodos.file) || {};
 let todoCounter = Object.keys(teamTodos).length;
-let groupInvites = load(FILES.groupInvites) || {};
-let broadcastSettings = load(FILES.broadcastSettings);
-let deletedUsers = normalizeDataKeys(load(FILES.deleted));
-// load owner config (persisted owner/coowner settings)
+let groupInvites = load(FILES.groupInvites.file) || {};
+let broadcastSettings = load(FILES.broadcastSettings.file);
+let deletedUsers = normalizeDataKeys(load(FILES.deleted.file));
 let ownerCfg = {};
-try { ownerCfg = load(FILES.owner) || {}; } catch (e) { ownerCfg = {}; }
+try { ownerCfg = load(FILES.owner.file) || {}; } catch (e) { ownerCfg = {}; }
 if (ownerCfg.ownerLid) OWNER_LID = ownerCfg.ownerLid;
 if (ownerCfg.ownerPriv) OWNER_PRIV = ownerCfg.ownerPriv;
 if (ownerCfg.coownerLid) COOWNER_LID = ownerCfg.coownerLid;
 
-// Load saved role assignments
 if (ownerCfg.roles) {
   Object.assign(ROLES, ownerCfg.roles);
 } else {
-  // Ensure default owners are in their roles
   ROLES.OWNER = [OWNER_LID, OWNER_PRIV];
   ROLES.COOWNER = [COOWNER_LID];
 }
+
 
 // ensure structures
 function ensureUser(rawJid) {
