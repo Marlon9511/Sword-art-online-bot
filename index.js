@@ -2897,7 +2897,7 @@ ${modelStatus}
     }
   });
 
-  console.log('RaptorBot gestartet.');
+  console.log('Sword-art-online-bot gestartet.');
 }
 
 startBot();
