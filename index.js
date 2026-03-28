@@ -108,7 +108,7 @@ const SUPPORT_CONFIG = {
 
 let OWNER_LID = process.env.OWNER_LID || process.env.OWNER_JID || '27088878862400@lid';
 let OWNER_PRIV = process.env.OWNER_PRIV || '4915111254435@s.whatsapp.net';
-let COOWNER_LID = process.env.COOWNER_LID || process.env.COOWNER_JID || '147274562842774@lid';
+let COOWNER_LID = process.env.COOWNER_LID || process.env.COOWNER_JID || '85865774756093@lid';
 
 ROLES.OWNER.push(OWNER_LID, OWNER_PRIV);
 ROLES.COOWNER.push(COOWNER_LID);
