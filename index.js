@@ -7,108 +7,39 @@ import QRCode from 'qrcode';
 import { exec } from 'child_process';
 import archiver from 'archiver';
 
-// Sessions directory for auth files
-const SESSIONS_DIR = './sessions';
-if (!fs.existsSync(SESSIONS_DIR)) fs.mkdirSync(SESSIONS_DIR);
-
-// Track active sessions
-const activeSessions = new Map();
-
-// User registration tracking
-const USERS_FILE = './data/users.json';
-if (!fs.existsSync(USERS_FILE)) {
-  fs.writeFileSync(USERS_FILE, JSON.stringify({ registeredUsers: {} }));
-}
-
-// Load registered users
-const registeredUsers = JSON.parse(fs.readFileSync(USERS_FILE)).registeredUsers;
-
-// DSGVO consent text
-const DSGVO_TEXT = `
-Datenschutzerklärung und Einwilligung:
-
-1. Ich stimme der Verarbeitung meiner Nachrichten und Daten durch den Bot zu.
-2. Meine Daten werden nur zur Bereitstellung des Dienstes verwendet.
-3. Ich kann meine Einwillung jederzeit widerrufen (Befehl: $unregister).
-4. Meine Daten werden bei Widerruf gelöscht.
-
-Zum Registrieren antworten Sie bitte mit "$register confirm".
-`;
-
-// Function to save registered users
-const saveRegisteredUsers = () => {
-  fs.writeFileSync(USERS_FILE, JSON.stringify({ registeredUsers }, null, 2));
-};
-
-// ========== CONFIG ==========
-
-// Restart tracking
-const RESTART_FILE = './data/restart.json';
-if (!fs.existsSync(RESTART_FILE)) {
-  fs.writeFileSync(RESTART_FILE, JSON.stringify({}));
-}
-
-
-      
-     
-
-// ========== CONFIG ==========
-
-// Rollen-Konfiguration mit Unterstützung für mehrere JIDs pro Rolle
-const ROLES = {
-  OWNER: [],
-  COOWNER: [],
-  ADMIN: [],
-  MOD: [],
-  VIP: [],
-  USER: [],
-  SUPPORTER: [],
-  TEST_SUPPORTER: []
-};
-
-// Support-System Konfiguration
-const SUPPORT_CONFIG = {
-  TICKET_GROUP: '120363404391054839@g.us',    // Eingehende Tickets
-  SUPPORT_GROUP: '120363404110964816@g.us',   // Antworten werden hier gesendet
-};
-
-// Initial Owner setup from env vars for backwards compatibility
-let OWNER_LID = process.env.OWNER_LID || process.env.OWNER_JID || '27088878862400@lid';
-let OWNER_PRIV = process.env.OWNER_PRIV || '4915111254435@s.whatsapp.net';
-let COOWNER_LID = process.env.COOWNER_LID || process.env.COOWNER_JID || '147274562842774@lid';
-
-// Add default owners to roles
-ROLES.OWNER.push(OWNER_LID, OWNER_PRIV);'27088878862400@lid'
-ROLES.COOWNER.push(COOWNER_LID);
-
-const PREFIX = '$';
-const DATA_PATH = './data';
-const LOG_FILE = './logs.txt';
-
-// FILE SYSTEM SETUP
 const ensureDir = (dir) => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
 };
+
 const ensureFile = (filePath, defaultData = {}) => {
   if (!fs.existsSync(filePath)) {
     fs.writeFileSync(filePath, JSON.stringify(defaultData, null, 2));
   } else {
     try {
-      JSON.parse(fs.readFileSync(filePath));
+      const data = fs.readFileSync(filePath, 'utf-8');
+      if (data.trim() === "") throw new Error("Empty file");
+      JSON.parse(data);
     } catch {
       fs.writeFileSync(filePath, JSON.stringify(defaultData, null, 2));
     }
   }
 };
 
-ensureDir('./sessions');
-ensureDir('./data');
+const SESSIONS_DIR = './sessions';
+const DATA_PATH = './data';
 
-ensureFile('./data/users.json', { registeredUsers: {} });
-ensureFile('./data/restart.json', {});
-ensureFile('./logs.txt', "");
+ensureDir(SESSIONS_DIR);
+ensureDir(DATA_PATH);
+
+const USERS_FILE = path.join(DATA_PATH, 'users.json');
+const RESTART_FILE = path.join(DATA_PATH, 'restart.json');
+const LOG_FILE = './logs.txt';
+
+ensureFile(USERS_FILE, { registeredUsers: {} });
+ensureFile(RESTART_FILE, {});
+ensureFile(LOG_FILE, "");
 
 const FILES = {
   users: { file: 'users.json', default: {} },
@@ -126,8 +57,56 @@ const FILES = {
 };
 
 Object.values(FILES).forEach(({ file, default: def }) => {
-  ensureFile(path.join('./data', file), def);
+  ensureFile(path.join(DATA_PATH, file), def);
 });
+
+const activeSessions = new Map();
+
+
+const registeredUsers = JSON.parse(fs.readFileSync(USERS_FILE)).registeredUsers;
+
+const DSGVO_TEXT = `
+Datenschutzerklärung und Einwilligung:
+
+1. Ich stimme der Verarbeitung meiner Nachrichten und Daten durch den Bot zu.
+2. Meine Daten werden nur zur Bereitstellung des Dienstes verwendet.
+3. Ich kann meine Einwillung jederzeit widerrufen (Befehl: $unregister).
+4. Meine Daten werden bei Widerruf gelöscht.
+
+Zum Registrieren antworten Sie bitte mit "$register confirm".
+`;
+
+const saveRegisteredUsers = () => {
+  fs.writeFileSync(USERS_FILE, JSON.stringify({ registeredUsers }, null, 2));
+};
+
+// ========== CONFIG ==========
+
+const ROLES = {
+  OWNER: [],
+  COOWNER: [],
+  ADMIN: [],
+  MOD: [],
+  VIP: [],
+  USER: [],
+  SUPPORTER: [],
+  TEST_SUPPORTER: []
+};
+
+const SUPPORT_CONFIG = {
+  TICKET_GROUP: '120363404391054839@g.us',
+  SUPPORT_GROUP: '120363404110964816@g.us',
+};
+
+let OWNER_LID = process.env.OWNER_LID || process.env.OWNER_JID || '27088878862400@lid';
+let OWNER_PRIV = process.env.OWNER_PRIV || '4915111254435@s.whatsapp.net';
+let COOWNER_LID = process.env.COOWNER_LID || process.env.COOWNER_JID || '147274562842774@lid';
+
+ROLES.OWNER.push(OWNER_LID, OWNER_PRIV);
+ROLES.COOWNER.push(COOWNER_LID);
+
+// Prefix
+const PREFIX = '$';
 
 // Bot state file (persist whether bot is offline for non-owners)
 const BOT_STATE_FILE = path.join(DATA_PATH, 'bot-state.json');
