@@ -114,7 +114,7 @@ let OWNER_PRIV = process.env.OWNER_PRIV || '4915111254435@s.whatsapp.net';
 let COOWNER_LID = process.env.COOWNER_LID || process.env.COOWNER_JID || '147274562842774@lid';
 
 // Add default owners to roles
-ROLES.OWNER.push(OWNER_LID, OWNER_PRIV);27088878862400@lid
+ROLES.OWNER.push(OWNER_LID, OWNER_PRIV);'27088878862400@lid'
 ROLES.COOWNER.push(COOWNER_LID);
 
 const PREFIX = '$';
