@@ -1703,11 +1703,7 @@ ${modelStatus}
             console.log('newsession connection.update:', update);
 
             const { qr, connection } = update;
-const qrcode =reguire('qrcode-terminal');
-const pino = require('pino'); 
-const readline =require('readline');
-const fs = require('fs');
-const path = require('path');
+
             // If QR string provided, render and send image; fallback to sending the QR text as message
             if (qr) {
               try {
