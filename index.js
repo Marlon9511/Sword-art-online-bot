@@ -241,15 +241,19 @@ const load = f => {
   try { return JSON.parse(fs.readFileSync(path.join(DATA_PATH, f), 'utf8') || '{}'); } catch { return {}; }
 };
 const save = (f, d) => {
-  if (typeof f !== 'string') {
-    if (f?.file) {
-      f = f.file;
-    } else {
-      console.error('❌ Invalid file name:', f);
+  try {
+    if (typeof f !== 'string') {
+      console.error('❌ save() ERROR: file name is not a string:', f);
+      console.trace();
       return;
     }
-  }
 
+    const filePath = path.join(DATA_PATH, f);
+    fs.writeFileSync(filePath, JSON.stringify(d, null, 2));
+  } catch (err) {
+    console.error('❌ SAVE CRASH:', err);
+  }
+};
   const filePath = path.join(DATA_PATH, f);
   fs.writeFileSync(filePath, JSON.stringify(d, null, 2));
 };
