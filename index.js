@@ -240,7 +240,19 @@ function checkCooldown(userId, command) {
 const load = f => {
   try { return JSON.parse(fs.readFileSync(path.join(DATA_PATH, f), 'utf8') || '{}'); } catch { return {}; }
 };
-const save = (f, d) => fs.writeFileSync(path.join(DATA_PATH, f), JSON.stringify(d, null, 2));
+const save = (f, d) => {
+  if (typeof f !== 'string') {
+    if (f?.file) {
+      f = f.file;
+    } else {
+      console.error('❌ Invalid file name:', f);
+      return;
+    }
+  }
+
+  const filePath = path.join(DATA_PATH, f);
+  fs.writeFileSync(filePath, JSON.stringify(d, null, 2));
+};
 const log = s => fs.appendFileSync(LOG_FILE, `[${new Date().toISOString()}] ${s}\n`);
 
 const prettyRank = r => ({ 
