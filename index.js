@@ -1654,7 +1654,7 @@ ${modelStatus}
             logger: P({ level: 'silent' }),
             printQRInTerminal: false,
             auth: state,
-            browser: ['RaptorBot MultiSession', 'Chrome', '4.0.0'],
+            browser: ['Sword-art-online-bot MultiSession', 'Chrome', '4.0.0'],
             markOnlineOnConnect: true
           });
 
