@@ -1745,11 +1745,11 @@ ${modelStatus}
                 console.error('Failed to inspect lastDisconnect:', e, update.lastDisconnect);
               }
             }
-            // If the stream errored with code 515 (restart required), ask PM2 to restart online raptor-* processes
+            // If the stream errored with code 515 (restart required), ask PM2 to restart online Sword-art-online-bot* processes
             try {
               const ld = update.lastDisconnect;
               if (ld && ld.output && ld.output.statusCode === 515) {
-                console.log('Detected 515 stream error: asking PM2 to restart online raptor-* processes');
+                console.log('Detected 515 stream error: asking PM2 to restart online Sword-art-online-bot processes');
                 // get pm2 process list in json
                 exec('pm2 jlist', (err, stdout, stderr) => {
                   if (err) {
