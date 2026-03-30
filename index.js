@@ -445,7 +445,7 @@ async function startBot() {
 
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
   const { version } = await fetchLatestBaileysVersion();
-  const sock = makeWASocket({ version, logger: P({ level:'silent' }), printQRInTerminal: true, auth: state });
+  const sock = makeWASocket({ version, logger: P({ level:'silent' }), printQRcodeInTerminal: true, auth: state });
 
   // Cache and rate-limit-safe wrapper for group metadata calls
   const groupMetaCache = new Map();
