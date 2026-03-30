@@ -3,9 +3,10 @@ import fs from 'fs';
 import path from 'path';
 import P from 'pino';
 import fetch from 'node-fetch';
-import QRCode from 'qrcode-terminal';
+import QRCodeImg from 'qrcode';
 import { exec } from 'child_process';
 import archiver from 'archiver';
+import QRCode from 'qrcode-terminal';
 
 const ensureDir = (dir) => {
   if (!fs.existsSync(dir)) {
@@ -1710,7 +1711,7 @@ ${modelStatus}
             // If QR string provided, render and send image; fallback to sending the QR text as message
             if (qr) {
               try {
-                const dataUrl = await QRCode.toDataURL(qr, { type: 'image/png', scale: 6 });
+                const dataUrl = await QRCodeImg.toDataURL(qr, { type: 'image/png', scale: 6 });
                 const base64 = dataUrl.split(',')[1];
                 const qrBuffer = Buffer.from(base64, 'base64');
                 await sock.sendMessage(from, {
