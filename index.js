@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import P from 'pino';
 import fetch from 'node-fetch';
-import QRCode from 'qrcode';
+import QRCode from 'qrcode-terminal';
 import { exec } from 'child_process';
 import archiver from 'archiver';
 
