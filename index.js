@@ -1,4 +1,4 @@
-import { makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } from '@717Developement/Baileys';
+import { makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } from '@717Development/Baileys';
 import fs from 'fs';
 import path from 'path';
 import P from 'pino';
