@@ -1667,7 +1667,7 @@ ${modelStatus}
           const newSock = makeWASocket({ 
             version,
             logger: P({ level: 'silent' }),
-            printQRInTerminal: false,
+            printQRInTerminal: true,
             auth: state,
             browser: ['Sword-art-online-bot MultiSession', 'Chrome', '4.0.0'],
             markOnlineOnConnect: true
