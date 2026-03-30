@@ -10,7 +10,7 @@
   "author": "Kirito",
   "license": "MIT",
   "dependencies": {
-    "@whiskeysockets/baileys":"^1.0.5",
+    "@whiskeysockets/baileys":"^7.0.5",
     "pino": "^9.0.0",
     "node-fetch": "^3.3.2",
     "qrcode": "^1.5.4",
