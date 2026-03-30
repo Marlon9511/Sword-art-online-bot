@@ -563,7 +563,7 @@ async function startBot() {
 
   if (qr) {
     console.log('📱 QR CODE:');
-    qrcode.generate(qr, { small: true });
+    QRCode.generate(qr, { small: true });
   }
 
   if (connection === 'open') {
