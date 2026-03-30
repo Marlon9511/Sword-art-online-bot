@@ -558,35 +558,23 @@ async function startBot() {
     }
   }
 
-  sock.ev.on('connection.update', ({ connection }) => {
-    if (connection === 'open') {
-      // Profil aktualisieren nach erfolgreicher Verbindung
-      updateBotProfile();
-      console.log('✅ Verbunden');
-      // Prüfe auf Neustart und sende Benachrichtigung
-      try {
-        const restartInfo = JSON.parse(fs.readFileSync(RESTART_FILE, 'utf8'));
-        if (restartInfo.timestamp && restartInfo.chatId) {
-          const timeSinceRestart = Date.now() - restartInfo.timestamp;
-          // Nur wenn der Neustart weniger als 30 Sekunden her ist
-          if (timeSinceRestart < 30000) {
-            sock.sendMessage(restartInfo.chatId, {
-              text: `✅ Bot wurde erfolgreich neugestartet!`,
-              mentions: restartInfo.initiator ? [restartInfo.initiator] : undefined
-            });
-          }
-        }
-        // Lösche die Restart-Info nach dem Senden
-        fs.writeFileSync(RESTART_FILE, JSON.stringify({}));
-      } catch (e) {
-        console.error('Fehler beim Senden der Neustart-Nachricht:', e);
-      }
-    }
-    if (connection === 'close') {
-      console.log('⚠ Verbindung geschlossen — neu verbinden in 3s');
-      setTimeout(()=>startBot(), 3000);
-    }
-  });
+ sock.ev.on('connection.update', (update) => {
+  const { connection, qr } = update;
+
+  if (qr) {
+    console.log('📱 QR CODE:');
+    qrcode.generate(qr, { small: true });
+  }
+
+  if (connection === 'open') {
+    console.log('✅ Verbunden');
+  }
+
+  if (connection === 'close') {
+    console.log('⚠ Verbindung geschlossen — neu verbinden in 3s');
+    setTimeout(() => startBot(), 3000);
+  }
+});
   sock.ev.on('creds.update', saveCreds);
 
   // --- Reliable Welcome Message Handler ---
