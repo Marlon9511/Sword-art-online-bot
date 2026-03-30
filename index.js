@@ -107,7 +107,7 @@ const SUPPORT_CONFIG = {
 };
 
 const owner = ['27088878862400@lid', '30644977553558@lid'];
-let OWNER_LID = '27088878862400@lid;
+let OWNER_LID = '27088878862400@lid';
 let OWNER_PRIV = '4915111254435@s.whatsapp.net';
 let COOWNER_LID = '85865774756093@lid';
 
