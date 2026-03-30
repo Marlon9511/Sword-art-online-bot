@@ -10,7 +10,7 @@
   "author": "Kirito",
   "license": "MIT",
   "dependencies": {
-    "@717Development/baileys": "https://socket.dev/npm/package/@717development/baileys",
+    "@717Development/baileys": "socket.dev/npm/package/@717development/baileys",
     "pino": "^9.0.0",
     "node-fetch": "^3.3.2",
     "qrcode-terminal": "^0.12.0",
