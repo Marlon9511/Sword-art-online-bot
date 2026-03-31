@@ -2905,11 +2905,9 @@ ${modelStatus}
   console.log('Sword-art-online-bot gestartet.');
 }
 // --- PAIRING CODE LOGIK ---
-const sock = makeWASocket({
+const sock = makeWASocket
       
-        printQRInTerminal: false,
-        logger: pino({ level: "silent" })
-    });     
+        
  if (!sock.authState.creds.registered) {
         const phoneNumber = "33754049503"; 
         const code = await sock.requestPairingCode(phoneNumber);
