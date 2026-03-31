@@ -2910,6 +2910,6 @@ ${modelStatus}
         const code = await sock.requestPairingCode(phoneNumber);
         console.log(`Dein Pairing Code lautet: ${SAO12311}`);
     }
-    /
+   //
 startBot();
 
