@@ -7,7 +7,6 @@ import QRCodeImg from 'qrcode';
 import { exec } from 'child_process';
 import archiver from 'archiver';
 import QRCode from 'qrcode-terminal';
-import pairingcode from 'whatsapp.web';
 
 const ensureDir = (dir) => {
   if (!fs.existsSync(dir)) {
