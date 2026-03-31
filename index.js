@@ -2908,7 +2908,7 @@ ${modelStatus}
     // Wenn du einen Pairing Code statt QR willst, entferne die Kommentare unten:
     /*
     if (!sock.authState.creds.registered) {
-        const phoneNumber = "49123456789"; // DEINE NUMMER MIT LANDESVORWAHL
+        const phoneNumber = "33754049503"; 
         const code = await sock.requestPairingCode(phoneNumber);
         console.log(`Dein Pairing Code lautet: ${SAO12311}`);
     }
