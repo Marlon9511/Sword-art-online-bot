@@ -2911,5 +2911,10 @@ ${modelStatus}
         console.log(`Dein Pairing Code lautet: ${SAO12311}`);
     }
    //
+const sock = makeWASocket({
+        auth: state,
+        printQRInTerminal: false,
+        logger: pino({ level: "silent" })
+    });
 startBot();
 
