@@ -2906,7 +2906,7 @@ ${modelStatus}
 }
 // --- PAIRING CODE LOGIK ---
 const sock = makeWASocket({
-        auth: state,
+      
         printQRInTerminal: false,
         logger: pino({ level: "silent" })
     });     
