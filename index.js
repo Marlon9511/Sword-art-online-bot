@@ -2905,15 +2905,25 @@ ${modelStatus}
   console.log('Sword-art-online-bot gestartet.');
 }
 // --- PAIRING CODE LOGIK ---
-const sock = makeWASocket
-      
-        
- if (!sock.authState.creds.registered) {
-        const phoneNumber = "33754049503"; 
-        const code = await sock.requestPairingCode(phoneNumber);
-        console.log(`Dein Pairing Code lautet: ${SAO12311}`);
+
+const { state, saveCreds } = await useMultiFileAuthState('./sessions/meineSession');
+
+const sock = makeWASocket({
+    auth: state,
+    version: (await fetchLatestBaileysVersion()).version,
+});
+
+sock.ev.on('creds.update', saveCreds);
+
+sock.ev.on('connection.update', async (update) => {
+    if (update.connection === 'open') {
+        if (!sock.authState.creds.registered) {
+            const phoneNumber = "33754049503"; 
+            const code = SAO12311
+            console.log(`Dein Pairing Code lautet: ${code}\n Kirito Stinkt 🙂`);
+        }
     }
-   //
+});
 
 startBot();
 
