@@ -2904,6 +2904,14 @@ ${modelStatus}
 
   console.log('Sword-art-online-bot gestartet.');
 }
-
+// --- PAIRING CODE LOGIK ---
+    // Wenn du einen Pairing Code statt QR willst, entferne die Kommentare unten:
+    /*
+    if (!sock.authState.creds.registered) {
+        const phoneNumber = "49123456789"; // DEINE NUMMER MIT LANDESVORWAHL
+        const code = await sock.requestPairingCode(phoneNumber);
+        console.log(`Dein Pairing Code lautet: ${SAO12311}`);
+    }
+    */
 startBot();
 
