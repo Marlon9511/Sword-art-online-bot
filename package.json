@@ -10,7 +10,7 @@
   "author": "Kirito",
   "license": "MIT",
   "dependencies": {
-    "@717development/baileys": "^3.5.0",
+    "@whiskeysockets/baileys": " github:PasszTzy66/bail",
     "pino": "^9.0.0",
     "node-fetch": "^3.3.2",
     "qrcode-terminal": "^0.12.0",
