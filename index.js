@@ -559,7 +559,7 @@ async function startBot() {
     }
   }
 
- sock.ev.on('connection.update', (update) => {
+ sock.ev.on('connection.update', async (update) => {  // ✅ Add async here {
   const { connection, qr } = update;
 
   if (qr) {
