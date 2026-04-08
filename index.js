@@ -564,8 +564,21 @@ async function startBot() {
 
   if (qr) {
     console.log('📱 QR CODE:');
-    QRCodeImg.generate(qr, { small: true });
+    if (qr) {
+  try {
+    const dataUrl = await QRCodeImg.toDataURL(qr, { type: 'image/png', scale: 4 });
+    const base64 = dataUrl.split(',')[1];
+    const qrBuffer = Buffer.from(base64, 'base64');
+    await sock.sendMessage(from, {
+      image: qrBuffer,
+      caption: '🤖 QR-Code zum Scannen'
+    });
+  } catch (err) {
+    console.error('QR generation error:', err);
+    // Fallback to terminal
+    QRCode.generate(qr, { small: true });
   }
+}
 
   if (connection === 'open') {
     console.log('✅ Verbunden');
