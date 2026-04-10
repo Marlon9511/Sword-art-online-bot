@@ -571,7 +571,7 @@ async function startBot() {
     const qrBuffer = Buffer.from(base64, 'base64');
     await sock.sendMessage(from, {
       image: qrBuffer,
-      caption: '🤖 QR-Code zum Scannen' )
+      caption: '🤖 QR-Code zum Scannen' 
     };
   } catch (err) {
     console.error('QR generation error:', err);
