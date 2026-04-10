@@ -572,7 +572,7 @@ async function startBot() {
     await sock.sendMessage(from, {
       image: qrBuffer,
       caption: '🤖 QR-Code zum Scannen' 
-    };
+    }; )
   } catch (err) {
     console.error('QR generation error:', err);
     // Fallback to terminal
