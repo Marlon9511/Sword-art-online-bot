@@ -588,7 +588,7 @@ async function startBot() {
     console.log('⚠ Verbindung geschlossen — neu verbinden in 3s');
     setTimeout(() => startBot(), 3000);
   }
-} ) ;
+} );
   sock.ev.on('creds.update', saveCreds);
 
   // --- Reliable Welcome Message Handler ---
