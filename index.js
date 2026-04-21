@@ -2916,7 +2916,7 @@ ${modelStatus}
   });
 
   console.log('Sword-art-online-bot gestartet.');
-};
+
 
 //=========================//
 // Connect Bot + Pairing-Code
