@@ -2016,7 +2016,7 @@ ${modelStatus}
           mentions: [targetJid]
         });
       }
-});
+);
       // WORK
       if (cmd === 'work') {
         const earn = randInt(50, 200);
