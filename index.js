@@ -2947,5 +2947,5 @@ async function connectBot() {
         } else if (connection === "open") {
             console.log(chalk.green("✅Sword-art-online-bot Verbunden mit WhatsApp!"));
             console.log(chalk.green("-----------------------------------------"));
-"startBot"),
+"startBot",
 
