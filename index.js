@@ -2917,5 +2917,34 @@ ${modelStatus}
 
   console.log('Sword-art-online-bot gestartet.');
 }
-,"startBot"),
+//=========================//
+// Connect Bot + Pairing-Code
+//=========================//
+async function connectBot() {
+    const { state, saveCreds } = await useMultiFileAuthState("./auth");
 
+    const sock = makeWASocket({
+        auth: state,
+        printQRInTerminal: false,
+        logger: pino({ level: "silent" })
+    });
+
+    if (!sock.authState.creds.registered) {
+        let phoneNumber = await question(gradient("#ff0000", "#C00000")("📲 Deine Nummer (inkl. Ländervorwahl, z.B. +49123456789): "));
+        phoneNumber = phoneNumber.replace(/[^0-9]/g, "");
+
+        let code = await sock.requestPairingCode(phoneNumber, "AAAAAAAA");
+        code = code?.match(/.{1,4}/g)?.join("-") || code;
+        console.log(gradient("#ff0000", "#C00000")("🔑 Pairing Code: " + code));
+    }
+
+    sock.ev.on("connection.update", (update) => {
+        const { connection } = update;
+        if (connection === "close") {
+            console.log(chalk.red("❌ Verbindung geschlossen, reconnect..."));
+            setTimeout(connectBot, 5000);
+        } else if (connection === "open") {
+            console.log(chalk.green("✅Sword-art-online-bot Verbunden mit WhatsApp!"));
+            console.log(chalk.green("-----------------------------------------"));
+,"startBot"),
+}
