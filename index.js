@@ -2950,5 +2950,5 @@ async function connectBot() {
 connectBot();
 };
 
-};'
+
 
