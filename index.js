@@ -2952,4 +2952,4 @@ async function connectBot() {
 
 connectBot();
 }
-})
+});
