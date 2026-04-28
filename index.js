@@ -2948,10 +2948,10 @@ async function connectBot() {
         } else if (connection === "open") {
             console.log(chalk.green("✅Sword-art-online-bot Verbunden mit WhatsApp!"));
             console.log(chalk.green("-----------------------------------------"));
+        } // <- diese Klammer für das if(connection) fehlte
+    }); // <- diese Klammer für sock.ev.on fehlte
+
+    sock.ev.on("creds.update", saveCreds); // <- Das solltest du noch ergänzen, sonst speichert er den Login nicht
+} // <- diese Klammer für function connectBot fehlte
 
 connectBot();
-
-
-
-
-
