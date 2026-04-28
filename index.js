@@ -2951,7 +2951,7 @@ async function connectBot() {
     
 }
 connectBot();
-};
+};'
 
 
 
