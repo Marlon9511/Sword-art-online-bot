@@ -2924,6 +2924,9 @@ ${modelStatus}
 //=========================//
 async function connectBot() {
     const { state, saveCreds } = await useMultiFileAuthState("./auth");
+function connectBot(question) {
+  console.log(question);
+}
 
     const sock = makeWASocket({
         auth: state,
@@ -2946,10 +2949,12 @@ async function connectBot() {
             console.log(chalk.red("❌ Verbindung geschlossen, reconnect..."));
             setTimeout(connectBot, 5000);
         } else if (connection === "open") {
-            console.log(chalk.green("✅Sword-art-online-bot Verbunden mit WhatsApp!"));
-            console.log(chalk.green("-----------------------------------------"));
- 
+            console.log(chalk.green("✅ bot Verbunden mit WhatsApp!"));
+        }
+    });
+}
 
 connectBot();
+async function startBot() {
+startBot();
 }
-});
