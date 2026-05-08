@@ -2956,4 +2956,5 @@ function connectBot(question) {
  
 async function startBot() {
 startBot();
- }
+ };
+}
