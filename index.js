@@ -2953,8 +2953,8 @@ function connectBot(question) {
         }
     });
 }
- 
+
+connectBot();
 async function startBot() {
 startBot();
- };
 }
