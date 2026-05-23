@@ -2952,7 +2952,7 @@ function connectBot(question) {
             console.log(chalk.green("✅ bot Verbunden mit WhatsApp!"));
         }
     });
-}
+
 
 connectBot();
 async function startBot() {
