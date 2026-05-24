@@ -8,6 +8,7 @@ import { exec } from 'child_process';
 import archiver from 'archiver';
 import QRCode from 'qrcode-terminal';
 import chalk from 'chalk';
+import readline from "readline";
 
 const ensureDir = (dir) => {
   if (!fs.existsSync(dir)) {
