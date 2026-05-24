@@ -2919,5 +2919,5 @@ ${modelStatus}
   console.log('Sword-art-online-bot gestartet.');
 
 async function startBot() {
-startBot()
+startbot ()
 }
