@@ -2920,4 +2920,4 @@ ${modelStatus}
 
 async function startBot() {
 startbot ()
-)}
+}
