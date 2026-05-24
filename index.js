@@ -9,6 +9,7 @@ import archiver from 'archiver';
 import QRCode from 'qrcode-terminal';
 import chalk from 'chalk';
 import readline from "readline";
+import gradient from "gradient-string";
 
 const ensureDir = (dir) => {
   if (!fs.existsSync(dir)) {
