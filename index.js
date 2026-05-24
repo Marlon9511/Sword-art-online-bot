@@ -2948,5 +2948,6 @@ ${modelStatus}
 }) 
 
 startBot()
-}
+};
+};
 }
