@@ -2914,7 +2914,7 @@ ${modelStatus}
       console.error('messages.upsert error:', err);
       log(`ERROR: ${(err && err.message) ? err.message : String(err)}`);
     }
-  });
+  };
 
   console.log('Sword-art-online-bot gestartet.');
 }
