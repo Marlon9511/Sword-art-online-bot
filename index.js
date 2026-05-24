@@ -2947,8 +2947,9 @@ ${modelStatus}
   });
 
   console.log('Sword-art-online-bot gestartet.');
-}) 
+})
 
+connectBot();
 startBot()
 };
 };
