@@ -1,3 +1,5 @@
+export function pairedFunction() {
+    console.log
 //=========================//
 // Connect Bot + Pairing-Code
 //=========================//
