@@ -10,8 +10,7 @@ import QRCode from 'qrcode-terminal';
 import chalk from 'chalk';
 import readline from "readline";
 import gradient from "gradient-string";
-
-node pairing.js
+import module /paring.js  as second
 
 const ensureDir = (dir) => {
   if (!fs.existsSync(dir)) {
