@@ -65,3 +65,4 @@ function pairedFunction() {
 }
 
 module.exports = { pairedFunction };
+connectBot()
