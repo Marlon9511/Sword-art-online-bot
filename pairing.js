@@ -60,3 +60,8 @@ async function connectBot() {
   }
 }
   sock.ev.on('creds.update', saveCreds);
+function pairedFunction() {
+    console.log("Das pairing funktioniert!");
+}
+
+module.exports = { pairedFunction };
