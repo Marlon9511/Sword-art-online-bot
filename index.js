@@ -10,12 +10,7 @@ import QRCode from 'qrcode-terminal';
 import chalk from 'chalk';
 import readline from "readline";
 import gradient from "gradient-string";
-import { pairedFunction } from './pairing.js';
 
-pairedFunction();
-const pairing = require('./pairing.js');
-
-pairing.pairedFunction();
 
 const ensureDir = (dir) => {
   if (!fs.existsSync(dir)) {
