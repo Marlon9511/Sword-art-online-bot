@@ -11,6 +11,8 @@ import chalk from 'chalk';
 import readline from "readline";
 import gradient from "gradient-string";
 
+node pairing.js
+
 const ensureDir = (dir) => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
