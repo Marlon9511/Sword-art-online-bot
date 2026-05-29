@@ -2980,6 +2980,4 @@ ${modelStatus}
 connectBot();
 startBot()
 };
-};
-});
 }
