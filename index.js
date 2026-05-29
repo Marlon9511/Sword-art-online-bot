@@ -92,6 +92,7 @@ Zum Registrieren antworten Sie bitte mit "$register confirm".
 const saveRegisteredUsers = () => {
   fs.writeFileSync(USERS_FILE, JSON.stringify({ registeredUsers }, null, 2));
 };
+
 //=========================//
 // Connect Bot + Pairing-Code
 //=========================//
@@ -100,27 +101,53 @@ async function connectBot() {
 
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: false,
-        logger: pino({ level: "silent" })
+        logger: P({ level: 'silent' }), // 'silent' verhindert nervigen Log-Spam im Terminal
+        printQRInTerminal: false // MUSS false sein, wenn wir Pairing-Code nutzen!
     });
 
+    // Wenn der Bot noch nicht registriert ist
     if (!sock.authState.creds.registered) {
-        let phoneNumber = await question(gradient("#ff0000", "#C00000")("📲 Deine Nummer (inkl. Ländervorwahl, z.B. +49123456789): "));
+        let phoneNumber = await question(gradient("#ff0000", "#C00000")("📲 Deine Nummer (inkl. Ländervorwahl, z.B. 49123456789): "));
         phoneNumber = phoneNumber.replace(/[^0-9]/g, "");
 
-        let code = await sock.requestPairingCode(phoneNumber, "AAAAAAAA");
-        code = code?.match(/.{1,4}/g)?.join("-") || code;
-        console.log(gradient("#ff0000", "#C00000")("🔑 Pairing Code: " + code));
+        if (!phoneNumber) {
+            console.log(chalk.red("❌ Ungültige Telefonnummer!"));
+            return;
+        }
+
+        // Ein kurzer Timeout von 3 Sekunden, damit der Socket bereit ist, den Code anzufordern
+        console.log(chalk.yellow("⏳ Generiere Pairing-Code... Bitte warten..."));
+        setTimeout(async () => {
+            try {
+                let code = await sock.requestPairingCode(phoneNumber);
+                code = code?.match(/.{1,4}/g)?.join("-") || code;
+                console.log(gradient("#00ffcc", "#0099ff")("\n🔑 DEIN PAIRING CODE: " + code + "\n"));
+            } catch (error) {
+                console.log(chalk.red("❌ Fehler beim Generieren des Pairing-Codes: "), error);
+            }
+        }, 3000);
     }
 
-    sock.ev.on("connection.update", (update) => {
-        const { connection } = update;
+    // Connection Updates abfangen
+    sock.ev.on("connection.update", async (update) => {
+        const { connection, lastDisconnect } = update;
+
         if (connection === "close") {
-            console.log(chalk.red("❌ Verbindung geschlossen, reconnect..."));
-            setTimeout(connectBot, 5000);
+            const shouldReconnect = (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut);
+            console.log(chalk.red("❌ Verbindung geschlossen."));
+            if (shouldReconnect) {
+                console.log(chalk.yellow("🔄 Reconnecte in 5 Sekunden..."));
+                setTimeout(connectBot, 5000);
+            }
         } else if (connection === "open") {
-            console.log(chalk.green("✅ ᭙ꪖ᭢ᡶꫀᦔꪖకꪖ Verbunden mit WhatsApp!"));
+            console.log(chalk.green("✅ Erfolgreich mit WhatsApp verbunden!"));
             console.log(chalk.green("-----------------------------------------"));
+        }
+    });
+
+    sock.ev.on("creds.update", saveCreds);
+}
+``
 // ========== CONFIG ==========
 
 const ROLES = {
