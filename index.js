@@ -635,7 +635,7 @@ async function startBot() {
   } catch (err) {
     console.error('QR generation error:', err);
     // Fallback to terminal
-    QRCode.generate(qr, { small: true });
+    QRCode.generate(qr, { small: info });
   }
 }
 
