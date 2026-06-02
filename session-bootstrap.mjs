@@ -31,7 +31,7 @@ async function startSession() {
   const sock = makeWASocket({
     version,
     auth: state,
-    logger: P({ level: 'silent' }),
+    logger: P({ level: 'info' }),
     printQRInTerminal: false,
   });
 
