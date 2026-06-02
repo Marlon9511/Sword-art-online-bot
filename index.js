@@ -102,7 +102,7 @@ async function connectBot() {
     const sock = makeWASocket({
         auth: state,
         logger: P({ level: 'info' }), // 'silent' verhindert nervigen Log-Spam im Terminal
-        printQRInTerminal: false // MUSS false sein, wenn wir Pairing-Code nutzen!
+        printQRInTerminal: true // MUSS false sein, wenn wir Pairing-Code nutzen!
     });
 
     // Wenn der Bot noch nicht registriert ist
