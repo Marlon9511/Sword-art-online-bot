@@ -1595,30 +1595,24 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
         return send(`✅ ${jid} demoted.`);
       }
 
- if (cmd === 'setrank') {
+if (cmd === 'setrank') {
   if (!isOwner) return send('❌ Nur der Inhaber.');
-
-  const allowed = ['OWNER', 'COOWNER', 'ADMIN', 'MOD', 'VIP', 'USER', 'SUPPORTER', 'TEST_SUPPORTER'];
   const r = (args[args.length - 1] || '').toUpperCase();
+  if (!r) return send('Usage: $setrank <@mention|num|jid> <OWNER|COOWNER|ADMIN|MOD|VIP|USER>');
 
-  if (!r || !allowed.includes(r)) return send('❌ Ungültiger Rang. Verfügbar: ' + allowed.join(', '));
+  const allowed = ['OWNER', 'COOWNER', 'ADMIN', 'MOD', 'VIP', 'USER'];
+  if (!allowed.includes(r)) return send('Ungültiger Rang.');
 
-  // JID aus @-Markierung (mehrere Wege probieren)
+  // JID aus @-Markierung, Nummer oder direkt
   let jid;
-  const mentioned =
-    msg.message?.extendedTextMessage?.contextInfo?.mentionedJid ||
-    msg.message?.imageMessage?.contextInfo?.mentionedJid ||
-    msg.message?.conversation?.contextInfo?.mentionedJid ||
-    msg.mentionedJid ||
-    null;
-
+  const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid;
   if (mentioned && mentioned.length > 0) {
-    jid = mentioned[0];
-  } else if (args.length >= 2) {
+    jid = mentioned[0]; // erste @-Markierung verwenden
+  } else {
     jid = normalizeJid(args[0]);
   }
 
-  if (!jid) return send('Usage: $setrank <@mention|num|jid> <RANG>\nVerfügbar: ' + allowed.join(', '));
+  if (!jid) return send('Usage: $setrank <@mention|num|jid> <OWNER|COOWNER|ADMIN|MOD|VIP|USER>');
 
   if (r === 'OWNER') {
     for (const k of Object.keys(ranks)) { if (ranks[k] === 'OWNER') ranks[k] = 'USER'; }
@@ -1630,14 +1624,6 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
   } else {
     ranks[jid] = r;
   }
-
-  try {
-    save(FILES.ranks, ranks);
-    save(FILES.owner, { ownerLid: OWNER_LID, ownerPriv: OWNER_PRIV, coownerLid: COOWNER_LID });
-  } catch (e) {}
-
-  return send(`✅ Rang von ${jid} auf ${r} gesetzt.`);
-}
 
   try {
     save(FILES.ranks, ranks);
