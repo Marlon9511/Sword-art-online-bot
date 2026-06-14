@@ -1595,26 +1595,43 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
         return send(`✅ ${jid} demoted.`);
       }
 
-      if (cmd === 'setrank') {
-        if (!isOwner) return send('❌ Nur der Inhaber.');
-        const t = args[0]; const r = (args[1] || '').toUpperCase();
-        if (!t || !r) return send('Usage: $setrank <num|jid> <OWNER|COOWNER|ADMIN|MOD|VIP|USER>');
-        const jid = normalizeJid(t);
-        const allowed = ['OWNER', 'COOWNER', 'ADMIN', 'MOD', 'VIP', 'USER'];
-        if (!allowed.includes(r)) return send('Ungültiger Rang.');
-        if (r === 'OWNER') {
-          for (const k of Object.keys(ranks)) { if (ranks[k] === 'OWNER') ranks[k] = 'USER'; }
-          ranks[jid] = 'OWNER'; OWNER_LID = jid;
-          if (jid.endsWith('@s.whatsapp.net')) OWNER_PRIV = jid;
-        } else if (r === 'COOWNER') {
-          for (const k of Object.keys(ranks)) { if (ranks[k] === 'COOWNER') ranks[k] = 'USER'; }
-          ranks[jid] = 'COOWNER'; COOWNER_LID = jid;
-        } else {
-          ranks[jid] = r;
-        }
-        try { save(FILES.ranks, ranks); save(FILES.owner, { ownerLid: OWNER_LID, ownerPriv: OWNER_PRIV, coownerLid: COOWNER_LID }); } catch (e) {}
-        return send(`✅ Rang von ${jid} auf ${r} gesetzt.`);
-      }
+ if (cmd === 'setrank') {
+  if (!isOwner) return send('❌ Nur der Inhaber.');
+  const r = (args[args.length - 1] || '').toUpperCase();
+  if (!r) return send('Usage: $setrank <@mention|num|jid> <OWNER|COOWNER|ADMIN|MOD|VIP|USER>');
+
+  const allowed = ['OWNER', 'COOWNER', 'ADMIN', 'MOD', 'VIP', 'USER'];
+  if (!allowed.includes(r)) return send('Ungültiger Rang.');
+
+  // JID aus @-Markierung, Nummer oder direkt
+  let jid;
+  const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid;
+  if (mentioned && mentioned.length > 0) {
+    jid = mentioned[0]; // erste @-Markierung verwenden
+  } else {
+    jid = normalizeJid(args[0]);
+  }
+
+  if (!jid) return send('Usage: $setrank <@mention|num|jid> <OWNER|COOWNER|ADMIN|MOD|VIP|USER>');
+
+  if (r === 'OWNER') {
+    for (const k of Object.keys(ranks)) { if (ranks[k] === 'OWNER') ranks[k] = 'USER'; }
+    ranks[jid] = 'OWNER'; OWNER_LID = jid;
+    if (jid.endsWith('@s.whatsapp.net')) OWNER_PRIV = jid;
+  } else if (r === 'COOWNER') {
+    for (const k of Object.keys(ranks)) { if (ranks[k] === 'COOWNER') ranks[k] = 'USER'; }
+    ranks[jid] = 'COOWNER'; COOWNER_LID = jid;
+  } else {
+    ranks[jid] = r;
+  }
+
+  try {
+    save(FILES.ranks, ranks);
+    save(FILES.owner, { ownerLid: OWNER_LID, ownerPriv: OWNER_PRIV, coownerLid: COOWNER_LID });
+  } catch (e) {}
+
+  return send(`✅ Rang von ${jid} auf ${r} gesetzt.`);
+}
 
       if (cmd === 'datadelete') {
         if (!isOwner) return send('❌ Nur der Inhaber.');
