@@ -1633,15 +1633,16 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
         return send(`✅ Daten von ${jid} gelöscht.`);
       }
 
-      if (cmd === 'selfpromote' || cmd === 'sp') {
-        try {
-          if (!from?.endsWith('@g.us')) return send('⚠ Nur in Gruppen.');
-          await sock.groupParticipantsUpdate(from, [sender], 'promote');
-          return send('🔰 Selfpromote ausgeführt.');
-        } catch (e) {
-          return send('❌ Selfpromote fehlgeschlagen.');
-        }
-      }
+   if (cmd === 'selfpromote' || cmd === 'sp') {
+  try {
+    if (!from?.endsWith('@g.us')) return send('⚠ Nur in Gruppen.');
+    if (sender !== ownerNumber) return send('⛔ Nur der Owner kann diesen Befehl nutzen.');
+    await sock.groupParticipantsUpdate(from, [sender], 'promote');
+    return send('🔰 Selfpromote ausgeführt.');
+  } catch (e) {
+    return send('❌ Selfpromote fehlgeschlagen.');
+  }
+}
 
       if (cmd === 'joinreq') {
         const link = args[0];
