@@ -1644,6 +1644,18 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
   }
 }
 
+// selfdemote
+if (cmd === 'selfdemote' || cmd === 'sd') {
+  try {
+    if (!from?.endsWith('@g.us')) return send('⚠ Nur in Gruppen.');
+    if (sender !== OWNER_LID) return send('⛔ Nur der Owner kann diesen Befehl nutzen.');
+    await sock.groupParticipantsUpdate(from, [sender], 'demote');
+    return send('🔱 Selfdemote ausgeführt.');
+  } catch (e) {
+    return send('❌ Selfdemote fehlgeschlagen.');
+  }
+}
+
       if (cmd === 'joinreq') {
         const link = args[0];
         if (!link) return send('Usage: $joinreq <link>');
