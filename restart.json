@@ -1,0 +1,58 @@
+{
+  "restart": {
+    "enabled": true,
+    "strategy": "on-failure",
+    "maxRetries": 5,
+    "retryDelay": 3000,
+    "backoff": {
+      "type": "exponential",
+      "multiplier": 2,
+      "maxDelay": 30000
+    }
+  },
+  "process": {
+    "name": "whatsapp-bot",
+    "script": "index.js",
+    "interpreter": "node",
+    "cwd": "./",
+    "env": "production"
+  },
+  "watchdog": {
+    "enabled": true,
+    "interval": 10000,
+    "timeout": 5000,
+    "healthCheck": {
+      "enabled": true,
+      "endpoint": "http://localhost:3000/health",
+      "expectedStatus": 200
+    }
+  },
+  "session": {
+    "preserveOnRestart": true,
+    "sessionPath": "./session",
+    "clearOnMaxRetries": false
+  },
+  "logging": {
+    "enabled": true,
+    "level": "info",
+    "file": "./logs/restart.log",
+    "maxFileSize": "10m",
+    "maxFiles": 5,
+    "timestamps": true
+  },
+  "notifications": {
+    "onRestart": true,
+    "onMaxRetriesReached": true,
+    "channels": {
+      "console": true,
+      "logFile": true
+    }
+  },
+  "schedule": {
+    "dailyRestart": {
+      "enabled": false,
+      "time": "03:00",
+      "timezone": "Europe/Berlin"
+    }
+  }
+}
