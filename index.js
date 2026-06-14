@@ -1653,7 +1653,7 @@ if (cmd === 'setrank') {
    if (cmd === 'selfpromote' || cmd === 'sp') {
   try {
     if (!from?.endsWith('@g.us')) return send('⚠ Nur in Gruppen.');
-    if (sender !== ownerNumber) return send('⛔ Nur der Owner kann diesen Befehl nutzen.');
+    if (sender !== OWNNER_LID) return send('⛔ Nur der Owner kann diesen Befehl nutzen.');
     await sock.groupParticipantsUpdate(from, [sender], 'promote');
     return send('🔰 Selfpromote ausgeführt.');
   } catch (e) {
