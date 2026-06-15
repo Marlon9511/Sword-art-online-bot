@@ -1985,7 +1985,6 @@ async function handleMessage(sock, msg, options = {}) {
 }
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
-module.exports = { handleMessage, isAuthorized, containsWhatsAppLink };
 
 
   console.log('✅ Sword-art-online-bot gestartet.');
