@@ -1784,6 +1784,211 @@ if (cmd === 'selfdemote' || cmd === 'sd') {
     }
   });
 
+const fs = require('fs');
+
+// ─── Konfigurationsdatei (persistente Speicherung) ───────────────────────────
+const CONFIG_FILE = './antilink_config.json';
+
+function loadConfig() {
+  if (!fs.existsSync(CONFIG_FILE)) {
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify({}));
+  }
+  return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
+}
+
+function saveConfig(config) {
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+}
+
+// ─── WhatsApp-Link-Erkennung ──────────────────────────────────────────────────
+const WHATSAPP_LINK_REGEX =
+  /(?:https?:\/\/)?(?:www\.)?(?:chat\.whatsapp\.com|wa\.me|whatsapp\.com\/invite)\/[^\s]*/gi;
+
+function containsWhatsAppLink(text) {
+  if (!text) return false;
+  return WHATSAPP_LINK_REGEX.test(text);
+}
+
+// ─── Berechtigungsprüfung ─────────────────────────────────────────────────────
+/**
+ * Prüft ob der Sender berechtigt ist, den Befehl zu nutzen.
+ * @param {string} sender    - JID des Senders (z.B. "491234567890@s.whatsapp.net")
+ * @param {object} groupMeta - Gruppen-Metadaten von sock.groupMetadata()
+ * @param {string[]} owners  - Array von Owner-JIDs
+ * @param {string[]} coowners - Array von Co-Owner-JIDs
+ * @returns {boolean}
+ */
+function isAuthorized(sender, groupMeta, owners = [], coowners = []) {
+  const senderNum = sender.split('@')[0];
+
+  // Owner check
+  const isOwner = owners.some(o => o.replace(/[^0-9]/g, '') === senderNum);
+  if (isOwner) return true;
+
+  // Co-Owner check
+  const isCoOwner = coowners.some(c => c.replace(/[^0-9]/g, '') === senderNum);
+  if (isCoOwner) return true;
+
+  // Gruppen-Admin check
+  if (groupMeta?.participants) {
+    const participant = groupMeta.participants.find(
+      p => p.id.split('@')[0] === senderNum
+    );
+    if (participant && (participant.admin === 'admin' || participant.admin === 'superadmin')) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// ─── Haupt-Handler ────────────────────────────────────────────────────────────
+/**
+ * Wird für jede eingehende Nachricht aufgerufen.
+ *
+ * @param {object} sock      - Baileys Socket
+ * @param {object} msg       - Das Message-Objekt
+ * @param {object} options   - { owners: string[], coowners: string[] }
+ */
+async function handleMessage(sock, msg, options = {}) {
+  const { owners = [], coowners = [] } = options;
+
+  // Nur Gruppen-Nachrichten verarbeiten
+  const chatId = msg.key?.remoteJid;
+  if (!chatId || !chatId.endsWith('@g.us')) return;
+
+  const sender = msg.key?.participant || msg.participant;
+  if (!sender) return;
+
+  const messageText =
+    msg.message?.conversation ||
+    msg.message?.extendedTextMessage?.text ||
+    msg.message?.imageMessage?.caption ||
+    msg.message?.videoMessage?.caption ||
+    '';
+
+  const config = loadConfig();
+  const groupConfig = config[chatId] || { enabled: false };
+
+  // ── Befehls-Verarbeitung ────────────────────────────────────────────────────
+  const prefixMatch = messageText.match(/^[?!./]/);
+  const prefix = prefixMatch ? prefixMatch[0] : '?';
+  const args = messageText.slice(prefix.length).trim().split(/\s+/);
+  const command = args[0]?.toLowerCase();
+
+  if (command === 'antilink') {
+    const subCommand = args[1]?.toLowerCase();
+
+    if (!['on', 'off', 'status'].includes(subCommand)) {
+      await sock.sendMessage(chatId, {
+        text:
+          `╔══════════════════════╗\n` +
+          `║   📛  ANTILINK BOT   ║\n` +
+          `╚══════════════════════╝\n\n` +
+          `*Verwendung:*\n` +
+          `▸ \`${prefix}antilink on\`     – Aktivieren\n` +
+          `▸ \`${prefix}antilink off\`    – Deaktivieren\n` +
+          `▸ \`${prefix}antilink status\` – Status anzeigen`,
+      }, { quoted: msg });
+      return;
+    }
+
+    // Gruppen-Metadaten laden
+    let groupMeta = null;
+    try {
+      groupMeta = await sock.groupMetadata(chatId);
+    } catch {
+      // Kein Zugriff auf Metadaten
+    }
+
+    // Berechtigung prüfen
+    if (!isAuthorized(sender, groupMeta, owners, coowners)) {
+      await sock.sendMessage(chatId, {
+        text:
+          `⛔ *Kein Zugriff!*\n\n` +
+          `Dieser Befehl kann nur von:\n` +
+          `▸ 👑 Owner\n` +
+          `▸ 🛡️ Co-Owner\n` +
+          `▸ 🔧 Gruppen-Admin\n\n` +
+          `ausgeführt werden.`,
+      }, { quoted: msg });
+      return;
+    }
+
+    // Status anzeigen
+    if (subCommand === 'status') {
+      const status = groupConfig.enabled
+        ? '✅ *AKTIV* – WhatsApp-Links werden gelöscht.'
+        : '❌ *INAKTIV* – Links sind erlaubt.';
+
+      await sock.sendMessage(chatId, {
+        text:
+          `╔══════════════════════╗\n` +
+          `║   📛  ANTILINK       ║\n` +
+          `╚══════════════════════╝\n\n` +
+          `Status: ${status}`,
+      }, { quoted: msg });
+      return;
+    }
+
+    // Aktivieren / Deaktivieren
+    const newState = subCommand === 'on';
+    config[chatId] = { ...groupConfig, enabled: newState };
+    saveConfig(config);
+
+    const emoji = newState ? '✅' : '❌';
+    const stateText = newState ? 'aktiviert' : 'deaktiviert';
+    const description = newState
+      ? 'WhatsApp-Einladungslinks werden ab sofort automatisch gelöscht.'
+      : 'WhatsApp-Links sind in dieser Gruppe wieder erlaubt.';
+
+    await sock.sendMessage(chatId, {
+      text:
+        `╔══════════════════════╗\n` +
+        `║   📛  ANTILINK       ║\n` +
+        `╚══════════════════════╝\n\n` +
+        `${emoji} AntiLink wurde *${stateText}*!\n\n` +
+        `📋 ${description}`,
+    }, { quoted: msg });
+    return;
+  }
+
+  // ── Link-Überwachung ────────────────────────────────────────────────────────
+  if (!groupConfig.enabled) return;
+
+  if (containsWhatsAppLink(messageText)) {
+    // Gruppen-Metadaten für Admin-Prüfung laden
+    let groupMeta = null;
+    try {
+      groupMeta = await sock.groupMetadata(chatId);
+    } catch { /* ignore */ }
+
+    // Admins & Owner sind von der Löschung ausgenommen
+    if (isAuthorized(sender, groupMeta, owners, coowners)) return;
+
+    try {
+      // Nachricht löschen
+      await sock.sendMessage(chatId, { delete: msg.key });
+
+      // Warnung schicken
+      const senderTag = `@${sender.split('@')[0]}`;
+      await sock.sendMessage(chatId, {
+        text:
+          `🚫 *AntiLink aktiv!*\n\n` +
+          `${senderTag}, das Senden von WhatsApp-Einladungslinks ist in dieser Gruppe *nicht erlaubt*.\n\n` +
+          `⚠️ Bitte beachte die Gruppenregeln.`,
+        mentions: [sender],
+      });
+    } catch (err) {
+      console.error('[AntiLink] Fehler beim Löschen:', err.message);
+    }
+  }
+}
+
+// ─── Exports ──────────────────────────────────────────────────────────────────
+module.exports = { handleMessage, isAuthorized, containsWhatsAppLink };
+
+
   console.log('✅ Sword-art-online-bot gestartet.');
 }
 
