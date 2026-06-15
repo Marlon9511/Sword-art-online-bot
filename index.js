@@ -1784,8 +1784,6 @@ if (cmd === 'selfdemote' || cmd === 'sd') {
     }
   });
 
-const fs = require('fs');
-
 // ─── Konfigurationsdatei (persistente Speicherung) ───────────────────────────
 const CONFIG_FILE = './antilink_config.json';
 
