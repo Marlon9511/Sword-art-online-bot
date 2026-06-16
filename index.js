@@ -63,6 +63,7 @@ const FILES = {
   pets: { file: 'pets.json', default: {} },
   tickets: { file: 'tickets.json', default: {} },
   ranks: { file: 'ranks.json', default: {} },
+  commandBans: { file: 'command-bans.json', default: {} },
   broadcastSettings: { file: 'broadcast-settings.json', default: {} },
   deleted: { file: 'deleted.json', default: {} },
   owner: { file: 'owner.json', default: {} },
@@ -171,20 +172,22 @@ let COOWNER_LID = '272696835330300@lid';
 ROLES.OWNER.push(OWNER_LID, OWNER_PRIV);
 ROLES.COOWNER.push(COOWNER_LID);
 
-const PREFIX = '$';
-
 const BOT_STATE_FILE = path.join(DATA_PATH, 'bot-state.json');
 let BOT_OFFLINE = false;
+let PREFIX = '?';
 try {
   if (fs.existsSync(BOT_STATE_FILE)) {
     const st = JSON.parse(fs.readFileSync(BOT_STATE_FILE, 'utf8') || '{}');
     BOT_OFFLINE = !!st.offline;
+    if (st.prefix && typeof st.prefix === 'string' && st.prefix.trim().length) {
+      PREFIX = st.prefix.trim().slice(0, 1);
+    }
   }
 } catch (e) { console.error('Failed to load bot state:', e); }
 
 const saveBotState = () => {
   try {
-    fs.writeFileSync(BOT_STATE_FILE, JSON.stringify({ offline: !!BOT_OFFLINE }, null, 2));
+    fs.writeFileSync(BOT_STATE_FILE, JSON.stringify({ offline: !!BOT_OFFLINE, prefix: PREFIX }, null, 2));
   } catch (e) { console.error('Failed to save bot state:', e); }
 };
 
@@ -335,6 +338,18 @@ function normalizeJid(jid) {
   return num ? `${num}@s.whatsapp.net` : jid;
 }
 
+function normalizeTicketId(id) {
+  if (!id) return id;
+  const ticketId = String(id).trim();
+  if (/^\d{1,4}$/.test(ticketId)) return ticketId.padStart(4, '0');
+  return ticketId;
+}
+
+function getTicketById(id) {
+  const normalized = normalizeTicketId(id);
+  return tickets[normalized] || tickets[id];
+}
+
 function toParticipantJid(jid) {
   if (!jid) return jid;
   const n = normalizeJid(jid);
@@ -345,6 +360,15 @@ function toParticipantJid(jid) {
     return num ? `${num}@s.whatsapp.net` : n;
   }
   return n;
+}
+
+function toLidJid(jid) {
+  if (!jid) return jid;
+  const n = normalizeJid(jid);
+  if (!n) return n;
+  if (n.endsWith('@lid')) return n;
+  const num = n.replace(/\D+/g, '');
+  return num ? `${num}@lid` : n;
 }
 
 function isSameJid(a, b) {
@@ -358,6 +382,11 @@ function normalizeDataKeys(obj) {
     out[normalizeJid(k)] = obj[k];
   }
   return out;
+}
+
+function getGroupPrefix(groupJid) {
+  const normalized = normalizeJid(groupJid);
+  return groupSettings[normalized]?.prefix || PREFIX;
 }
 
 function hasAdminPerms(jid) {
@@ -377,6 +406,7 @@ let joinreqs = normalizeDataKeys(load(FILES.joinreq.file));
 let pets = normalizeDataKeys(load(FILES.pets.file));
 let tickets = normalizeDataKeys(load(FILES.tickets.file));
 let ranks = normalizeDataKeys(load(FILES.ranks.file));
+let commandBans = load(FILES.commandBans.file) || {};
 
 console.log('Loaded ranks:', ranks);
 
@@ -445,6 +475,17 @@ function registerUser(jid, name) {
   users[normalizedJid].registrationDate = new Date().toISOString();
   users[normalizedJid].name = name;
   save(FILES.users, users);
+}
+
+function getMentionDisplay(jid, contacts = {}) {
+  const normalizedJid = normalizeJid(jid);
+  const user = users[normalizedJid];
+  let display = user?.name || user?.registrationName;
+  const contact = contacts[normalizedJid];
+  if (!display && contact) {
+    display = contact.notify || contact.name || contact.vname || contact.short || contact.formattedName;
+  }
+  return `@${String(display || normalizedJid.split('@')[0]).replace(/\n/g, ' ').trim()}`;
 }
 
 function unregisterUser(jid) {
@@ -646,9 +687,11 @@ async function startBot() {
         || (m.message.imageMessage && m.message.imageMessage.caption)
         || '';
 
-      const isCmd = !!(body && body.startsWith(PREFIX));
+      const activePrefix = isGroup ? getGroupPrefix(from) : PREFIX;
+      if (!body || !body.startsWith(activePrefix)) return;
+      const isCmd = true;
 
-      if (isGroup && isCmd) {
+      if (isGroup) {
         try {
           const meta = await getGroupMetaSafe(from);
 
@@ -802,6 +845,20 @@ async function startBot() {
 
       ensureUser(sender);
 
+      // If user was AFK and now sent a message, clear AFK status
+      if (users[sender]?.afk) {
+        const oldReason = users[sender].afk.reason || 'Abwesend';
+        delete users[sender].afk;
+        try { save(FILES.users, users); } catch (e) {}
+        try {
+          if (from?.endsWith('@g.us')) {
+            await sock.sendMessage(from, { text: `✅ @${sender.split('@')[0]} ist zurück (war AFK: ${oldReason}).`, mentions: [sender] });
+          } else {
+            await sock.sendMessage(from, { text: `✅ Du bist nicht mehr AFK (Grund: ${oldReason}).` });
+          }
+        } catch (e) {}
+      }
+
       if (!m.key.fromMe) {
         users[sender].xp = (users[sender].xp || 0) + 5;
         users[sender].msgCount = (users[sender].msgCount || 0) + 1;
@@ -818,13 +875,13 @@ async function startBot() {
         }
       }
 
-      if (!body || !body.startsWith(PREFIX)) return;
+      if (!body || !body.startsWith(activePrefix)) return;
 
       await sleep(150);
 
       const [cmdRaw, ...args] = body.trim().split(/\s+/);
       const rawCmd = cmdRaw.toLowerCase();
-      const cmd = rawCmd.startsWith(PREFIX) ? rawCmd.slice(PREFIX.length) : rawCmd;
+      const cmd = rawCmd.startsWith(activePrefix) ? rawCmd.slice(activePrefix.length) : rawCmd;
 
       const userRank = ranks[sender] || users[sender]?.rank || 'USER';
       const isOwner = isAuthorized(sender, ['OWNER', 'COOWNER']);
@@ -837,9 +894,42 @@ async function startBot() {
       }
 
       const send = async (text, opts = {}) => {
-        try { await sock.sendMessage(from, { text, ...opts }); } catch (e) { console.error('send failed', e); }
+        try {
+          // Typing animation: send 'composing' presence, wait 5s, then send message
+          try { await sock.sendPresenceUpdate('composing', from); } catch (e) {}
+          await sleep(3000);
+          try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
+          const sendOpts = { ...opts };
+          if (sendOpts.mentions) {
+            const mentionArray = Array.isArray(sendOpts.mentions) ? sendOpts.mentions : [sendOpts.mentions];
+            sendOpts.contextInfo = sendOpts.contextInfo || {};
+            sendOpts.contextInfo.mentionedJid = mentionArray;
+          }
+          await sock.sendMessage(from, { text, ...sendOpts });
+        } catch (e) { console.error('send failed', e); }
       };
       log(`${sender} -> ${body}`);
+
+      // Block commands that are banned for regular users
+      if (commandBans && commandBans[cmd] && !isAuthorized(sender, ['OWNER', 'COOWNER'])) {
+        try { await sock.sendMessage(from, { text: '⛔ Dieser Befehl wurde vom Owner gesperrt und ist nur für Owner/CoOwner verfügbar.' }); } catch (e) {}
+        return;
+      }
+
+      // If message mentions users who are AFK, inform the sender
+      const mentionCtx = m.message?.extendedTextMessage?.contextInfo;
+      if (mentionCtx && Array.isArray(mentionCtx.mentionedJid) && mentionCtx.mentionedJid.length) {
+        for (const mid of mentionCtx.mentionedJid) {
+          const normalized = normalizeJid(mid);
+          const afk = users[normalized]?.afk;
+          if (afk) {
+            const reason = afk.reason || 'Abwesend';
+            try {
+              await sock.sendMessage(from, { text: `ℹ️ Dieser User ist nicht erreichbar aufgrund von ${reason}. Versuch es später nochmal.`, mentions: [mid] });
+            } catch (e) {}
+          }
+        }
+      }
 
       // GETLID
       if (cmd === 'getlid') {
@@ -858,21 +948,33 @@ async function startBot() {
         return;
       }
 
-      // HELP
-      if (cmd === 'help') {
+      // AFK - set yourself as AFK with optional reason
+      if (cmd === 'afk') {
+        const reason = args.length ? args.join(' ') : 'Abwesend';
+        if (!users[sender]) ensureUser(sender);
+        users[sender].afk = { reason, at: new Date().toISOString() };
+        try { save(FILES.users, users); } catch (e) {}
+        return send(`🔕 Du bist jetzt AFK: ${reason}`);
+      }
+
+      // HELP / MENU
+      if (cmd === 'help' || cmd === 'menu') {
         let helpText = `🤖 *Bot Command Übersicht*\n\n`;
 
         helpText += `*📱 Basis-Befehle:*
 ${PREFIX}help - Zeigt diese Hilfe an
 ${PREFIX}ping - Prüft ob der Bot online ist
+${PREFIX}owner - Kontaktiere den Owner
 ${PREFIX}whoami - Zeigt deine Nutzerinfo
 ${PREFIX}me - Zeigt deine Statistiken
 ${PREFIX}pet - Zeigt dein Haustier-Status
 ${PREFIX}daily - Tägliche Belohnung abholen
 ${PREFIX}blackjack - Starte ein Blackjack-Spiel
+${PREFIX}slot - Spielautomaten-Spiel
 ${PREFIX}adopt <name> - Adoptiere ein Haustier
 ${PREFIX}feed - Füttere dein Haustier
 ${PREFIX}fish - Gehe angeln
+${PREFIX}afk [grund] - Setze deinen AFK-Status mit optionalem Grund
 
 *💬 Chat & Gruppen:*
 ${PREFIX}gi - Gruppeneinstellungen anzeigen
@@ -881,10 +983,13 @@ ${PREFIX}welcome-aus - Welcome deaktivieren
 ${PREFIX}welcome-set <text> - Welcome-Text setzen
 ${PREFIX}hidetag - Nachricht mit verstecktem Tag\n\n`;
 
+        helpText += `*⚙️ Aktuelles Präfix:* ${PREFIX}
+`;
         if (isAuthorized(sender, ['OWNER', 'SUPPORTER', 'TEST_SUPPORTER'])) {
           helpText += `*🎫 Support-System:*
 ${PREFIX}answer <ticket-id> <text> - Ticket beantworten
-${PREFIX}support <nachricht> - Support-Ticket erstellen\n\n`;
+${PREFIX}support <nachricht> - Support-Ticket erstellen
+${PREFIX}tickets [id|status] - Tickets anzeigen\n\n`;
         }
 
         if (isAdmin) {
@@ -903,6 +1008,7 @@ ${PREFIX}addvip <@nutzer> <zeit> - VIP-Status geben\n\n`;
 ${PREFIX}broadcast <text> - Nachricht an alle Gruppen
 ${PREFIX}restart - Bot neu starten
 ${PREFIX}updateprofile - Profil aktualisieren
+      ${PREFIX}bancmd <befehl> [ban|unban] - cmdban befehl (unban oder ban)
 ${PREFIX}setrole @user <rolle> - Nutzerrolle setzen
 ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
         }
@@ -927,26 +1033,27 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
       // Group Settings (gi)
       if (cmd === 'gi' && isGroup) {
         const groupMetadata = await getGroupMetaSafe(from);
-        const isGroupAdmin = groupMetadata?.participants?.find(p => p.id === sender)?.admin;
+        const isGroupAdmin = groupMetadata?.participants?.find(p => isSameJid(p.id, sender))?.admin;
 
         if (!isGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) {
           return send('❌ Du musst Admin in dieser Gruppe sein.');
         }
 
         if (!groupSettings[from]) {
-          groupSettings[from] = { welcome: { enabled: false, message: 'Willkommen in der Gruppe {user}! 👋' } };
+          groupSettings[from] = { welcome: { enabled: false, message: 'Willkommen in der Gruppe {user}! 👋' }, prefix: PREFIX };
         }
 
         const settings = groupSettings[from];
+        const groupPrefix = settings.prefix || PREFIX;
         return send(
-          `📋 *Gruppeneinstellungen*\n\n*Welcome:* ${settings.welcome.enabled ? '✅ An' : '❌ Aus'}\n*Text:*\n${settings.welcome.message}\n\n*Befehle:*\n$welcome-an / $welcome-aus / $welcome-set <text>`
+          `📋 *Gruppeneinstellungen*\n\n*Welcome:* ${settings.welcome.enabled ? '✅ An' : '❌ Aus'}\n*Text:*\n${settings.welcome.message}\n*Prefix:* ${groupPrefix}\n\n*Befehle:*\n${groupPrefix}welcome-an / ${groupPrefix}welcome-aus / ${groupPrefix}welcome-set <text> / ${groupPrefix}setprefix <symbol> / ${groupPrefix}resetprefix`
         );
       }
 
       // Welcome Controls
       if ((cmd === 'welcome-an' || cmd === 'welcome-aus' || cmd === 'welcome-set') && isGroup) {
         const groupMetadata = await getGroupMetaSafe(from);
-        const isGroupAdmin = groupMetadata?.participants?.find(p => p.id === sender)?.admin;
+        const isGroupAdmin = groupMetadata?.participants?.find(p => isSameJid(p.id, sender))?.admin;
 
         if (!isGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) {
           return send('❌ Du musst Admin in dieser Gruppe sein.');
@@ -978,25 +1085,23 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
 
       // Ticket answer
       if (cmd === 'answer' && isAuthorized(sender, ['OWNER', 'SUPPORTER', 'TEST_SUPPORTER']) && args.length >= 2) {
-        const ticketId = args[0];
+        const rawTicketId = args[0];
+        const ticketId = normalizeTicketId(rawTicketId);
         const answer = args.slice(1).join(' ');
 
-        if (from === SUPPORT_CONFIG.SUPPORT_GROUP) {
-          if (!tickets[ticketId]) return send(`❌ Ticket #${ticketId} nicht gefunden.`);
+        const ticket = getTicketById(rawTicketId);
+        if (!ticket) return send(`❌ Ticket #${rawTicketId} nicht gefunden.`);
 
-          await sock.sendMessage(SUPPORT_CONFIG.SUPPORT_GROUP, {
-            text: `📝 Antwort auf Ticket #${ticketId}:\n\n${answer}\n\nSupporter: @${sender.split('@')[0]}`,
-            mentions: [sender]
-          });
+        await sock.sendMessage(SUPPORT_CONFIG.SUPPORT_GROUP, {
+          text: `📝 Antwort auf Ticket #${ticket.id}:\n\n${answer}\n\nSupporter: ${getMentionDisplay(sender, sock.contacts)}`,
+          mentions: [sender]
+        });
 
-          tickets[ticketId].status = 'answered';
-          tickets[ticketId].answeredBy = sender;
-          tickets[ticketId].answer = answer;
-          save(FILES.tickets, tickets);
-          return send(`✅ Antwort für Ticket #${ticketId} gesendet.`);
-        } else {
-          return send('❌ Dieser Befehl kann nur in der Support-Gruppe verwendet werden.');
-        }
+        ticket.status = 'answered';
+        ticket.answeredBy = sender;
+        ticket.answer = answer;
+        save(FILES.tickets, tickets);
+        return send(`✅ Antwort für Ticket #${ticket.id} gesendet.`);
       }
 
       // SETROLE
@@ -1004,26 +1109,102 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
         if (!isAuthorized(sender, ['OWNER'])) return send('❌ Nur für Owner.');
 
         const [role, ...jids] = args;
-        if (!role || jids.length === 0) return send(`❌ Nutzung: $setrole <ROLLE> <jid1,jid2,...>`);
+        if (!role) return send(`❌ Nutzung: $setrole <ROLLE> <jid1,jid2,...>`);
 
         const roleUpper = role.toUpperCase();
         if (!ROLES.hasOwnProperty(roleUpper)) return send(`❌ Ungültige Rolle. Verfügbar: ${Object.keys(ROLES).join(', ')}`);
 
-        const jidList = jids.join(' ').split(',').map(j => j.trim());
-        const validJids = jidList.filter(j => {
-          const normalized = normalizeJid(j);
-          return normalized && (normalized.endsWith('@s.whatsapp.net') || normalized.endsWith('@lid'));
-        });
+        // Build target JID list. If none provided, use mentioned JIDs or fall back to the command sender.
+        let jidList = jids.join(' ').split(',').map(j => j.trim()).filter(Boolean);
+        if (jidList.length === 0) {
+          const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid;
+          if (mentioned && mentioned.length > 0) {
+            jidList = mentioned.map(j => j.trim());
+          } else {
+            jidList = [sender];
+          }
+        }
 
+        const validJids = jidList.map(normalizeJid).filter(j => j && (j.endsWith('@s.whatsapp.net') || j.endsWith('@lid')));
         if (!validJids.length) return send('❌ Keine gültigen JIDs gefunden.');
 
-        ROLES[roleUpper] = validJids;
+        const normalizedJids = Array.from(new Set(validJids));
+
+        // Update users and ranks persistence
+        normalizedJids.forEach(jid => {
+          if (!users[jid]) {
+            users[jid] = {
+              xp: 0,
+              level: 1,
+              coins: 100,
+              rank: roleUpper,
+              msgCount: 0,
+              lastDaily: 0,
+              items: {},
+              registered: false,
+              registrationDate: null,
+              name: null
+            };
+          } else {
+            users[jid].rank = roleUpper;
+          }
+          ranks[jid] = roleUpper;
+        });
+
+        // Remove assigned JIDs from other role arrays to avoid stale memberships.
+        for (const otherRole of Object.keys(ROLES)) {
+          if (otherRole === roleUpper) continue;
+          ROLES[otherRole] = ROLES[otherRole].filter(id => !normalizedJids.some(jid => isSameJid(id, jid)));
+        }
+
+        ROLES[roleUpper] = normalizedJids;
+
         try {
+          save(FILES.users, users);
+          save(FILES.ranks, ranks);
           save(FILES.owner, { ...ownerCfg, roles: ROLES, ownerLid: OWNER_LID, ownerPriv: OWNER_PRIV, coownerLid: COOWNER_LID });
         } catch (e) {
           return send('❌ Fehler beim Speichern.');
         }
-        return send(`✅ ${validJids.length} JIDs der Rolle ${roleUpper} zugewiesen.`);
+        return send(`✅ ${normalizedJids.length} JIDs der Rolle ${roleUpper} zugewiesen und in ranks.json sowie users.json gespeichert.`);
+      }
+
+      if (cmd === 'setprefix') {
+        if (isGroup) {
+          const groupMetadata = await getGroupMetaSafe(from);
+          const isGroupAdmin = groupMetadata?.participants?.find(p => isSameJid(p.id, sender))?.admin;
+          if (!isGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER'])) {
+            return send('❌ Du musst Gruppenadmin sein, um das Gruppenpräfix zu ändern.');
+          }
+          if (!groupSettings[from]) {
+            groupSettings[from] = { welcome: { enabled: false, message: 'Willkommen in der Gruppe {user}! 👋' }, prefix: PREFIX };
+          }
+          const desired = args.join(' ').trim();
+          if (!desired) return send(`❌ Nutzung: ${groupSettings[from].prefix || PREFIX}setprefix <symbol>`);
+          groupSettings[from].prefix = desired[0];
+          save(FILES.groupSettings, groupSettings);
+          return send(`✅ Gruppenpräfix gesetzt auf: ${groupSettings[from].prefix}`);
+        }
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
+        const desired = args.join(' ').trim();
+        if (!desired) return send(`❌ Nutzung: ${PREFIX}setprefix <symbol>`);
+        PREFIX = desired[0];
+        saveBotState();
+        return send(`✅ Präfix gesetzt auf: ${PREFIX}`);
+      }
+
+      if (cmd === 'resetprefix' && isGroup) {
+        const groupMetadata = await getGroupMetaSafe(from);
+        const isGroupAdmin = groupMetadata?.participants?.find(p => isSameJid(p.id, sender))?.admin;
+        if (!isGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER'])) {
+          return send('❌ Du musst Gruppenadmin sein, um das Gruppenpräfix zurückzusetzen.');
+        }
+        if (!groupSettings[from]) {
+          groupSettings[from] = { welcome: { enabled: false, message: 'Willkommen in der Gruppe {user}! 👋' }, prefix: PREFIX };
+        }
+        groupSettings[from].prefix = '?';
+        save(FILES.groupSettings, groupSettings);
+        return send('✅ Gruppenpräfix zurückgesetzt auf: ?');
       }
 
       // LISTROLES
@@ -1031,9 +1212,85 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
         if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
         let message = '📋 Rollen:\n\n';
         for (const [role, jids] of Object.entries(ROLES)) {
-          message += `${role}: ${jids.length ? '\n' + jids.join('\n') : '(keine)'}\n\n`;
+          message += `${role}:`;
+          if (Array.isArray(jids) && jids.length) {
+            for (const id of jids) {
+              const n = normalizeJid(id);
+              const lid = n ? (n.endsWith('@s.whatsapp.net') ? n.replace('@s.whatsapp.net', '@lid') : n) : id;
+              const name = (users[n] && (users[n].name || users[n].registrationName)) || '(kein name)';
+              message += `\n${lid} — ${name}`;
+            }
+            message += '\n\n';
+          } else {
+            message += ' (keine)\n\n';
+          }
         }
         return send(message.trim());
+      }
+
+      // CMBAN / CMDBAN - ban a command so only OWNER/COOWNER can use it
+      if (cmd === 'cmdban' || cmd === 'bancmd') {
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Nur Owner/CoOwner.');
+        const target = args[0];
+        const action = (args[1] || '').toLowerCase();
+        if (!target) {
+          const banned = Object.keys(commandBans || {}).filter(k => commandBans[k]);
+          return send(`🔒 Gesperrte Befehle:\n${banned.length ? banned.join('\n') : '(keine)'}\n\nNutzung: ${PREFIX}cmdban <befehl> [ban|unban]`);
+        }
+        const tcmd = String(target).toLowerCase().replace(new RegExp(`^\\${PREFIX}`), '').trim();
+        if (!tcmd) return send('❌ Ungültiger Befehl.');
+
+        if (action === 'unban' || action === 'allow' || action === 'remove') {
+          if (commandBans[tcmd]) delete commandBans[tcmd];
+          try { save(FILES.commandBans, commandBans); } catch (e) {}
+          return send(`✅ Befehl ${tcmd} wurde entsperrt.`);
+        }
+
+        // default: ban/toggle
+        if (action === 'ban' || action === 'add' || !action) {
+          commandBans[tcmd] = true;
+          try { save(FILES.commandBans, commandBans); } catch (e) {}
+          return send(`⛔ Befehl ${tcmd} wurde gesperrt (nur Owner/CoOwner).`);
+        }
+
+        return send('❌ Ungültige Aktion. Verwende ban oder unban.');
+      }
+
+      // APPLYROLES - sync role assignments to a WhatsApp group (promote admins)
+      if (cmd === 'applyroles') {
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
+        const target = args[0] ? args[0].trim() : from;
+        const groupJid = normalizeJid(target);
+        if (!groupJid || !groupJid.endsWith('@g.us')) return send('❌ Gib eine Gruppen-JID an oder nutze den Befehl innerhalb einer Gruppe.');
+
+        const adminList = (ROLES.ADMIN || []).map(j => toParticipantJid(j)).filter(Boolean);
+        if (!adminList.length) return send('ℹ Keine Admin-JIDs in den Rollen gefunden.');
+
+        try {
+          await sock.groupParticipantsUpdate(groupJid, adminList, 'promote');
+          return send(`✅ ${adminList.length} Teilnehmer in ${groupJid} zu Admins befördert.`);
+        } catch (e) {
+          console.error('applyroles error', e);
+          return send('❌ Fehler beim Anwenden der Rollen in der Gruppe.');
+        }
+      }
+
+      // UNBANCMD - unban a command (owner/coowner only)
+      if (cmd === 'unbancmd') {
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Nur Owner/CoOwner.');
+        const target = args[0];
+        if (!target) {
+          return send(`Nutzung: ${PREFIX}unbancmd <befehl>`);
+        }
+        const tcmd = String(target).toLowerCase().replace(new RegExp(`^\\${PREFIX}`), '').trim();
+        if (!tcmd) return send('❌ Ungültiger Befehl.');
+        if (commandBans[tcmd]) {
+          delete commandBans[tcmd];
+          try { save(FILES.commandBans, commandBans); } catch (e) {}
+          return send(`✅ Befehl ${tcmd} wurde entsperrt.`);
+        } else {
+          return send(`ℹ️ Befehl ${tcmd} war nicht gesperrt.`);
+        }
       }
 
       // UPDATEPROFILE
@@ -1058,8 +1315,58 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
       // WHOAMI / ME
       if (cmd === 'whoami' || cmd === 'me') {
         const normalizedSender = normalizeJid(sender);
-        const r = ranks[normalizedSender] || users[normalizedSender]?.rank || '(none)';
-        return send(`You: ${sender}\nNormalized: ${normalizedSender}\nRank: ${r}`);
+        const user = users[normalizedSender] || {};
+        const username = user.name || user.registrationName || sender.split('@')[0];
+        const coins = user.coins || 0;
+        const r = ranks[normalizedSender] || user.rank || '(none)';
+        const caption = `User: ${username}\nCoins: ${coins}\nRank: ${r}`;
+
+        // Try to fetch profile picture (use participant JID for @lid) and send as image with caption
+        try {
+          // Try multiple candidates for profile picture (handles @lid, owner LID/PRIV)
+          const candidates = [];
+          const pjid = toParticipantJid(normalizedSender);
+          if (pjid) candidates.push(pjid);
+          if (normalizedSender) candidates.push(normalizedSender);
+          if (isSameJid(normalizedSender, OWNER_LID) || isSameJid(normalizedSender, OWNER_PRIV)) {
+            if (OWNER_PRIV) candidates.push(OWNER_PRIV);
+            if (toParticipantJid(OWNER_PRIV)) candidates.push(toParticipantJid(OWNER_PRIV));
+            if (OWNER_LID) candidates.push(OWNER_LID);
+          }
+
+          const getPPUrl = async (jid) => {
+            const types = ['image', 'preview'];
+            for (const type of types) {
+              try {
+                const result = await Promise.race([
+                  sock.profilePictureUrl(jid, type),
+                  new Promise((_, reject) => setTimeout(() => reject(new Error('pp timeout')), 2000))
+                ]);
+                if (result) return result;
+              } catch (e) {}
+            }
+            return null;
+          };
+
+          let ppUrl = null;
+          for (const c of candidates) {
+            if (!c) continue;
+            ppUrl = await getPPUrl(c);
+            if (ppUrl) break;
+          }
+
+          if (ppUrl) {
+            try { await sock.sendPresenceUpdate('composing', from); } catch (e) {}
+            await sleep(5000);
+            try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
+            await sock.sendMessage(from, { image: { url: ppUrl }, caption });
+            return;
+          }
+        } catch (e) {
+          // ignore and fall back to text
+        }
+
+        return send(caption);
       }
 
       // PING
@@ -1067,6 +1374,11 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
         const startTime = Date.now();
         await send('🏓 Pong!');
         return send(`Antwortzeit: ${Date.now() - startTime}ms`);
+      }
+
+      // OWNER
+      if (cmd === 'owner') {
+        return send('👑 Kontaktiere den Owner:\nhttps://wa.me/4915111254435');
       }
 
       // CODE
@@ -1175,13 +1487,18 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
       // HIDETAG
       if (cmd === 'hidetag') {
         if (!isGroup) return send('❌ Nur in Gruppen.');
-        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) return send('❌ Kein Zugriff.');
+        const groupMetadata = await getGroupMetaSafe(from);
+        const isGroupAdmin = groupMetadata?.participants?.find(p => isSameJid(p.id, sender))?.admin;
+        if (!isGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) return send('❌ Kein Zugriff.');
         const message = args.join(' ');
         if (!message) return send('❌ Beispiel: $hidetag Wichtige Ankündigung!');
         try {
           const groupMembers = await getGroupMetaSafe(from);
-          const mentions = groupMembers.participants.map(p => p.id);
-          await sock.sendMessage(from, { text: message, mentions }, { quoted: m });
+          const mentions = (groupMembers?.participants || [])
+            .map(p => toLidJid(p.id))
+            .filter(jid => jid && jid.endsWith('@lid'));
+          if (!mentions.length) return send('❌ Keine Gruppenmitglieder gefunden.');
+          return send(message, { mentions, quoted: m });
         } catch (err) {
           return send('❌ Fehler beim Ausführen.');
         }
@@ -1377,36 +1694,58 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
       }
 
       // BLACKJACK
-      if (cmd === 'bjstart') {
+      if (cmd === 'blackjack' || cmd === 'bjstart' || cmd === 'bj') {
+        if (!users[sender]) ensureUser(sender);
+        if (users[sender].bj?.active) return send('Du hast bereits ein aktives Spiel. Nutze $hit oder $stand.');
         const player = [bjDraw(), bjDraw()];
         const dealer = [bjDraw(), bjDraw()];
         users[sender].bj = { player, dealer, active: true };
         save(FILES.users, users);
-        return send(`🃏 Blackjack!\nDeine Karten: ${player.map(c => c.value + c.suit).join(', ')}\nDealer zeigt: ${dealer[0].value + dealer[0].suit}\nNutze $hit oder $stand`);
+        return send(`🃏 Blackjack!\nDeine Karten: ${player.map(c => c.value + c.suit).join(', ')}\nDealer zeigt: ${dealer[0].value + dealer[0].suit}\nNutze ${PREFIX}hit oder ${PREFIX}stand`);
       }
       if (cmd === 'hit') {
-        if (!users[sender].bj?.active) return send('Kein aktives Spiel. Starte mit $bjstart');
+        if (!users[sender]) ensureUser(sender);
+        if (!users[sender].bj?.active) return send(`Kein aktives Spiel. Starte mit ${PREFIX}blackjack`);
         const bj = users[sender].bj;
         bj.player.push(bjDraw());
         const p = bjScore(bj.player);
-        const d = bjScore(bj.dealer);
         let out = `Deine Karten: ${bj.player.map(c => c.value + c.suit).join(', ')}\nPunkte: ${p}`;
         if (p > 21) {
-          out += '\n😢 Bust! Du verloren.';
+          out += '\n😢 Bust! Du verlierst.';
           delete users[sender].bj;
-          save(FILES.users, users);
+        } else if (p === 21) {
+          users[sender].coins = (users[sender].coins || 0) + 75;
+          users[sender].xp = (users[sender].xp || 0) + 40;
+          out += '\n🎉 Blackjack! Du gewinnst +75 Coins +40 XP';
+          delete users[sender].bj;
+        } else {
+          out += '\nNutze $hit oder $stand';
         }
+        save(FILES.users, users);
         return send(out);
       }
       if (cmd === 'stand') {
-        if (!users[sender].bj?.active) return send('Kein aktives Spiel. Starte mit $bjstart');
+        if (!users[sender]) ensureUser(sender);
+        if (!users[sender].bj?.active) return send(`Kein aktives Spiel. Starte mit ${PREFIX}blackjack`);
         const bj = users[sender].bj;
         const p = bjScore(bj.player);
-        const d = bjScore(bj.dealer);
-        let out = `Dealer: ${d}, Du: ${p}`;
-        if (d > 21 || p > d) { users[sender].coins = (users[sender].coins || 0) + 75; users[sender].xp = (users[sender].xp || 0) + 40; out += '\n🎉 Du gewinnst! +75 Coins +40 XP'; }
-        else if (p === d) out += '\nUnentschieden';
-        else out += '\nDealer gewinnt';
+        let d = bjScore(bj.dealer);
+        while (d < 17) {
+          bj.dealer.push(bjDraw());
+          d = bjScore(bj.dealer);
+        }
+        let out = `Dealer-Karten: ${bj.dealer.map(c => c.value + c.suit).join(', ')}\nDealer: ${d}\nDu: ${p}`;
+        if (p > 21) {
+          out += '\n😢 Bust! Du verlierst.';
+        } else if (d > 21 || p > d) {
+          users[sender].coins = (users[sender].coins || 0) + 75;
+          users[sender].xp = (users[sender].xp || 0) + 40;
+          out += '\n🎉 Du gewinnst! +75 Coins +40 XP';
+        } else if (p === d) {
+          out += '\nUnentschieden';
+        } else {
+          out += '\nDealer gewinnt';
+        }
         delete users[sender].bj;
         save(FILES.users, users);
         return send(out);
@@ -1453,7 +1792,7 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
         save(FILES.tickets, tickets);
         try {
           await sock.sendMessage(SUPPORT_CONFIG.TICKET_GROUP, {
-            text: `🎫 Neues Ticket #${ticketId}\nVon: @${sender.split('@')[0]}\n\nNachricht:\n${text}`,
+            text: `🎫 Neues Ticket #${ticketId}\nVon: ${getMentionDisplay(sender, sock.contacts)}\n\nNachricht:\n${text}`,
             mentions: [sender]
           });
           return send(`✅ Ticket #${ticketId} erstellt.`);
@@ -1462,9 +1801,38 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
         }
       }
       if (cmd === 'tickets') {
-        if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('Kein Zugriff.');
-        const list = Object.values(tickets).map(t => `${t.id} - ${t.status}`).join('\n') || '(keine)';
-        return send(`🎫 Tickets:\n${list}`);
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'SUPPORTER', 'TEST_SUPPORTER'])) return send('Kein Zugriff.');
+        const filter = (args[0] || '').toLowerCase();
+        let ticket = null;
+
+        if (filter) {
+          ticket = tickets[filter] || tickets[filter.padStart(4, '0')];
+        }
+
+        if (ticket) {
+          const messageText = ticket.message || ticket.text || 'Keine Nachricht';
+          return send(
+            `🎫 Ticket #${ticket.id}\n` +
+            `Status: ${ticket.status}\n` +
+            `Von: ${getMentionDisplay(ticket.sender, sock.contacts)}\n` +
+            `Nachricht: ${messageText}\n` +
+            `Antwort: ${ticket.answer || 'Keine'}\n` +
+            `Erstellt: ${new Date(ticket.timestamp).toLocaleString()}`,
+            { mentions: [ticket.sender] }
+          );
+        }
+
+        const ticketValues = Object.values(tickets);
+        const visibleTickets = ticketValues.filter(t => !filter || filter === 'all' || t.status.toLowerCase() === filter);
+        const mentions = [...new Set(visibleTickets.map(t => t.sender))];
+        const list = visibleTickets
+          .map(t => {
+            const msg = String(t.message || t.text || '').slice(0, 50);
+            return `${t.id} | ${t.status} | ${getMentionDisplay(t.sender, sock.contacts)} | ${msg}${msg.length >= 50 ? '…' : ''}`;
+          })
+          .join('\n') || '(keine)';
+        const subtitle = filter ? ` (${filter === 'all' ? 'alle' : filter})` : '';
+        return send(`🎫 Tickets${subtitle}:\n${list}`, { mentions });
       }
       if (cmd === 'closeticket') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('Kein Zugriff.');
@@ -1554,11 +1922,45 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
       }
 
       if (cmd === 'kick') {
-        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
-        const t = args[0]; if (!t) return send('Usage: $kick <num|jid>');
-        const participantJid = toParticipantJid(normalizeJid(t));
-        if (!participantJid) return send('❌ Ungültige JID.');
-        try { await sock.groupParticipantsUpdate(from, [participantJid], 'remove'); return send(`✅ ${participantJid} entfernt.`); } catch (e) { return send('❌ Kicken fehlgeschlagen.'); }
+        const ctx = m.message?.extendedTextMessage?.contextInfo;
+        let target = args[0];
+        if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+        if (!target) return send('Usage: $kick <num|jid|@user>');
+
+        let permitted = isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD']);
+        let groupMetadata;
+        if (!permitted && isGroup) {
+          groupMetadata = await getGroupMetaSafe(from);
+          const isGroupAdmin = groupMetadata?.participants?.find(p => isSameJid(p.id, sender))?.admin;
+          permitted = !!isGroupAdmin;
+        }
+        if (!permitted) return send('Kein Zugriff.');
+
+        if (!isGroup) return send('❌ Nur in Gruppen.');
+
+        groupMetadata = groupMetadata || await getGroupMetaSafe(from);
+        const normalizedTarget = normalizeJid(target);
+        const rawId = target.replace(/^@/, '').split('@')[0];
+        
+        const targetParticipant = groupMetadata?.participants?.find(p => 
+          isSameJid(p.id, normalizedTarget) || 
+          (p.id || '').split('@')[0] === rawId
+        );
+
+        if (!targetParticipant) return send('❌ Benutzer nicht gefunden.');
+
+        console.log('[kick-debug] Ziel:', { id: targetParticipant.id, jid: normalizedTarget, raw: rawId });
+
+        try {
+          await sock.groupParticipantsUpdate(from, [targetParticipant.id], 'remove');
+          return send(`✅ @${targetParticipant.id.split('@')[0]} entfernt.`, { mentions: [targetParticipant.id] });
+        } catch (e) {
+          console.error('[kick] Fehler:', e?.message, e?.response?.status);
+          if (e?.message?.includes('not admin') || e?.message?.includes('admin')) {
+            return send('❌ Ich bin kein Gruppenadmin und kann niemanden kicken.');
+          }
+          return send('❌ Kicken fehlgeschlagen: ' + (e?.message || 'Unbekannter Fehler'));
+        }
       }
 
       if (cmd === 'warn') {
@@ -1654,7 +2056,7 @@ if (cmd === 'setrank') {
    if (cmd === 'selfpromote' || cmd === 'sp') {
   try {
     if (!from?.endsWith('@g.us')) return send('⚠ Nur in Gruppen.');
-    if (sender !== OWNNER_LID) return send('⛔ Nur der Owner kann diesen Befehl nutzen.');
+    if (sender !== OWNER_LID) if (sender !== COOWNER_LID) return send('⛔ Nur der Owner kann diesen Befehl nutzen.');
     await sock.groupParticipantsUpdate(from, [sender], 'promote');
     return send('🔰 Selfpromote ausgeführt.');
   } catch (e) {
@@ -1666,7 +2068,7 @@ if (cmd === 'setrank') {
 if (cmd === 'selfdemote' || cmd === 'sd') {
   try {
     if (!from?.endsWith('@g.us')) return send('⚠ Nur in Gruppen.');
-    if (sender !== OWNER_LID) return send('⛔ Nur der Owner kann diesen Befehl nutzen.');
+    if (sender !== OWNER_LID) if (sender !== COOWNER_LID) return send('⛔ Nur der Owner kann diesen Befehl nutzen.');
     await sock.groupParticipantsUpdate(from, [sender], 'demote');
     return send('🔱 Selfdemote ausgeführt.');
   } catch (e) {
