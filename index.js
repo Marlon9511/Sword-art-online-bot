@@ -103,7 +103,7 @@ async function connectBot() {
   const sock = makeWASocket({
     auth: state,
     logger: P({ level: 'silent' }),
-    printQRInTerminal: false // false, weil wir Pairing-Code nutzen
+    printQRInTerminal: false
   });
 
   if (!sock.authState.creds.registered) {
@@ -531,7 +531,6 @@ async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
   const { version } = await fetchLatestBaileysVersion();
 
-  // FIX: printQRInTerminal korrekt geschrieben
   const sock = makeWASocket({
     version,
     logger: P({ level: 'silent' }),
@@ -601,22 +600,18 @@ async function startBot() {
     }
   }
 
-  // FIX: connection.update korrekt strukturiert mit richtigen Klammern
   sock.ev.on('connection.update', async (update) => {
     const { connection, qr, lastDisconnect } = update;
 
-    // FIX: QR-Code an OWNER_PRIV senden (nicht `from` welches hier undefined wäre)
     if (qr) {
       console.log('📱 QR-Code wird generiert...');
-      // Im Terminal anzeigen (Fallback immer verfügbar)
-      QRCode.generate(qr, { small: true }); // FIX: `true` statt `info`
+      QRCode.generate(qr, { small: true });
 
-      // Als Bild an Owner senden
       try {
         const dataUrl = await QRCodeImg.toDataURL(qr, { type: 'image/png', scale: 4 });
         const base64 = dataUrl.split(',')[1];
         const qrBuffer = Buffer.from(base64, 'base64');
-        await sock.sendMessage(OWNER_PRIV, { // FIX: OWNER_PRIV statt `from`
+        await sock.sendMessage(OWNER_PRIV, {
           image: qrBuffer,
           caption: '🤖 QR-Code zum Scannen mit WhatsApp'
         });
@@ -626,7 +621,6 @@ async function startBot() {
       }
     }
 
-    // FIX: Diese Blöcke sind jetzt AUSSERHALB des if(qr)-Blocks
     if (connection === 'open') {
       console.log('✅ Verbunden mit WhatsApp!');
     }
@@ -686,6 +680,26 @@ async function startBot() {
         || (m.message.extendedTextMessage && m.message.extendedTextMessage.text)
         || (m.message.imageMessage && m.message.imageMessage.caption)
         || '';
+
+      // =============================================
+      // FIX 1: AFK-Erkennung bei JEDER Nachricht
+      // (auch ohne Prefix — nicht nur bei Commands)
+      // =============================================
+      if (body && !m.key.fromMe && users[sender]?.afk) {
+        const oldReason = users[sender].afk.reason || 'Abwesend';
+        delete users[sender].afk;
+        try { save(FILES.users, users); } catch (e) {}
+        try {
+          if (isGroup) {
+            await sock.sendMessage(from, {
+              text: `✅ @${sender.split('@')[0]} ist zurück (war AFK: ${oldReason}).`,
+              mentions: [sender]
+            });
+          } else {
+            await sock.sendMessage(from, { text: `✅ Du bist nicht mehr AFK (Grund: ${oldReason}).` });
+          }
+        } catch (e) {}
+      }
 
       const activePrefix = isGroup ? getGroupPrefix(from) : PREFIX;
       if (!body || !body.startsWith(activePrefix)) return;
@@ -845,19 +859,8 @@ async function startBot() {
 
       ensureUser(sender);
 
-      // If user was AFK and now sent a message, clear AFK status
-      if (users[sender]?.afk) {
-        const oldReason = users[sender].afk.reason || 'Abwesend';
-        delete users[sender].afk;
-        try { save(FILES.users, users); } catch (e) {}
-        try {
-          if (from?.endsWith('@g.us')) {
-            await sock.sendMessage(from, { text: `✅ @${sender.split('@')[0]} ist zurück (war AFK: ${oldReason}).`, mentions: [sender] });
-          } else {
-            await sock.sendMessage(from, { text: `✅ Du bist nicht mehr AFK (Grund: ${oldReason}).` });
-          }
-        } catch (e) {}
-      }
+      // NOTE: AFK-Rückkehr wurde bereits OBEN (vor dem Prefix-Check) behandelt,
+      // sodass es auch ohne Command-Prefix funktioniert.
 
       if (!m.key.fromMe) {
         users[sender].xp = (users[sender].xp || 0) + 5;
@@ -895,7 +898,6 @@ async function startBot() {
 
       const send = async (text, opts = {}) => {
         try {
-          // Typing animation: send 'composing' presence, wait 5s, then send message
           try { await sock.sendPresenceUpdate('composing', from); } catch (e) {}
           await sleep(3000);
           try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
@@ -910,13 +912,12 @@ async function startBot() {
       };
       log(`${sender} -> ${body}`);
 
-      // Block commands that are banned for regular users
       if (commandBans && commandBans[cmd] && !isAuthorized(sender, ['OWNER', 'COOWNER'])) {
         try { await sock.sendMessage(from, { text: '⛔ Dieser Befehl wurde vom Owner gesperrt und ist nur für Owner/CoOwner verfügbar.' }); } catch (e) {}
         return;
       }
 
-      // If message mentions users who are AFK, inform the sender
+      // AFK-Mentions: Wenn ein AFK-User erwähnt wird, Sender informieren
       const mentionCtx = m.message?.extendedTextMessage?.contextInfo;
       if (mentionCtx && Array.isArray(mentionCtx.mentionedJid) && mentionCtx.mentionedJid.length) {
         for (const mid of mentionCtx.mentionedJid) {
@@ -948,7 +949,7 @@ async function startBot() {
         return;
       }
 
-      // AFK - set yourself as AFK with optional reason
+      // AFK
       if (cmd === 'afk') {
         const reason = args.length ? args.join(' ') : 'Abwesend';
         if (!users[sender]) ensureUser(sender);
@@ -1104,25 +1105,34 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
         return send(`✅ Antwort für Ticket #${ticket.id} gesendet.`);
       }
 
-      // SETROLE
+      // =============================================
+      // FIX 2: SETROLE — Ränge werden DAUERHAFT in
+      // ranks.json + users.json gespeichert
+      // =============================================
       if (cmd === 'setrole') {
         if (!isAuthorized(sender, ['OWNER'])) return send('❌ Nur für Owner.');
 
-        const [role, ...jids] = args;
-        if (!role) return send(`❌ Nutzung: $setrole <ROLLE> <jid1,jid2,...>`);
+        // Letztes Argument ist die Rolle, alles davor sind JIDs
+        const roleArg = args[args.length - 1];
+        if (!roleArg) return send(`❌ Nutzung: ${PREFIX}setrole <ROLLE> <jid1,jid2,...>\noder: ${PREFIX}setrole <jid> <ROLLE>`);
 
-        const roleUpper = role.toUpperCase();
+        const roleUpper = roleArg.toUpperCase();
         if (!ROLES.hasOwnProperty(roleUpper)) return send(`❌ Ungültige Rolle. Verfügbar: ${Object.keys(ROLES).join(', ')}`);
 
-        // Build target JID list. If none provided, use mentioned JIDs or fall back to the command sender.
-        let jidList = jids.join(' ').split(',').map(j => j.trim()).filter(Boolean);
+        // JID-Liste: Alle Args außer dem letzten (die Rolle)
+        let jidList = args.slice(0, -1).join(' ').split(',').map(j => j.trim()).filter(Boolean);
+
+        // Fallback: @mentions aus contextInfo
         if (jidList.length === 0) {
-          const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid;
+          const mentioned = m.message?.extendedTextMessage?.contextInfo?.mentionedJid;
           if (mentioned && mentioned.length > 0) {
             jidList = mentioned.map(j => j.trim());
-          } else {
-            jidList = [sender];
           }
+        }
+
+        // Letzter Fallback: Sender selbst
+        if (jidList.length === 0) {
+          jidList = [sender];
         }
 
         const validJids = jidList.map(normalizeJid).filter(j => j && (j.endsWith('@s.whatsapp.net') || j.endsWith('@lid')));
@@ -1130,8 +1140,12 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
 
         const normalizedJids = Array.from(new Set(validJids));
 
-        // Update users and ranks persistence
+        // Alle JIDs in ranks.json und users.json speichern
         normalizedJids.forEach(jid => {
+          // ranks.json aktualisieren
+          ranks[jid] = roleUpper;
+
+          // users.json aktualisieren (User anlegen falls nötig)
           if (!users[jid]) {
             users[jid] = {
               xp: 0,
@@ -1148,25 +1162,44 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
           } else {
             users[jid].rank = roleUpper;
           }
-          ranks[jid] = roleUpper;
         });
 
-        // Remove assigned JIDs from other role arrays to avoid stale memberships.
+        // Aus anderen ROLES-Arrays entfernen (keine veralteten Einträge)
         for (const otherRole of Object.keys(ROLES)) {
           if (otherRole === roleUpper) continue;
-          ROLES[otherRole] = ROLES[otherRole].filter(id => !normalizedJids.some(jid => isSameJid(id, jid)));
+          ROLES[otherRole] = (ROLES[otherRole] || []).filter(
+            id => !normalizedJids.some(jid => isSameJid(id, jid))
+          );
         }
 
-        ROLES[roleUpper] = normalizedJids;
+        // Zur Ziel-Rolle hinzufügen (Duplikate vermeiden)
+        if (!ROLES[roleUpper]) ROLES[roleUpper] = [];
+        for (const jid of normalizedJids) {
+          if (!ROLES[roleUpper].some(id => isSameJid(id, jid))) {
+            ROLES[roleUpper].push(jid);
+          }
+        }
 
+        // Alles persistieren
         try {
-          save(FILES.users, users);
           save(FILES.ranks, ranks);
-          save(FILES.owner, { ...ownerCfg, roles: ROLES, ownerLid: OWNER_LID, ownerPriv: OWNER_PRIV, coownerLid: COOWNER_LID });
+          save(FILES.users, users);
+          save(FILES.owner, {
+            ...ownerCfg,
+            roles: ROLES,
+            ownerLid: OWNER_LID,
+            ownerPriv: OWNER_PRIV,
+            coownerLid: COOWNER_LID
+          });
         } catch (e) {
-          return send('❌ Fehler beim Speichern.');
+          return send('❌ Fehler beim Speichern: ' + e.message);
         }
-        return send(`✅ ${normalizedJids.length} JIDs der Rolle ${roleUpper} zugewiesen und in ranks.json sowie users.json gespeichert.`);
+
+        const displayJids = normalizedJids.map(j => j.split('@')[0]).join(', ');
+        return send(
+          `✅ Rolle *${roleUpper}* (${prettyRank(roleUpper)}) erfolgreich gesetzt für:\n${displayJids}\n\n` +
+          `💾 Gespeichert in: ranks.json, users.json, owner.json`
+        );
       }
 
       if (cmd === 'setprefix') {
@@ -1218,7 +1251,8 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
               const n = normalizeJid(id);
               const lid = n ? (n.endsWith('@s.whatsapp.net') ? n.replace('@s.whatsapp.net', '@lid') : n) : id;
               const name = (users[n] && (users[n].name || users[n].registrationName)) || '(kein name)';
-              message += `\n${lid} — ${name}`;
+              const rankEntry = ranks[n] || '(kein rank)';
+              message += `\n${lid} — ${name} [${rankEntry}]`;
             }
             message += '\n\n';
           } else {
@@ -1228,7 +1262,7 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
         return send(message.trim());
       }
 
-      // CMBAN / CMDBAN - ban a command so only OWNER/COOWNER can use it
+      // CMBAN / CMDBAN
       if (cmd === 'cmdban' || cmd === 'bancmd') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Nur Owner/CoOwner.');
         const target = args[0];
@@ -1246,7 +1280,6 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
           return send(`✅ Befehl ${tcmd} wurde entsperrt.`);
         }
 
-        // default: ban/toggle
         if (action === 'ban' || action === 'add' || !action) {
           commandBans[tcmd] = true;
           try { save(FILES.commandBans, commandBans); } catch (e) {}
@@ -1256,7 +1289,7 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
         return send('❌ Ungültige Aktion. Verwende ban oder unban.');
       }
 
-      // APPLYROLES - sync role assignments to a WhatsApp group (promote admins)
+      // APPLYROLES
       if (cmd === 'applyroles') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
         const target = args[0] ? args[0].trim() : from;
@@ -1275,7 +1308,7 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
         }
       }
 
-      // UNBANCMD - unban a command (owner/coowner only)
+      // UNBANCMD
       if (cmd === 'unbancmd') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Nur Owner/CoOwner.');
         const target = args[0];
@@ -1321,9 +1354,7 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
         const r = ranks[normalizedSender] || user.rank || '(none)';
         const caption = `User: ${username}\nCoins: ${coins}\nRank: ${r}`;
 
-        // Try to fetch profile picture (use participant JID for @lid) and send as image with caption
         try {
-          // Try multiple candidates for profile picture (handles @lid, owner LID/PRIV)
           const candidates = [];
           const pjid = toParticipantJid(normalizedSender);
           if (pjid) candidates.push(pjid);
@@ -1362,9 +1393,7 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
             await sock.sendMessage(from, { image: { url: ppUrl }, caption });
             return;
           }
-        } catch (e) {
-          // ignore and fall back to text
-        }
+        } catch (e) {}
 
         return send(caption);
       }
@@ -1444,7 +1473,7 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
           const newSock = makeWASocket({
             version: newVersion,
             logger: P({ level: 'silent' }),
-            printQRInTerminal: true, // FIX: korrekter Name
+            printQRInTerminal: true,
             auth: newState,
             browser: ['Sword-art-online-bot MultiSession', 'Chrome', '4.0.0'],
           });
@@ -1941,7 +1970,7 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
         groupMetadata = groupMetadata || await getGroupMetaSafe(from);
         const normalizedTarget = normalizeJid(target);
         const rawId = target.replace(/^@/, '').split('@')[0];
-        
+
         const targetParticipant = groupMetadata?.participants?.find(p => 
           isSameJid(p.id, normalizedTarget) || 
           (p.id || '').split('@')[0] === rawId
@@ -1998,43 +2027,42 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
         return send(`✅ ${jid} demoted.`);
       }
 
-if (cmd === 'setrank') {
-  if (!isOwner) return send('❌ Nur der Inhaber.');
-  const r = (args[args.length - 1] || '').toUpperCase();
-  if (!r) return send('Usage: $setrank <@mention|num|jid> <OWNER|COOWNER|ADMIN|MOD|VIP|USER>');
+      if (cmd === 'setrank') {
+        if (!isOwner) return send('❌ Nur der Inhaber.');
+        const r = (args[args.length - 1] || '').toUpperCase();
+        if (!r) return send('Usage: $setrank <@mention|num|jid> <OWNER|COOWNER|ADMIN|MOD|VIP|USER>');
 
-  const allowed = ['OWNER', 'COOWNER', 'ADMIN', 'MOD', 'VIP', 'USER'];
-  if (!allowed.includes(r)) return send('Ungültiger Rang.');
+        const allowed = ['OWNER', 'COOWNER', 'ADMIN', 'MOD', 'VIP', 'USER'];
+        if (!allowed.includes(r)) return send('Ungültiger Rang.');
 
-  // JID aus @-Markierung, Nummer oder direkt
-  let jid;
-  const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid;
-  if (mentioned && mentioned.length > 0) {
-    jid = mentioned[0]; // erste @-Markierung verwenden
-  } else {
-    jid = normalizeJid(args[0]);
-  }
+        let jid;
+        const mentioned = m.message?.extendedTextMessage?.contextInfo?.mentionedJid;
+        if (mentioned && mentioned.length > 0) {
+          jid = mentioned[0];
+        } else {
+          jid = normalizeJid(args[0]);
+        }
 
-  if (!jid) return send('Usage: $setrank <@mention|num|jid> <OWNER|COOWNER|ADMIN|MOD|VIP|USER>');
+        if (!jid) return send('Usage: $setrank <@mention|num|jid> <OWNER|COOWNER|ADMIN|MOD|VIP|USER>');
 
-  if (r === 'OWNER') {
-    for (const k of Object.keys(ranks)) { if (ranks[k] === 'OWNER') ranks[k] = 'USER'; }
-    ranks[jid] = 'OWNER'; OWNER_LID = jid;
-    if (jid.endsWith('@s.whatsapp.net')) OWNER_PRIV = jid;
-  } else if (r === 'COOWNER') {
-    for (const k of Object.keys(ranks)) { if (ranks[k] === 'COOWNER') ranks[k] = 'USER'; }
-    ranks[jid] = 'COOWNER'; COOWNER_LID = jid;
-  } else {
-    ranks[jid] = r;
-  }
+        if (r === 'OWNER') {
+          for (const k of Object.keys(ranks)) { if (ranks[k] === 'OWNER') ranks[k] = 'USER'; }
+          ranks[jid] = 'OWNER'; OWNER_LID = jid;
+          if (jid.endsWith('@s.whatsapp.net')) OWNER_PRIV = jid;
+        } else if (r === 'COOWNER') {
+          for (const k of Object.keys(ranks)) { if (ranks[k] === 'COOWNER') ranks[k] = 'USER'; }
+          ranks[jid] = 'COOWNER'; COOWNER_LID = jid;
+        } else {
+          ranks[jid] = r;
+        }
 
-  try {
-    save(FILES.ranks, ranks);
-    save(FILES.owner, { ownerLid: OWNER_LID, ownerPriv: OWNER_PRIV, coownerLid: COOWNER_LID });
-  } catch (e) {}
+        try {
+          save(FILES.ranks, ranks);
+          save(FILES.owner, { ownerLid: OWNER_LID, ownerPriv: OWNER_PRIV, coownerLid: COOWNER_LID });
+        } catch (e) {}
 
-  return send(`✅ Rang von ${jid} auf ${r} gesetzt.`);
-}
+        return send(`✅ Rang von ${jid} auf ${r} gesetzt.`);
+      }
 
       if (cmd === 'datadelete') {
         if (!isOwner) return send('❌ Nur der Inhaber.');
@@ -2053,28 +2081,27 @@ if (cmd === 'setrank') {
         return send(`✅ Daten von ${jid} gelöscht.`);
       }
 
-   if (cmd === 'selfpromote' || cmd === 'sp') {
-  try {
-    if (!from?.endsWith('@g.us')) return send('⚠ Nur in Gruppen.');
-    if (sender !== OWNER_LID) if (sender !== COOWNER_LID) return send('⛔ Nur der Owner kann diesen Befehl nutzen.');
-    await sock.groupParticipantsUpdate(from, [sender], 'promote');
-    return send('🔰 Selfpromote ausgeführt.');
-  } catch (e) {
-    return send('❌ Selfpromote fehlgeschlagen.');
-  }
-}
+      if (cmd === 'selfpromote' || cmd === 'sp') {
+        try {
+          if (!from?.endsWith('@g.us')) return send('⚠ Nur in Gruppen.');
+          if (sender !== OWNER_LID) if (sender !== COOWNER_LID) return send('⛔ Nur der Owner kann diesen Befehl nutzen.');
+          await sock.groupParticipantsUpdate(from, [sender], 'promote');
+          return send('🔰 Selfpromote ausgeführt.');
+        } catch (e) {
+          return send('❌ Selfpromote fehlgeschlagen.');
+        }
+      }
 
-// selfdemote
-if (cmd === 'selfdemote' || cmd === 'sd') {
-  try {
-    if (!from?.endsWith('@g.us')) return send('⚠ Nur in Gruppen.');
-    if (sender !== OWNER_LID) if (sender !== COOWNER_LID) return send('⛔ Nur der Owner kann diesen Befehl nutzen.');
-    await sock.groupParticipantsUpdate(from, [sender], 'demote');
-    return send('🔱 Selfdemote ausgeführt.');
-  } catch (e) {
-    return send('❌ Selfdemote fehlgeschlagen.');
-  }
-}
+      if (cmd === 'selfdemote' || cmd === 'sd') {
+        try {
+          if (!from?.endsWith('@g.us')) return send('⚠ Nur in Gruppen.');
+          if (sender !== OWNER_LID) if (sender !== COOWNER_LID) return send('⛔ Nur der Owner kann diesen Befehl nutzen.');
+          await sock.groupParticipantsUpdate(from, [sender], 'demote');
+          return send('🔱 Selfdemote ausgeführt.');
+        } catch (e) {
+          return send('❌ Selfdemote fehlgeschlagen.');
+        }
+      }
 
       if (cmd === 'joinreq') {
         const link = args[0];
@@ -2186,7 +2213,6 @@ if (cmd === 'selfdemote' || cmd === 'sd') {
       log(`ERROR: ${err?.message || String(err)}`);
     }
   });
-
 
   console.log('✅ Sword-art-online-bot gestartet.');
 }
