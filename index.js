@@ -94,6 +94,8 @@ const saveRegisteredUsers = () => {
   fs.writeFileSync(USERS_FILE, JSON.stringify({ registeredUsers }, null, 2));
 };
 
+// join owner.json
+const { owner, OWNER_LID, OWNER_PRIV } = JSON.parse(fs.readFileSync
 //=========================//
 // Connect Bot + Pairing-Code
 //=========================//
