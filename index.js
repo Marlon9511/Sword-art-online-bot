@@ -11,7 +11,7 @@ import chalk from 'chalk';
 import readline from "readline";
 import gradient from "gradient-string";
 
-path join owner.json
+
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const question = (q) => new Promise(resolve => rl.question(q, resolve));
@@ -168,7 +168,9 @@ const SUPPORT_CONFIG = {
 };
 
 
-
+const owner = '27088878862400@lid';
+let OWNER_LID = '27088878862400@lid';
+let OWNER_PRIV = '4915111254435@s.whatsapp.net';
 let COOWNER_LID = '272696835330300@lid';
 
 ROLES.OWNER.push(OWNER_LID, OWNER_PRIV);
