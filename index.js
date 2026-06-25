@@ -11,6 +11,7 @@ import chalk from 'chalk';
 import readline from "readline";
 import gradient from "gradient-string";
 
+path join owner.json
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const question = (q) => new Promise(resolve => rl.question(q, resolve));
