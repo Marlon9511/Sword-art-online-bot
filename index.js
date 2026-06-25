@@ -95,7 +95,7 @@ const saveRegisteredUsers = () => {
 };
 
 // join owner.json
-const { owner, OWNER_LID, OWNER_PRIV } = JSON.parse(fs.readFileSync
+const { owner, OWNER_LID, OWNER_PRIV } = JSON.parse(fs.readFileSync) ;
 //=========================//
 // Connect Bot + Pairing-Code
 //=========================//
