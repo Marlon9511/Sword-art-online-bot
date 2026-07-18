@@ -13,6 +13,7 @@ import gradient from "gradient-string";
 import { initTelegramConnect, setActiveSock, sendQrToTelegram } from './telegram-connect.js';
 
 
+
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const question = (q) => new Promise(resolve => rl.question(q, resolve));
 
@@ -541,6 +542,8 @@ async function startBot() {
     auth: state
   });
 
+  setActiveSock(sock);
+
   const groupMetaCache = new Map();
   const lastProcessed = new Map();
   const pendingActions = new Map();
@@ -618,6 +621,7 @@ async function startBot() {
           image: qrBuffer,
           caption: '🤖 QR-Code zum Scannen mit WhatsApp'
         });
+        await sendQrToTelegram(qrBuffer);
       } catch (err) {
         console.error('QR Bild-Senden fehlgeschlagen:', err);
         console.log('QR-Code wurde im Terminal angezeigt.');
@@ -2222,5 +2226,4 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
 
 // ========== MAIN ==========
 initTelegramConnect();
-connectBot();
 startBot();
