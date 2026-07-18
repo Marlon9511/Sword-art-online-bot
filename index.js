@@ -10,7 +10,7 @@ import QRCode from 'qrcode-terminal';
 import chalk from 'chalk';
 import readline from "readline";
 import gradient from "gradient-string";
-
+import { initTelegramConnect, setActiveSock, sendQrToTelegram } from './telegram-connect.js';
 
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
