@@ -2221,5 +2221,6 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
 }
 
 // ========== MAIN ==========
+initTelegramConnect();
 connectBot();
 startBot();
