@@ -46,7 +46,8 @@ export function initTelegramConnect() {
     telegramBot.sendMessage(msg.chat.id,
       '🤖 *WhatsApp-Verbindung*\n\n' +
       '/pair <nummer> - Pairing-Code anfordern (z.B. /pair 49123456789)\n' +
-      '/status - Verbindungsstatus prüfen\n\n' +
+      '/status - Verbindungsstatus prüfen\n' +
+      '/unpair - WhatsApp-Verbindung trennen\n\n' +
       'Sobald ein QR-Code generiert wird, schicke ich ihn dir automatisch hier als Bild.',
       { parse_mode: 'Markdown' });
   });
@@ -74,6 +75,23 @@ export function initTelegramConnect() {
     telegramBot.sendMessage(msg.chat.id, connected
       ? `✅ Verbunden als ${currentSock.user.id}`
       : '⚠️ WhatsApp ist aktuell nicht verbunden.');
+  });
+
+  telegramBot.onText(/\/unpair/, async (msg) => {
+    if (!isOwnerChat(msg)) return telegramBot.sendMessage(msg.chat.id, '❌ Kein Zugriff.');
+    if (!currentSock) return telegramBot.sendMessage(msg.chat.id, '⚠️ WhatsApp-Bot ist noch nicht bereit.');
+    
+    const connected = !!(currentSock && currentSock.user);
+    if (!connected) {
+      return telegramBot.sendMessage(msg.chat.id, '⚠️ WhatsApp ist nicht verbunden. Es gibt nichts zu trennen.');
+    }
+
+    try {
+      await currentSock.logout();
+      telegramBot.sendMessage(msg.chat.id, '✅ WhatsApp-Verbindung erfolgreich beendet. Du kannst dich jetzt neu pairen mit /pair');
+    } catch (e) {
+      telegramBot.sendMessage(msg.chat.id, '❌ Fehler beim Trennen: ' + e.message);
+    }
   });
 
   console.log('✅ Telegram-Verbindungs-Bot gestartet. Schreib /start an deinen Bot.');
