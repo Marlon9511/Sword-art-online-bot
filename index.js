@@ -1057,7 +1057,7 @@ ${PREFIX}delete - Als Reply: löscht die Nachricht (eigene immer, fremde nur als
 
         helpText += `*⚙️ Aktuelles Präfix:* ${PREFIX}
 `;
-        if (isAuthorized(sender, ['OWNER', 'SUPPORTER', 'TEST_SUPPORTER'])) {
+        if (isAuthorized(sender, ['OWNER', 'COOWNER', 'MOD', 'SUPPORTER', 'TEST_SUPPORTER'])) {
           helpText += `*🎫 Support-System:*
 ${PREFIX}answer <ticket-id> <text> - Ticket beantworten
 ${PREFIX}support <nachricht> - Support-Ticket erstellen
@@ -1162,7 +1162,7 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
 
       // Ticket answer
       if (cmd === 'answer') {
-        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'SUPPORTER', 'TEST_SUPPORTER'])) return send('❌ Kein Zugriff.');
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'MOD', 'SUPPORTER', 'TEST_SUPPORTER'])) return send('❌ Kein Zugriff.');
         if (args.length < 2) return send(`❌ Nutzung: ${PREFIX}answer <ticket-id> <antwort-text>`);
 
         const rawTicketId = args[0];
@@ -2015,7 +2015,7 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
         }
       }
       if (cmd === 'tickets') {
-        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'SUPPORTER', 'TEST_SUPPORTER'])) return send('Kein Zugriff.');
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'MOD', 'SUPPORTER', 'TEST_SUPPORTER'])) return send('Kein Zugriff.');
         const filter = (args[0] || '').toLowerCase();
         let ticket = null;
 
@@ -2049,7 +2049,7 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
         return send(`🎫 Tickets${subtitle}:\n${list}`, { mentions });
       }
       if (cmd === 'closeticket') {
-        if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('Kein Zugriff.');
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'MOD', 'SUPPORTER', 'TEST_SUPPORTER'])) return send('Kein Zugriff.');
         const id = args[0];
         if (!id || !tickets[id]) return send('Usage: $closeticket <id>');
         tickets[id].status = 'closed';
