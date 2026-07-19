@@ -1330,10 +1330,11 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
           return send('❌ Fehler beim Speichern: ' + e.message);
         }
 
-        const displayJids = normalizedJids.map(j => j.split('@')[0]).join(', ');
+        const displayMentions = normalizedJids.map(j => getNumberMention(j)).join(', ');
         return send(
-          `✅ Rolle *${roleUpper}* (${prettyRank(roleUpper)}) erfolgreich gesetzt für:\n${displayJids}\n\n` +
-          `💾 Gespeichert in: ranks.json, users.json, owner.json`
+          `✅ Rolle *${roleUpper}* (${prettyRank(roleUpper)}) erfolgreich gesetzt für:\n${displayMentions}\n\n` +
+          `💾 Gespeichert in: ranks.json, users.json, owner.json`,
+          { mentions: normalizedJids }
         );
       }
 
@@ -2295,7 +2296,7 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
           save(FILES.owner, { ownerLid: OWNER_LID, ownerPriv: OWNER_PRIV, coownerLid: COOWNER_LID });
         } catch (e) {}
 
-        return send(`✅ Rang von ${jid} auf ${r} gesetzt.`);
+        return send(`✅ Rang von ${getNumberMention(jid)} auf ${r} gesetzt.`, { mentions: [jid] });
       }
 
       if (cmd === 'datadelete') {
