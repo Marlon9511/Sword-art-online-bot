@@ -543,6 +543,17 @@ function getNumberMention(jid) {
   return `@${num}`;
 }
 
+// Sucht die JID eines registrierten Nutzers anhand des gespeicherten Namens (z.B. bei $setrole @kirito).
+function findUserJidByName(name) {
+  const target = String(name || '').trim().toLowerCase();
+  if (!target) return null;
+  for (const [jid, u] of Object.entries(users)) {
+    const uname = u?.name || u?.registrationName;
+    if (uname && String(uname).trim().toLowerCase() === target) return jid;
+  }
+  return null;
+}
+
 function unregisterUser(jid) {
   const normalizedJid = normalizeJid(jid);
   if (users[normalizedJid]) {
@@ -1211,21 +1222,38 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
       if (cmd === 'setrole') {
         if (!isAuthorized(sender, ['OWNER'])) return send('❌ Nur für Owner.');
 
-        // Letztes Argument ist die Rolle, alles davor sind JIDs
-        const roleArg = args[args.length - 1];
-        if (!roleArg) return send(`❌ Nutzung: ${PREFIX}setrole <ROLLE> <jid1,jid2,...>\noder: ${PREFIX}setrole <jid> <ROLLE>`);
+        if (args.length < 2) {
+          return send(`❌ Nutzung:\n${PREFIX}setrole @user <ROLLE>\noder: ${PREFIX}setrole <ROLLE> @user\nVerfügbare Rollen: ${Object.keys(ROLES).join(', ')}`);
+        }
 
-        const roleUpper = roleArg.toUpperCase();
-        if (!ROLES.hasOwnProperty(roleUpper)) return send(`❌ Ungültige Rolle. Verfügbar: ${Object.keys(ROLES).join(', ')}`);
+        // Rolle darf vorne ODER hinten stehen
+        const firstUpper = args[0].toUpperCase();
+        const lastUpper = args[args.length - 1].toUpperCase();
 
-        // JID-Liste: Alle Args außer dem letzten (die Rolle)
-        let jidList = args.slice(0, -1).join(' ').split(',').map(j => j.trim()).filter(Boolean);
+        let roleUpper, targetArgs;
+        if (ROLES.hasOwnProperty(lastUpper)) {
+          roleUpper = lastUpper;
+          targetArgs = args.slice(0, -1);
+        } else if (ROLES.hasOwnProperty(firstUpper)) {
+          roleUpper = firstUpper;
+          targetArgs = args.slice(1);
+        } else {
+          return send(`❌ Ungültige Rolle. Verfügbar: ${Object.keys(ROLES).join(', ')}\nNutzung: ${PREFIX}setrole @user <ROLLE> oder ${PREFIX}setrole <ROLLE> @user`);
+        }
 
-        // Fallback: @mentions aus contextInfo
-        if (jidList.length === 0) {
-          const mentioned = m.message?.extendedTextMessage?.contextInfo?.mentionedJid;
-          if (mentioned && mentioned.length > 0) {
-            jidList = mentioned.map(j => j.trim());
+        // Ziel-JIDs sammeln: 1) echte @-Mentions (am zuverlässigsten), 2) Nummern/JIDs im Text,
+        // 3) registrierte Namen (z.B. "kirito"), falls kein echter Mention/JID erkannt wurde
+        const mentioned = m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+        let jidList = [...mentioned];
+
+        const textTargets = targetArgs.join(' ').split(',').map(s => s.trim()).filter(Boolean);
+        for (const raw of textTargets) {
+          const cleaned = raw.startsWith('@') ? raw.slice(1) : raw;
+          if (/^\d{5,}(@[\w.]+)?$/.test(cleaned)) {
+            jidList.push(raw);
+          } else {
+            const byName = findUserJidByName(cleaned);
+            if (byName) jidList.push(byName);
           }
         }
 
@@ -1235,7 +1263,7 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
         }
 
         const validJids = jidList.map(normalizeJid).filter(j => j && (j.endsWith('@s.whatsapp.net') || j.endsWith('@lid')));
-        if (!validJids.length) return send('❌ Keine gültigen JIDs gefunden.');
+        if (!validJids.length) return send('❌ Keine gültigen Nutzer gefunden (weder Mention, Nummer noch registrierter Name).');
 
         const normalizedJids = Array.from(new Set(validJids));
 
