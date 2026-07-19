@@ -1061,7 +1061,8 @@ ${PREFIX}delete - Als Reply: löscht die Nachricht (eigene immer, fremde nur als
           helpText += `*🎫 Support-System:*
 ${PREFIX}answer <ticket-id> <text> - Ticket beantworten
 ${PREFIX}support <nachricht> - Support-Ticket erstellen
-${PREFIX}tickets [id|status] - Tickets anzeigen\n\n`;
+${PREFIX}tickets [id|status] - Tickets anzeigen
+${PREFIX}cleartickets - Alle Tickets löschen (Zähler auf 0001)\n\n`;
         }
 
         if (isAdmin) {
@@ -2047,6 +2048,19 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
         tickets[id].status = 'closed';
         save(FILES.tickets, tickets);
         return send(`✅ Ticket ${id} geschlossen.`);
+      }
+
+      // CLEARTICKETS — alle Tickets auf einmal löschen, Zähler zurücksetzen
+      if (cmd === 'cleartickets' || cmd === 'clearalltickets' || cmd === 'ticketsclear') {
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
+        const count = Object.keys(tickets).length;
+        if (!count) return send('ℹ️ Es sind bereits keine Tickets vorhanden.');
+
+        for (const key of Object.keys(tickets)) delete tickets[key];
+        save(FILES.tickets, tickets);
+        ticketCounter = 0;
+
+        return send(`✅ ${count} Ticket(s) wurden gelöscht. Zähler zurückgesetzt — das nächste Ticket beginnt wieder bei #0001.`);
       }
 
       // TEAM TODOS
