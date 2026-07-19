@@ -1,4 +1,3 @@
-
 import { makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion, DisconnectReason } from '@whiskeysockets/baileys';
 import fs from 'fs';
 import path from 'path';
@@ -1025,7 +1024,8 @@ ${PREFIX}gi - Gruppeneinstellungen anzeigen
 ${PREFIX}welcome-an - Welcome aktivieren
 ${PREFIX}welcome-aus - Welcome deaktivieren
 ${PREFIX}welcome-set <text> - Welcome-Text setzen
-${PREFIX}hidetag - Nachricht mit verstecktem Tag\n\n`;
+${PREFIX}hidetag - Nachricht mit verstecktem Tag
+${PREFIX}delete - Als Reply: löscht die Nachricht (eigene immer, fremde nur als Admin)\n\n`;
 
         helpText += `*⚙️ Aktuelles Präfix:* ${PREFIX}
 `;
@@ -1055,7 +1055,10 @@ ${PREFIX}updateprofile - Profil aktualisieren
       ${PREFIX}bancmd <befehl> [ban|unban] - cmdban befehl (unban oder ban)
 ${PREFIX}setrole @user <rolle> - Nutzerrolle setzen
 ${PREFIX}listroles - Alle Rollen anzeigen
-${PREFIX}newsession <name> - Neue Bot-Session starten (weitere Nummer)\n\n`;
+${PREFIX}newsession <name> - Neue Bot-Session starten (weitere Nummer)
+${PREFIX}sessions - Aktive Sessions anzeigen
+${PREFIX}stopsession <name> - Session stoppen (Login-Daten bleiben)
+${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
         }
 
         helpText += `_Tipp: Nutze die Befehle ohne Parameter für mehr Info_`;
@@ -1564,6 +1567,44 @@ ${PREFIX}newsession <name> - Neue Bot-Session starten (weitere Nummer)\n\n`;
         }
       }
 
+      // DELETESESSION — Session stoppen UND komplett von der Platte löschen
+      if (cmd === 'deletesession' || cmd === 'delsession') {
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
+        const target = args[0];
+        if (!target) return send(`❌ Nutzung: ${PREFIX}deletesession <name>`);
+
+        const targetPath = path.join(SESSIONS_DIR, target);
+        const normalizedTargetPath = path.normalize(targetPath);
+        if (!normalizedTargetPath.startsWith(SESSIONS_DIR)) return send('❌ Ungültiger Session-Name.');
+
+        const isCurrentSession = target === sessionName;
+        if (isCurrentSession) {
+          return send('❌ Diese Session läuft gerade und beantwortet deinen Befehl — lösche sie über eine andere Session oder stoppe sie zuerst manuell auf dem Server.');
+        }
+
+        const targetSock = activeSessions.get(target);
+        if (targetSock) {
+          try {
+            activeSessions.delete(target);
+            targetSock.ev.removeAllListeners();
+            try { await targetSock.logout(); } catch (e) {}
+            try { targetSock.end(new Error('deleted by command')); } catch (e) {}
+          } catch (e) {}
+        }
+
+        if (!fs.existsSync(targetPath)) {
+          return send(`❌ Session "${target}" existiert nicht (weder aktiv noch als gespeicherte Login-Daten).`);
+        }
+
+        try {
+          fs.rmSync(targetPath, { recursive: true, force: true });
+        } catch (e) {
+          return send(`❌ Fehler beim Löschen der Session-Dateien von "${target}": ` + e.message);
+        }
+
+        return send(`✅ Session "${target}" wurde gestoppt und vollständig gelöscht (inkl. Login-Daten). Beim nächsten "${PREFIX}newsession ${target}" muss neu per QR-Code gescannt werden.`);
+      }
+
       // HIDETAG
       if (cmd === 'hidetag') {
         if (!isGroup) return send('❌ Nur in Gruppen.');
@@ -1581,6 +1622,47 @@ ${PREFIX}newsession <name> - Neue Bot-Session starten (weitere Nummer)\n\n`;
           return send(message, { mentions, quoted: m });
         } catch (err) {
           return send('❌ Fehler beim Ausführen.');
+        }
+      }
+
+      // DELETE / DEL — Nachricht löschen (per Reply auf die Nachricht)
+      if (cmd === 'delete' || cmd === 'del') {
+        const ctx = m.message?.extendedTextMessage?.contextInfo;
+        if (!ctx || !ctx.stanzaId) {
+          return send(`❌ Antworte mit ${activePrefix}delete auf die Nachricht, die gelöscht werden soll.`);
+        }
+
+        const quotedParticipant = normalizeJid(ctx.participant || from);
+        const botSelfIds = getBotSelfIds(sock);
+        const quotedRaw = String(quotedParticipant);
+        const isOwnMessage = botSelfIds.has(quotedRaw) || botSelfIds.has(quotedRaw.split('@')[0]);
+
+        if (!isOwnMessage) {
+          if (!isGroup) {
+            return send('❌ In privaten Chats kann ich nur meine eigenen Nachrichten löschen.');
+          }
+          let permitted = isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD']);
+          if (!permitted) {
+            const groupMetadata = await getGroupMetaSafe(from);
+            const isGroupAdmin = groupMetadata?.participants?.find(p => isSameJid(p.id, sender))?.admin;
+            permitted = !!isGroupAdmin;
+          }
+          if (!permitted) return send('❌ Du darfst nur eigene Nachrichten oder (als Admin) fremde Nachrichten löschen.');
+        }
+
+        const key = {
+          remoteJid: from,
+          id: ctx.stanzaId,
+          fromMe: isOwnMessage,
+          ...(isGroup ? { participant: quotedParticipant } : {})
+        };
+
+        try {
+          await sock.sendMessage(from, { delete: key });
+          return;
+        } catch (e) {
+          console.error('[delete] Fehler:', e);
+          return send('❌ Löschen fehlgeschlagen (ich brauche dafür ggf. Admin-Rechte in der Gruppe, wenn es nicht meine eigene Nachricht ist).');
         }
       }
 
