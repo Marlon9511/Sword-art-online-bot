@@ -1188,11 +1188,12 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
           console.error('[answer] Konnte Antwort nicht direkt an den Nutzer senden:', e);
         }
 
-        ticket.status = 'answered';
-        ticket.answeredBy = sender;
-        ticket.answer = answerText;
+        // Ticket nach Beantwortung löschen, damit die Nummerierung wieder bei 0001 beginnt
+        delete tickets[ticket.id];
         save(FILES.tickets, tickets);
-        return send(`✅ Antwort für Ticket #${ticket.id} gesendet.`);
+        ticketCounter = Object.keys(tickets).length;
+
+        return send(`✅ Antwort für Ticket #${ticket.id} gesendet und Ticket gelöscht.`);
       }
 
       // =============================================
