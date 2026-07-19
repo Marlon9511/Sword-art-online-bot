@@ -380,6 +380,35 @@ function isSameJid(a, b) {
   return normalizeJid(a) === normalizeJid(b);
 }
 
+// Ermittelt alle bekannten eigenen Identitäten des Bots (JID/LID/Nummer),
+// komplett dynamisch aus dem aktiven Socket — es muss keine LID mehr
+// hart im Script eingetragen werden.
+function getBotSelfIds(sock) {
+  const ids = new Set();
+
+  const add = (value) => {
+    if (!value) return;
+    const s = String(value);
+    ids.add(s);
+
+    const num = s.split(':')[0].split('@')[0].replace(/[^0-9]/g, '');
+    if (num) {
+      ids.add(num);
+      ids.add(`${num}@s.whatsapp.net`);
+      ids.add(`${num}@lid`);
+      ids.add(`${num}@c.us`);
+    }
+  };
+
+  add(sock?.user?.id);
+  add(sock?.user?.lid);
+  add(sock?.user?.jid);
+  add(sock?.authState?.creds?.me?.id);
+  add(sock?.authState?.creds?.me?.lid);
+
+  return ids;
+}
+
 function normalizeDataKeys(obj) {
   const out = {};
   for (const k of Object.keys(obj || {})) {
@@ -527,10 +556,18 @@ function bjVal(card) { if (['J', 'Q', 'K'].includes(card.value)) return 10; if (
 function bjScore(hand) { let s = 0, ac = 0; for (const c of hand) { if (c.value === 'A') { ac++; s += 11; } else s += bjVal(c); } while (s > 21 && ac > 0) { s -= 10; ac--; } return s; }
 
 // ========== START BOT ==========
-async function startBot() {
-  const sessionSockets = new Map();
+// sessionName: Ordnername unter /sessions für diese Bot-Instanz.
+// hooks: optionale { onQr(qrBuffer, sessionName), onOpen(botId, sessionName) },
+//        werden z.B. vom $newsession-Befehl genutzt, um QR/Status in den
+//        anfragenden Chat statt an OWNER_PRIV zu schicken.
+async function startBot(sessionName = 'default', hooks = {}) {
+  if (activeSessions.has(sessionName)) {
+    console.log(chalk.yellow(`⚠ Session "${sessionName}" läuft bereits.`));
+    return activeSessions.get(sessionName);
+  }
 
-  const AUTH_DIR = process.env.AUTH_DIR || path.join(SESSIONS_DIR, process.env.SESSION_NAME || 'default');
+  const AUTH_DIR = path.join(SESSIONS_DIR, sessionName);
+  ensureDir(AUTH_DIR);
 
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
   const { version } = await fetchLatestBaileysVersion();
@@ -542,7 +579,13 @@ async function startBot() {
     auth: state
   });
 
-  setActiveSock(sock);
+  activeSessions.set(sessionName, sock);
+
+  // Der Telegram-QR-Relay bleibt an die erste/Standard-Session gekoppelt,
+  // damit zusätzliche Sessions ihn nicht überschreiben.
+  if (sessionName === 'default') {
+    setActiveSock(sock);
+  }
 
   const groupMetaCache = new Map();
   const lastProcessed = new Map();
@@ -610,18 +653,23 @@ async function startBot() {
     const { connection, qr, lastDisconnect } = update;
 
     if (qr) {
-      console.log('📱 QR-Code wird generiert...');
+      console.log(`📱 QR-Code für Session "${sessionName}" wird generiert...`);
       QRCode.generate(qr, { small: true });
 
       try {
         const dataUrl = await QRCodeImg.toDataURL(qr, { type: 'image/png', scale: 4 });
         const base64 = dataUrl.split(',')[1];
         const qrBuffer = Buffer.from(base64, 'base64');
-        await sock.sendMessage(OWNER_PRIV, {
-          image: qrBuffer,
-          caption: '🤖 QR-Code zum Scannen mit WhatsApp'
-        });
-        await sendQrToTelegram(qrBuffer);
+
+        if (hooks.onQr) {
+          await hooks.onQr(qrBuffer, sessionName);
+        } else {
+          await sock.sendMessage(OWNER_PRIV, {
+            image: qrBuffer,
+            caption: `🤖 QR-Code zum Scannen mit WhatsApp (Session: ${sessionName})`
+          });
+          await sendQrToTelegram(qrBuffer);
+        }
       } catch (err) {
         console.error('QR Bild-Senden fehlgeschlagen:', err);
         console.log('QR-Code wurde im Terminal angezeigt.');
@@ -629,12 +677,16 @@ async function startBot() {
     }
 
     if (connection === 'open') {
-      console.log('✅ Verbunden mit WhatsApp!');
+      console.log(`✅ Session "${sessionName}" verbunden mit WhatsApp!`);
+      if (hooks.onOpen) {
+        try { await hooks.onOpen(sock.user?.id, sessionName); } catch (e) {}
+      }
     }
 
     if (connection === 'close') {
-      console.log('⚠ Verbindung geschlossen — neu verbinden in 3s');
-      setTimeout(() => startBot(), 3000);
+      console.log(`⚠ Session "${sessionName}" getrennt — neu verbinden in 3s`);
+      activeSessions.delete(sessionName);
+      setTimeout(() => startBot(sessionName, hooks), 3000);
     }
   });
 
@@ -721,26 +773,9 @@ async function startBot() {
             return;
           }
 
-          const BOT_LID = '31959606677598@lid';
-          const rawNumber = (sock.user?.id || '').split(':')[0].split('@')[0].replace(/[^0-9]/g, '');
-          const lidNumber = BOT_LID.split('@')[0];
-
-          const possibleBotIds = [
-            BOT_LID,
-            sock.user?.id,
-            sock.user?.jid,
-            sock.user?.id?.split(':')[0],
-            rawNumber ? `${rawNumber}@s.whatsapp.net` : null,
-            rawNumber ? `${rawNumber}@c.us` : null,
-            `${lidNumber}@s.whatsapp.net`,
-          ].filter(Boolean);
-
-          const allBotIds = [...new Set(possibleBotIds.flatMap(id => [
-            id,
-            id.split('@')[0],
-            `${id.split('@')[0]}@s.whatsapp.net`,
-            `${id.split('@')[0]}@c.us`
-          ]))].map(String);
+          // Eigene Identität wird komplett dynamisch aus dem Socket ermittelt —
+          // keine hartkodierte LID mehr nötig.
+          const allBotIds = [...getBotSelfIds(sock)];
 
           const botPart = (meta.participants || []).find(p => {
             const pids = [
@@ -1018,7 +1053,8 @@ ${PREFIX}restart - Bot neu starten
 ${PREFIX}updateprofile - Profil aktualisieren
       ${PREFIX}bancmd <befehl> [ban|unban] - cmdban befehl (unban oder ban)
 ${PREFIX}setrole @user <rolle> - Nutzerrolle setzen
-${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
+${PREFIX}listroles - Alle Rollen anzeigen
+${PREFIX}newsession <name> - Neue Bot-Session starten (weitere Nummer)\n\n`;
         }
 
         helpText += `_Tipp: Nutze die Befehle ohne Parameter für mehr Info_`;
@@ -1468,56 +1504,63 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
       // NEWSESSION
       if (cmd === 'newsession') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) return send('❌ Kein Zugriff.');
-        const sessionName = args[0];
-        if (!sessionName) return send('❌ Beispiel: $newsession meinbot');
+        const newSessionName = args[0];
+        if (!newSessionName) return send('❌ Beispiel: $newsession meinbot');
+        if (activeSessions.has(newSessionName)) return send(`❌ Session "${newSessionName}" läuft bereits.`);
 
-        const authPath = path.join(SESSIONS_DIR, sessionName);
-        if (!fs.existsSync(authPath)) fs.mkdirSync(authPath, { recursive: true });
+        await send(`⏳ Starte neue Session "${newSessionName}"...`);
 
-        try {
-          const { state: newState, saveCreds: newSaveCreds } = await useMultiFileAuthState(authPath);
-          const { version: newVersion } = await fetchLatestBaileysVersion();
-          const newSock = makeWASocket({
-            version: newVersion,
-            logger: P({ level: 'silent' }),
-            printQRInTerminal: true,
-            auth: newState,
-            browser: ['Sword-art-online-bot MultiSession', 'Chrome', '4.0.0'],
-          });
-
-          activeSessions.set(sessionName, newSock);
-
-          newSock.ev.on('creds.update', newSaveCreds);
-
-          newSock.ev.on('connection.update', async (upd) => {
-            const { qr: newQr, connection: newConn } = upd;
-
-            if (newQr) {
-              try {
-                const dataUrl = await QRCodeImg.toDataURL(newQr, { type: 'image/png', scale: 6 });
-                const base64 = dataUrl.split(',')[1];
-                const qrBuffer = Buffer.from(base64, 'base64');
-                await sock.sendMessage(from, {
-                  image: qrBuffer,
-                  mimetype: 'image/png',
-                  caption: `🤖 Neue Bot Session: ${sessionName}\nScanne den QR-Code.`
-                });
-              } catch (err) {
-                console.error('QR send error:', err);
-                try { await sock.sendMessage(from, { text: `QR für ${sessionName}:\n${newQr}` }); } catch (e) {}
-              }
+        startBot(newSessionName, {
+          onQr: async (qrBuffer) => {
+            try {
+              await sock.sendMessage(from, {
+                image: qrBuffer,
+                mimetype: 'image/png',
+                caption: `🤖 Neue Bot Session: ${newSessionName}\nScanne den QR-Code.`
+              });
+            } catch (err) {
+              console.error('QR send error:', err);
             }
-
-            if (newConn === 'open') {
-              const id = newSock.user?.id || '(unknown)';
-              try { await sock.sendMessage(from, { text: `✅ Session "${sessionName}" angemeldet! JID: ${id}` }); } catch (e) {}
-            }
-          });
-        } catch (err) {
+          },
+          onOpen: async (id) => {
+            try { await sock.sendMessage(from, { text: `✅ Session "${newSessionName}" angemeldet! JID: ${id || '(unbekannt)'}` }); } catch (e) {}
+          }
+        }).catch(async (err) => {
           console.error('Session creation error:', err);
-          return send('❌ Fehler beim Erstellen der Session.');
-        }
+          try { await sock.sendMessage(from, { text: `❌ Fehler beim Erstellen der Session "${newSessionName}".` }); } catch (e) {}
+        });
+
         return;
+      }
+
+      // SESSIONS
+      if (cmd === 'sessions') {
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) return send('❌ Kein Zugriff.');
+        const list = [...activeSessions.keys()].map(name => {
+          const s = activeSessions.get(name);
+          const id = s?.user?.id || '(verbindet...)';
+          return `• ${name} — ${id}`;
+        }).join('\n') || '(keine aktiven Sessions)';
+        return send(`📱 Aktive Sessions:\n${list}`);
+      }
+
+      // STOPSESSION
+      if (cmd === 'stopsession') {
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
+        const target = args[0];
+        if (!target) return send(`❌ Nutzung: ${PREFIX}stopsession <name>`);
+        if (target === 'default') return send('❌ Die Standard-Session kann nicht über den Befehl gestoppt werden.');
+        const targetSock = activeSessions.get(target);
+        if (!targetSock) return send(`❌ Session "${target}" ist nicht aktiv.`);
+        try {
+          activeSessions.delete(target);
+          targetSock.ev.removeAllListeners();
+          try { await targetSock.logout(); } catch (e) {}
+          try { targetSock.end(new Error('stopped by command')); } catch (e) {}
+          return send(`✅ Session "${target}" gestoppt.`);
+        } catch (e) {
+          return send(`❌ Fehler beim Stoppen von "${target}": ` + e.message);
+        }
       }
 
       // HIDETAG
@@ -2221,9 +2264,31 @@ ${PREFIX}listroles - Alle Rollen anzeigen\n\n`;
     }
   });
 
-  console.log('✅ Sword-art-online-bot gestartet.');
+  console.log(`✅ Sword-art-online-bot Session "${sessionName}" gestartet.`);
+  return sock;
 }
 
 // ========== MAIN ==========
 initTelegramConnect();
-startBot();
+
+(async () => {
+  let existingSessions = [];
+  try {
+    existingSessions = fs.readdirSync(SESSIONS_DIR, { withFileTypes: true })
+      .filter(d => d.isDirectory())
+      .map(d => d.name);
+  } catch (e) {
+    existingSessions = [];
+  }
+
+  if (existingSessions.length === 0) {
+    // Noch keine Session vorhanden -> Standard-Session anlegen (QR-Login)
+    await startBot('default');
+  } else {
+    // Alle vorhandenen Sessions parallel wieder starten
+    for (const sessionName of existingSessions) {
+      await startBot(sessionName);
+      await sleep(1000); // kleine Pause, um Rate-Limits beim Verbindungsaufbau zu vermeiden
+    }
+  }
+})();
