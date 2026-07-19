@@ -1,4 +1,3 @@
-
 import { makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion, DisconnectReason } from '@whiskeysockets/baileys';
 import fs from 'fs';
 import path from 'path';
@@ -534,6 +533,14 @@ function getMentionDisplay(jid, contacts = {}) {
     display = contact.notify || contact.name || contact.vname || contact.short || contact.formattedName;
   }
   return `@${String(display || normalizedJid.split('@')[0]).replace(/\n/g, ' ').trim()}`;
+}
+
+// Zeigt IMMER die Nummer als klickbare @-Markierung (keine Namen) —
+// genutzt bei Support-Anfragen, damit direkt erkennbar/anklickbar ist, wer es ist.
+function getNumberMention(jid) {
+  const normalizedJid = normalizeJid(jid);
+  const num = String(normalizedJid || '').split('@')[0];
+  return `@${num}`;
 }
 
 function unregisterUser(jid) {
@@ -1975,7 +1982,7 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
         save(FILES.tickets, tickets);
         try {
           await sock.sendMessage(SUPPORT_CONFIG.TICKET_GROUP, {
-            text: `🎫 Neues Ticket #${ticketId}\nVon: ${getMentionDisplay(sender, sock.contacts)}\n\nNachricht:\n${text}`,
+            text: `🎫 Neues Ticket #${ticketId}\nVon: ${getNumberMention(sender)}\n\nNachricht:\n${text}`,
             mentions: [sender]
           });
           return send(`✅ Ticket #${ticketId} erstellt.`);
@@ -1997,7 +2004,7 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
           return send(
             `🎫 Ticket #${ticket.id}\n` +
             `Status: ${ticket.status}\n` +
-            `Von: ${getMentionDisplay(ticket.sender, sock.contacts)}\n` +
+            `Von: ${getNumberMention(ticket.sender)}\n` +
             `Nachricht: ${messageText}\n` +
             `Antwort: ${ticket.answer || 'Keine'}\n` +
             `Erstellt: ${new Date(ticket.timestamp).toLocaleString()}`,
@@ -2011,7 +2018,7 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
         const list = visibleTickets
           .map(t => {
             const msg = String(t.message || t.text || '').slice(0, 50);
-            return `${t.id} | ${t.status} | ${getMentionDisplay(t.sender, sock.contacts)} | ${msg}${msg.length >= 50 ? '…' : ''}`;
+            return `${t.id} | ${t.status} | ${getNumberMention(t.sender)} | ${msg}${msg.length >= 50 ? '…' : ''}`;
           })
           .join('\n') || '(keine)';
         const subtitle = filter ? ` (${filter === 'all' ? 'alle' : filter})` : '';
