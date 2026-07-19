@@ -1,3 +1,4 @@
+
 import { makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion, DisconnectReason } from '@whiskeysockets/baileys';
 import fs from 'fs';
 import path from 'path';
@@ -409,6 +410,20 @@ function getBotSelfIds(sock) {
   return ids;
 }
 
+// Findet den AFK-Eintrag eines Users auch dann, wenn WhatsApp die Nachricht
+// unter einer anderen JID-Form schickt als die, unter der $afk gesetzt wurde
+// (z.B. @lid beim Setzen, @s.whatsapp.net bei der nächsten Nachricht, oder umgekehrt).
+// Gibt den tatsächlichen Schlüssel in `users` zurück, unter dem der AFK-Eintrag liegt, oder null.
+function findAfkKey(rawJid) {
+  const candidates = new Set(
+    [normalizeJid(rawJid), toParticipantJid(rawJid), toLidJid(rawJid)].filter(Boolean)
+  );
+  for (const candidate of candidates) {
+    if (users[candidate]?.afk) return candidate;
+  }
+  return null;
+}
+
 function normalizeDataKeys(obj) {
   const out = {};
   for (const k of Object.keys(obj || {})) {
@@ -743,21 +758,27 @@ async function startBot(sessionName = 'default', hooks = {}) {
       // =============================================
       // FIX 1: AFK-Erkennung bei JEDER Nachricht
       // (auch ohne Prefix — nicht nur bei Commands)
+      // FIX 2: Erkennt den AFK-Eintrag auch, wenn die Rückkehr-Nachricht
+      // unter einer anderen JID-Form (LID vs. Telefonnummer) ankommt
+      // als die, unter der $afk ursprünglich gesetzt wurde.
       // =============================================
-      if (body && !m.key.fromMe && users[sender]?.afk) {
-        const oldReason = users[sender].afk.reason || 'Abwesend';
-        delete users[sender].afk;
-        try { save(FILES.users, users); } catch (e) {}
-        try {
-          if (isGroup) {
-            await sock.sendMessage(from, {
-              text: `✅ @${sender.split('@')[0]} ist zurück (war AFK: ${oldReason}).`,
-              mentions: [sender]
-            });
-          } else {
-            await sock.sendMessage(from, { text: `✅ Du bist nicht mehr AFK (Grund: ${oldReason}).` });
-          }
-        } catch (e) {}
+      if (body && !m.key.fromMe) {
+        const afkKey = findAfkKey(sender);
+        if (afkKey) {
+          const oldReason = users[afkKey].afk.reason || 'Abwesend';
+          delete users[afkKey].afk;
+          try { save(FILES.users, users); } catch (e) {}
+          try {
+            if (isGroup) {
+              await sock.sendMessage(from, {
+                text: `✅ @${sender.split('@')[0]} ist zurück (war AFK: ${oldReason}).`,
+                mentions: [sender]
+              });
+            } else {
+              await sock.sendMessage(from, { text: `✅ Du bist nicht mehr AFK (Grund: ${oldReason}).` });
+            }
+          } catch (e) {}
+        }
       }
 
       const activePrefix = isGroup ? getGroupPrefix(from) : PREFIX;
@@ -963,8 +984,8 @@ async function startBot(sessionName = 'default', hooks = {}) {
       const mentionCtx = m.message?.extendedTextMessage?.contextInfo;
       if (mentionCtx && Array.isArray(mentionCtx.mentionedJid) && mentionCtx.mentionedJid.length) {
         for (const mid of mentionCtx.mentionedJid) {
-          const normalized = normalizeJid(mid);
-          const afk = users[normalized]?.afk;
+          const afkKey = findAfkKey(mid);
+          const afk = afkKey ? users[afkKey].afk : null;
           if (afk) {
             const reason = afk.reason || 'Abwesend';
             try {
