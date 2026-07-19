@@ -1160,22 +1160,37 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
       }
 
       // Ticket answer
-      if (cmd === 'answer' && isAuthorized(sender, ['OWNER', 'SUPPORTER', 'TEST_SUPPORTER']) && args.length >= 2) {
+      if (cmd === 'answer' && isAuthorized(sender, ['OWNER', 'COOWNER', 'SUPPORTER', 'TEST_SUPPORTER']) && args.length >= 2) {
         const rawTicketId = args[0];
         const ticketId = normalizeTicketId(rawTicketId);
-        const answer = args.slice(1).join(' ');
+        const answerText = args.slice(1).join(' ');
 
         const ticket = getTicketById(rawTicketId);
         if (!ticket) return send(`❌ Ticket #${rawTicketId} nicht gefunden.`);
 
+        const normalizedAnswerer = normalizeJid(sender);
+        const answererRank = ranks[normalizedAnswerer] || users[normalizedAnswerer]?.rank || 'USER';
+        const rankLabel = prettyRank(answererRank);
+
+        // Bestätigung/Log in der internen Support-Gruppe — statt "Supporter" steht hier der Team-Rang
         await sock.sendMessage(SUPPORT_CONFIG.SUPPORT_GROUP, {
-          text: `📝 Antwort auf Ticket #${ticket.id}:\n\n${answer}\n\nSupporter: ${getMentionDisplay(sender, sock.contacts)}`,
+          text: `📝 Antwort auf Ticket #${ticket.id}:\n\n${answerText}\n\n${rankLabel}: ${getNumberMention(sender)}`,
           mentions: [sender]
         });
 
+        // Antwort direkt an den Ticket-Ersteller, mit klickbarer @-Markierung des Teammitglieds
+        try {
+          await sock.sendMessage(ticket.sender, {
+            text: `📩 Antwort auf dein Support-Ticket #${ticket.id}:\n\n${answerText}\n\nBeantwortet von: ${rankLabel} ${getNumberMention(sender)}`,
+            mentions: [sender]
+          });
+        } catch (e) {
+          console.error('[answer] Konnte Antwort nicht direkt an den Nutzer senden:', e);
+        }
+
         ticket.status = 'answered';
         ticket.answeredBy = sender;
-        ticket.answer = answer;
+        ticket.answer = answerText;
         save(FILES.tickets, tickets);
         return send(`✅ Antwort für Ticket #${ticket.id} gesendet.`);
       }
