@@ -1093,7 +1093,7 @@ ${PREFIX}broadcast <text> - Nachricht an alle Gruppen
 ${PREFIX}restart - Bot neu starten
 ${PREFIX}updateprofile - Profil aktualisieren
       ${PREFIX}bancmd <befehl> [ban|unban] - cmdban befehl (unban oder ban)
-${PREFIX}setrole @user <rolle> - Nutzerrolle setzen
+${PREFIX}setrole @user <rolle> - Nutzerrolle setzen (auch als Antwort auf eine Nachricht: ${PREFIX}setrole <rolle>)
 ${PREFIX}listroles - Alle Rollen anzeigen
 ${PREFIX}newsession <name> - Neue Bot-Session starten (weitere Nummer)
 ${PREFIX}sessions - Aktive Sessions anzeigen
@@ -1222,16 +1222,22 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
       if (cmd === 'setrole') {
         if (!isAuthorized(sender, ['OWNER'])) return send('❌ Nur für Owner.');
 
-        if (args.length < 2) {
-          return send(`❌ Nutzung:\n${PREFIX}setrole @user <ROLLE>\noder: ${PREFIX}setrole <ROLLE> @user\nVerfügbare Rollen: ${Object.keys(ROLES).join(', ')}`);
+        const ctx = m.message?.extendedTextMessage?.contextInfo;
+        const isReply = !!ctx?.participant;
+
+        if (args.length < 1 || (args.length < 2 && !isReply)) {
+          return send(`❌ Nutzung:\n${PREFIX}setrole @user <ROLLE>\noder: ${PREFIX}setrole <ROLLE> @user\noder: als Antwort auf eine Nachricht einfach ${PREFIX}setrole <ROLLE>\nVerfügbare Rollen: ${Object.keys(ROLES).join(', ')}`);
         }
 
-        // Rolle darf vorne ODER hinten stehen
+        // Rolle darf vorne ODER hinten stehen (oder, bei Reply, das einzige Argument sein)
         const firstUpper = args[0].toUpperCase();
         const lastUpper = args[args.length - 1].toUpperCase();
 
         let roleUpper, targetArgs;
-        if (ROLES.hasOwnProperty(lastUpper)) {
+        if (args.length === 1 && ROLES.hasOwnProperty(firstUpper)) {
+          roleUpper = firstUpper;
+          targetArgs = [];
+        } else if (ROLES.hasOwnProperty(lastUpper)) {
           roleUpper = lastUpper;
           targetArgs = args.slice(0, -1);
         } else if (ROLES.hasOwnProperty(firstUpper)) {
@@ -1241,10 +1247,12 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
           return send(`❌ Ungültige Rolle. Verfügbar: ${Object.keys(ROLES).join(', ')}\nNutzung: ${PREFIX}setrole @user <ROLLE> oder ${PREFIX}setrole <ROLLE> @user`);
         }
 
-        // Ziel-JIDs sammeln: 1) echte @-Mentions (am zuverlässigsten), 2) Nummern/JIDs im Text,
-        // 3) registrierte Namen (z.B. "kirito"), falls kein echter Mention/JID erkannt wurde
-        const mentioned = m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
-        let jidList = [...mentioned];
+        // Ziel-JIDs sammeln: 1) Antwort auf eine Nachricht (Absender der zitierten Nachricht),
+        // 2) echte @-Mentions, 3) Nummern/JIDs im Text, 4) registrierte Namen (z.B. "kirito")
+        const mentioned = ctx?.mentionedJid || [];
+        let jidList = [];
+        if (ctx?.participant) jidList.push(ctx.participant);
+        jidList.push(...mentioned);
 
         const textTargets = targetArgs.join(' ').split(',').map(s => s.trim()).filter(Boolean);
         for (const raw of textTargets) {
