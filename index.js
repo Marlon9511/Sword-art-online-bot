@@ -71,8 +71,7 @@ const FILES = {
   owner: { file: 'owner.json', default: {} },
   teamTodos: { file: 'team-todos.json', default: {} },
   groupInvites: { file: 'group-invites.json', default: {} },
-  groupSettings: { file: 'group-settings.json', default: {} },
-  credits: { file: 'credits.json', default: {} }
+  groupSettings: { file: 'group-settings.json', default: {} }
 };
 
 Object.values(FILES).forEach(({ file, default: def }) => {
@@ -469,49 +468,6 @@ if (Object.keys(ranks).length === 0) {
 }
 
 let groupSettings = normalizeDataKeys(load(FILES.groupSettings.file));
-
-// ========== CREDITS ==========
-const CREDIT_CATEGORIES = [
-  { key: 'owner', label: 'Inhaber/Developer/in' },
-  { key: 'deputy', label: 'Stellvertretende Inhaber/in' },
-  { key: 'manager', label: 'Manager/in' },
-  { key: 'moderator', label: 'Moderator/in' },
-  { key: 'supporter', label: 'Supporter/in' },
-  { key: 'ideas', label: 'Ideen von' }
-];
-
-let credits = load(FILES.credits.file) || {};
-for (const cat of CREDIT_CATEGORIES) {
-  if (!Array.isArray(credits[cat.key])) credits[cat.key] = [];
-}
-save(FILES.credits, credits);
-
-const CREDIT_ALIASES = {
-  inhaber: 'owner', dev: 'owner', developer: 'owner', 'developer/in': 'owner', owner: 'owner',
-  stellv: 'deputy', stellvertreter: 'deputy', stellvertretend: 'deputy', deputy: 'deputy',
-  manager: 'manager',
-  mod: 'moderator', mods: 'moderator', moderator: 'moderator', moderatorin: 'moderator', moderatoren: 'moderator',
-  supporter: 'supporter', support: 'supporter',
-  ideen: 'ideas', idee: 'ideas', idea: 'ideas', ideas: 'ideas'
-};
-
-function resolveCreditCategory(input) {
-  const q = String(input || '').toLowerCase().trim();
-  return CREDIT_ALIASES[q] || (CREDIT_CATEGORIES.some(c => c.key === q) ? q : null);
-}
-
-function buildCreditsText() {
-  let out = '-----[ CREDITS ]----- \n';
-  for (const cat of CREDIT_CATEGORIES) {
-    const list = credits[cat.key] || [];
-    out += '\n        ______________ \n';
-    out += `        *${cat.label}:* \n\n`;
-    for (const name of list) {
-      out += `        -  ${name}\n`;
-    }
-  }
-  return out.trimEnd();
-}
 let ticketCounter = Object.keys(tickets).length;
 let teamTodos = load(FILES.teamTodos.file) || {};
 let todoCounter = Object.keys(teamTodos).length;
@@ -579,34 +535,12 @@ function getMentionDisplay(jid, contacts = {}) {
   return `@${String(display || normalizedJid.split('@')[0]).replace(/\n/g, ' ').trim()}`;
 }
 
-// Löst eine @lid-JID über Baileys' offizielle LID<->Nummer-Zuordnung zur echten
-// Telefonnummer auf (falls Baileys sie schon kennt). Ohne das würde man einfach
-// die LID-Ziffern als "Nummer" anzeigen, was wie eine falsche Nummer aussieht
-// (z.B. mit einer zufälligen Ländervorwahl wie +850).
-async function resolvePhoneJid(jid, sock) {
-  const n = normalizeJid(jid);
-  if (!n) return null;
-  if (n.endsWith('@s.whatsapp.net')) return n;
-  if (n.endsWith('@lid')) {
-    try {
-      const pn = await sock?.signalRepository?.lidMapping?.getPNForLID(n);
-      if (pn) {
-        const num = String(pn).split('@')[0].replace(/[^0-9]/g, '');
-        if (num) return `${num}@s.whatsapp.net`;
-      }
-    } catch (e) {}
-  }
-  return null;
-}
-
-// Zeigt die ECHTE Telefonnummer als klickbare @-Markierung. Kann Baileys die
-// LID nicht auflösen, wird KEINE Ziffernfolge gezeigt (die sonst wie eine
-// falsche Nummer aussehen würde), sondern ein neutraler Platzhaltertext —
-// die Markierung bleibt trotzdem über das mentions-Array anklickbar.
-async function getNumberMention(jid, sock) {
-  const resolved = await resolvePhoneJid(jid, sock);
-  if (resolved) return `@${resolved.split('@')[0]}`;
-  return '@Nutzer';
+// Zeigt IMMER die Nummer als klickbare @-Markierung (keine Namen) —
+// genutzt bei Support-Anfragen, damit direkt erkennbar/anklickbar ist, wer es ist.
+function getNumberMention(jid) {
+  const normalizedJid = normalizeJid(jid);
+  const num = String(normalizedJid || '').split('@')[0];
+  return `@${num}`;
 }
 
 // Sucht die JID eines registrierten Nutzers anhand des gespeicherten Namens (z.B. bei $setrole @kirito).
@@ -1161,9 +1095,6 @@ ${PREFIX}updateprofile - Profil aktualisieren
       ${PREFIX}bancmd <befehl> [ban|unban] - cmdban befehl (unban oder ban)
 ${PREFIX}setrole @user <rolle> - Nutzerrolle setzen (auch als Antwort auf eine Nachricht: ${PREFIX}setrole <rolle>)
 ${PREFIX}listroles - Alle Rollen anzeigen
-${PREFIX}credits - Credits/Team-Liste anzeigen
-${PREFIX}credits add <kategorie> <name> - Person zu Credits hinzufügen
-${PREFIX}credits remove <kategorie> <name> - Person aus Credits entfernen
 ${PREFIX}newsession <name> - Neue Bot-Session starten (weitere Nummer)
 ${PREFIX}sessions - Aktive Sessions anzeigen
 ${PREFIX}stopsession <name> - Session stoppen (Login-Daten bleiben)
@@ -1259,7 +1190,7 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
         // Bestätigung/Log in der internen Support-Gruppe — statt "Supporter" steht hier der Team-Rang
         try {
           await sock.sendMessage(SUPPORT_CONFIG.SUPPORT_GROUP, {
-            text: `📝 Antwort auf Ticket #${ticket.id}:\n\n${answerText}\n\n${rankLabel}: ${await getNumberMention(sender, sock)}`,
+            text: `📝 Antwort auf Ticket #${ticket.id}:\n\n${answerText}\n\n${rankLabel}: ${getNumberMention(sender)}`,
             mentions: [sender]
           });
         } catch (e) {
@@ -1269,7 +1200,7 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
         // Antwort direkt an den Ticket-Ersteller, mit klickbarer @-Markierung des Teammitglieds
         try {
           await sock.sendMessage(ticket.sender, {
-            text: `📩 Antwort auf dein Support-Ticket #${ticket.id}:\n\n${answerText}\n\nBeantwortet von: ${rankLabel} ${await getNumberMention(sender, sock)}`,
+            text: `📩 Antwort auf dein Support-Ticket #${ticket.id}:\n\n${answerText}\n\nBeantwortet von: ${rankLabel} ${getNumberMention(sender)}`,
             mentions: [sender]
           });
         } catch (e) {
@@ -1399,7 +1330,7 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
           return send('❌ Fehler beim Speichern: ' + e.message);
         }
 
-        const displayMentions = (await Promise.all(normalizedJids.map(j => getNumberMention(j, sock)))).join(', ');
+        const displayMentions = normalizedJids.map(j => getNumberMention(j)).join(', ');
         return send(
           `✅ Rolle *${roleUpper}* (${prettyRank(roleUpper)}) erfolgreich gesetzt für:\n${displayMentions}\n\n` +
           `💾 Gespeichert in: ranks.json, users.json, owner.json`,
@@ -1465,55 +1396,6 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
           }
         }
         return send(message.trim());
-      }
-
-      // CREDITS
-      if (cmd === 'credits') {
-        const sub = (args[0] || '').toLowerCase();
-
-        if (!sub || sub === 'list' || sub === 'show') {
-          return send(buildCreditsText());
-        }
-
-        if (sub === 'categories' || sub === 'kategorien') {
-          const list = CREDIT_CATEGORIES.map(c => `• ${c.key} — ${c.label}`).join('\n');
-          return send(`📋 Verfügbare Kategorien:\n${list}`);
-        }
-
-        if (sub === 'add') {
-          if (!hasAdminPerms(sender)) return send('❌ Kein Zugriff.');
-          const catInput = args[1];
-          const name = args.slice(2).join(' ').trim();
-          const catKey = resolveCreditCategory(catInput);
-          if (!catKey || !name) {
-            return send(`❌ Nutzung: ${PREFIX}credits add <kategorie> <name>\n${PREFIX}credits categories für verfügbare Kategorien.`);
-          }
-          if (credits[catKey].some(n => n.toLowerCase() === name.toLowerCase())) {
-            return send(`ℹ️ "${name}" steht schon unter ${CREDIT_CATEGORIES.find(c => c.key === catKey).label}.`);
-          }
-          credits[catKey].push(name);
-          save(FILES.credits, credits);
-          return send(`✅ "${name}" zu *${CREDIT_CATEGORIES.find(c => c.key === catKey).label}* hinzugefügt.`);
-        }
-
-        if (sub === 'remove' || sub === 'rm' || sub === 'del') {
-          if (!hasAdminPerms(sender)) return send('❌ Kein Zugriff.');
-          const catInput = args[1];
-          const name = args.slice(2).join(' ').trim();
-          const catKey = resolveCreditCategory(catInput);
-          if (!catKey || !name) {
-            return send(`❌ Nutzung: ${PREFIX}credits remove <kategorie> <name>`);
-          }
-          const before = credits[catKey].length;
-          credits[catKey] = credits[catKey].filter(n => n.toLowerCase() !== name.toLowerCase());
-          if (credits[catKey].length === before) {
-            return send(`❌ "${name}" wurde in ${CREDIT_CATEGORIES.find(c => c.key === catKey).label} nicht gefunden.`);
-          }
-          save(FILES.credits, credits);
-          return send(`✅ "${name}" aus *${CREDIT_CATEGORIES.find(c => c.key === catKey).label}* entfernt.`);
-        }
-
-        return send(`❌ Nutzung:\n${PREFIX}credits - Credits anzeigen\n${PREFIX}credits add <kategorie> <name>\n${PREFIX}credits remove <kategorie> <name>\n${PREFIX}credits categories - verfügbare Kategorien`);
       }
 
       // CMBAN / CMDBAN
@@ -2161,7 +2043,7 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
         save(FILES.tickets, tickets);
         try {
           await sock.sendMessage(SUPPORT_CONFIG.TICKET_GROUP, {
-            text: `🎫 Neues Ticket #${ticketId}\nVon: ${await getNumberMention(sender, sock)}\n\nNachricht:\n${text}`,
+            text: `🎫 Neues Ticket #${ticketId}\nVon: ${getNumberMention(sender)}\n\nNachricht:\n${text}`,
             mentions: [sender]
           });
           return send(`✅ Ticket #${ticketId} erstellt.`);
@@ -2183,7 +2065,7 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
           return send(
             `🎫 Ticket #${ticket.id}\n` +
             `Status: ${ticket.status}\n` +
-            `Von: ${await getNumberMention(ticket.sender, sock)}\n` +
+            `Von: ${getNumberMention(ticket.sender)}\n` +
             `Nachricht: ${messageText}\n` +
             `Antwort: ${ticket.answer || 'Keine'}\n` +
             `Erstellt: ${new Date(ticket.timestamp).toLocaleString()}`,
@@ -2194,11 +2076,12 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
         const ticketValues = Object.values(tickets);
         const visibleTickets = ticketValues.filter(t => !filter || filter === 'all' || t.status.toLowerCase() === filter);
         const mentions = [...new Set(visibleTickets.map(t => t.sender))];
-        const listLines = await Promise.all(visibleTickets.map(async t => {
-          const msg = String(t.message || t.text || '').slice(0, 50);
-          return `${t.id} | ${t.status} | ${await getNumberMention(t.sender, sock)} | ${msg}${msg.length >= 50 ? '…' : ''}`;
-        }));
-        const list = listLines.join('\n') || '(keine)';
+        const list = visibleTickets
+          .map(t => {
+            const msg = String(t.message || t.text || '').slice(0, 50);
+            return `${t.id} | ${t.status} | ${getNumberMention(t.sender)} | ${msg}${msg.length >= 50 ? '…' : ''}`;
+          })
+          .join('\n') || '(keine)';
         const subtitle = filter ? ` (${filter === 'all' ? 'alle' : filter})` : '';
         return send(`🎫 Tickets${subtitle}:\n${list}`, { mentions });
       }
@@ -2413,7 +2296,7 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
           save(FILES.owner, { ownerLid: OWNER_LID, ownerPriv: OWNER_PRIV, coownerLid: COOWNER_LID });
         } catch (e) {}
 
-        return send(`✅ Rang von ${await getNumberMention(jid, sock)} auf ${r} gesetzt.`, { mentions: [jid] });
+        return send(`✅ Rang von ${getNumberMention(jid)} auf ${r} gesetzt.`, { mentions: [jid] });
       }
 
       if (cmd === 'datadelete') {
@@ -2485,4 +2368,112 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
           const groups = await sock.groupFetchAllParticipating();
           let list = '📋 *Gruppenliste*\n\n';
           for (const [id, group] of Object.entries(groups)) {
-            list += `*${group.subject || 'Unbekannt'}*\nID:
+            list += `*${group.subject || 'Unbekannt'}*\nID: ${id}\nMitglieder: ${group.participants?.length || 0}\n\n`;
+          }
+          await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: list });
+          return send('📨 Gruppenliste privat zugeschickt.');
+        } catch (error) {
+          return send('❌ Fehler beim Abrufen der Gruppenliste.');
+        }
+      }
+
+      if (cmd === 'broadcast') {
+        if (!(isOwner || isCoOwner)) return send('Kein Zugriff.');
+        const textMsg = args.join(' ');
+        if (!textMsg) return send('Usage: $broadcast <text>');
+        const chats = await sock.groupFetchAllParticipating();
+        const gids = Object.keys(chats).filter(gid => broadcastSettings[gid] !== false);
+        send(`📣 Broadcast an ${gids.length} Gruppen...`);
+        for (const g of gids) { try { await sock.sendMessage(g, { text: `📣 Broadcast:\n${textMsg}` }); await sleep(300); } catch {} }
+        return send('✅ Broadcast abgeschlossen.');
+      }
+
+      if (cmd === 'stats' || cmd === 'profile') {
+        const u = users[sender];
+        return send(`📊 Profil:\nLevel: ${u.level}\nXP: ${u.xp}\nCoins: ${u.coins}\nNachrichten: ${u.msgCount}`);
+      }
+      if (cmd === 'userinfo') {
+        const t = args[0] ? normalizeJid(args[0]) : sender;
+        ensureUser(t);
+        const u = users[t];
+        return send(`👤 ${t}\nLevel: ${u.level}\nXP: ${u.xp}\nCoins: ${u.coins}\nRank: ${ranks[t] || u.rank}`);
+      }
+      if (cmd === 'top') {
+        const top = Object.entries(users).sort((a, b) => (b[1].level * 1000 + (b[1].xp || 0)) - (a[1].level * 1000 + (a[1].xp || 0))).slice(0, 10);
+        let out = '🏆 Top Spieler\n';
+        top.forEach(([jid, u], i) => out += `${i + 1}. ${jid.split('@')[0]} - Lv.${u.level} (${u.xp} XP)\n`);
+        return send(out);
+      }
+
+      // YEETBAN
+      if (cmd === 'yeetban') {
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) return send('Kein Zugriff.');
+        let target = args[0];
+        try {
+          const ctx = m.message?.extendedTextMessage?.contextInfo;
+          if (!target && ctx?.participant) target = ctx.participant;
+          if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+        } catch (e) {}
+        if (!target) return send('Usage: $yeetban <num|jid>');
+        const jid = normalizeJid(target);
+        const reason = args.slice(1).join(' ') || 'Kein Grund';
+        bans[jid] = { by: sender, at: new Date().toISOString(), reason };
+        save(FILES.bans, bans);
+        try {
+          const groups = await sock.groupFetchAllParticipating();
+          let removed = 0, failed = 0;
+          for (const gid of Object.keys(groups)) {
+            try {
+              const meta = await getGroupMetaSafe(gid);
+              if (!meta?.participants) { failed++; continue; }
+              const rawJid = jid.split('@')[0];
+              const targetParticipant = meta.participants.find(p => (p.id || '').split('@')[0] === rawJid);
+              if (!targetParticipant) { failed++; continue; }
+              await sock.groupParticipantsUpdate(gid, [targetParticipant.id], 'remove');
+              await sleep(500);
+              removed++;
+            } catch (e) { failed++; }
+          }
+          return send(`✅ Yeetban: ${jid} — entfernt aus ${removed} Gruppen, fehlgeschlagen: ${failed}`);
+        } catch (e) {
+          return send('❌ Yeetban fehlgeschlagen.');
+        }
+      }
+
+      // Unbekannter Befehl
+      return send('❓ Unbekannter Befehl — $help für eine Liste der Befehle.');
+
+    } catch (err) {
+      console.error('messages.upsert error:', err);
+      log(`ERROR: ${err?.message || String(err)}`);
+    }
+  });
+
+  console.log(`✅ Sword-art-online-bot Session "${sessionName}" gestartet.`);
+  return sock;
+}
+
+// ========== MAIN ==========
+initTelegramConnect();
+
+(async () => {
+  let existingSessions = [];
+  try {
+    existingSessions = fs.readdirSync(SESSIONS_DIR, { withFileTypes: true })
+      .filter(d => d.isDirectory())
+      .map(d => d.name);
+  } catch (e) {
+    existingSessions = [];
+  }
+
+  if (existingSessions.length === 0) {
+    // Noch keine Session vorhanden -> Standard-Session anlegen (QR-Login)
+    await startBot('default');
+  } else {
+    // Alle vorhandenen Sessions parallel wieder starten
+    for (const sessionName of existingSessions) {
+      await startBot(sessionName);
+      await sleep(1000); // kleine Pause, um Rate-Limits beim Verbindungsaufbau zu vermeiden
+    }
+  }
+})();
