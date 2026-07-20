@@ -2273,7 +2273,7 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
       return send(`✅ ${jid} zum ADMIN befördert (Bot-Rang). ⚠️ Nutzer wurde nicht in dieser Gruppe gefunden, konnte also nicht als Gruppen-Admin gesetzt werden.`);
     
 
-
+}
   }
 
   return send(`✅ ${jid} zum ADMIN befördert (Bot-Rang). ℹ️ Kein Gruppenkontext — Gruppen-Admin-Rechte wurden nicht gesetzt.`);
