@@ -168,8 +168,9 @@ const SUPPORT_CONFIG = {
 };
 
 
-const owner = '27088878862400@lid'; 
-const OWNER_LID = '27088878862400@lid'; let OWNER_PRIV = '4915111254435@s.whatsapp.net';
+const owner = '27088878862400@lid';
+let OWNER_LID = '27088878862400@lid';
+let OWNER_PRIV = '4915111254435@s.whatsapp.net';
 let COOWNER_LID = '272696835330300@lid';
 
 ROLES.OWNER.push(OWNER_LID, OWNER_PRIV);
