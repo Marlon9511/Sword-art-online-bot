@@ -71,7 +71,8 @@ const FILES = {
   owner: { file: 'owner.json', default: {} },
   teamTodos: { file: 'team-todos.json', default: {} },
   groupInvites: { file: 'group-invites.json', default: {} },
-  groupSettings: { file: 'group-settings.json', default: {} }
+  groupSettings: { file: 'group-settings.json', default: {} },
+  credits: { file: 'credits.json', default: {} }
 };
 
 Object.values(FILES).forEach(({ file, default: def }) => {
@@ -468,6 +469,49 @@ if (Object.keys(ranks).length === 0) {
 }
 
 let groupSettings = normalizeDataKeys(load(FILES.groupSettings.file));
+
+// ========== CREDITS ==========
+const CREDIT_CATEGORIES = [
+  { key: 'owner', label: 'Inhaber/Developer/in' },
+  { key: 'deputy', label: 'Stellvertretende Inhaber/in' },
+  { key: 'manager', label: 'Manager/in' },
+  { key: 'moderator', label: 'Moderator/in' },
+  { key: 'supporter', label: 'Supporter/in' },
+  { key: 'ideas', label: 'Ideen von' }
+];
+
+let credits = load(FILES.credits.file) || {};
+for (const cat of CREDIT_CATEGORIES) {
+  if (!Array.isArray(credits[cat.key])) credits[cat.key] = [];
+}
+save(FILES.credits, credits);
+
+const CREDIT_ALIASES = {
+  inhaber: 'owner', dev: 'owner', developer: 'owner', 'developer/in': 'owner', owner: 'owner',
+  stellv: 'deputy', stellvertreter: 'deputy', stellvertretend: 'deputy', deputy: 'deputy',
+  manager: 'manager',
+  mod: 'moderator', mods: 'moderator', moderator: 'moderator', moderatorin: 'moderator', moderatoren: 'moderator',
+  supporter: 'supporter', support: 'supporter',
+  ideen: 'ideas', idee: 'ideas', idea: 'ideas', ideas: 'ideas'
+};
+
+function resolveCreditCategory(input) {
+  const q = String(input || '').toLowerCase().trim();
+  return CREDIT_ALIASES[q] || (CREDIT_CATEGORIES.some(c => c.key === q) ? q : null);
+}
+
+function buildCreditsText() {
+  let out = '-----[ CREDITS ]----- \n';
+  for (const cat of CREDIT_CATEGORIES) {
+    const list = credits[cat.key] || [];
+    out += '\n        ______________ \n';
+    out += `        *${cat.label}:* \n\n`;
+    for (const name of list) {
+      out += `        -  ${name}\n`;
+    }
+  }
+  return out.trimEnd();
+}
 let ticketCounter = Object.keys(tickets).length;
 let teamTodos = load(FILES.teamTodos.file) || {};
 let todoCounter = Object.keys(teamTodos).length;
@@ -993,8 +1037,6 @@ async function startBot(sessionName = 'default', hooks = {}) {
       const isOwner = isAuthorized(sender, ['OWNER', 'COOWNER']);
       const isCoOwner = isAuthorized(sender, ['COOWNER']);
       const isAdmin = isAuthorized(sender, ['ADMIN']);
-      // Team-Mitglieder = alle Ränge außer VIP, USER und ADMIN
-      const isTeamMember = isAuthorized(sender, ['OWNER', 'COOWNER', 'MOD', 'SUPPORTER', 'TEST_SUPPORTER']);
 
       if (BOT_OFFLINE && !isOwner) {
         try { await sock.sendMessage(from, { text: '⚠️ Der Bot ist derzeit im Offline-Modus.' }); } catch (e) {}
@@ -1003,11 +1045,9 @@ async function startBot(sessionName = 'default', hooks = {}) {
 
       const send = async (text, opts = {}) => {
         try {
-          if (!isTeamMember) {
-            try { await sock.sendPresenceUpdate('composing', from); } catch (e) {}
-            await sleep(3000);
-            try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
-          }
+          try { await sock.sendPresenceUpdate('composing', from); } catch (e) {}
+          await sleep(3000);
+          try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
           const sendOpts = { ...opts };
           if (sendOpts.mentions) {
             const mentionArray = Array.isArray(sendOpts.mentions) ? sendOpts.mentions : [sendOpts.mentions];
@@ -1121,6 +1161,9 @@ ${PREFIX}updateprofile - Profil aktualisieren
       ${PREFIX}bancmd <befehl> [ban|unban] - cmdban befehl (unban oder ban)
 ${PREFIX}setrole @user <rolle> - Nutzerrolle setzen (auch als Antwort auf eine Nachricht: ${PREFIX}setrole <rolle>)
 ${PREFIX}listroles - Alle Rollen anzeigen
+${PREFIX}credits - Credits/Team-Liste anzeigen
+${PREFIX}credits add <kategorie> <name> - Person zu Credits hinzufügen
+${PREFIX}credits remove <kategorie> <name> - Person aus Credits entfernen
 ${PREFIX}newsession <name> - Neue Bot-Session starten (weitere Nummer)
 ${PREFIX}sessions - Aktive Sessions anzeigen
 ${PREFIX}stopsession <name> - Session stoppen (Login-Daten bleiben)
@@ -1424,6 +1467,55 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
         return send(message.trim());
       }
 
+      // CREDITS
+      if (cmd === 'credits') {
+        const sub = (args[0] || '').toLowerCase();
+
+        if (!sub || sub === 'list' || sub === 'show') {
+          return send(buildCreditsText());
+        }
+
+        if (sub === 'categories' || sub === 'kategorien') {
+          const list = CREDIT_CATEGORIES.map(c => `• ${c.key} — ${c.label}`).join('\n');
+          return send(`📋 Verfügbare Kategorien:\n${list}`);
+        }
+
+        if (sub === 'add') {
+          if (!hasAdminPerms(sender)) return send('❌ Kein Zugriff.');
+          const catInput = args[1];
+          const name = args.slice(2).join(' ').trim();
+          const catKey = resolveCreditCategory(catInput);
+          if (!catKey || !name) {
+            return send(`❌ Nutzung: ${PREFIX}credits add <kategorie> <name>\n${PREFIX}credits categories für verfügbare Kategorien.`);
+          }
+          if (credits[catKey].some(n => n.toLowerCase() === name.toLowerCase())) {
+            return send(`ℹ️ "${name}" steht schon unter ${CREDIT_CATEGORIES.find(c => c.key === catKey).label}.`);
+          }
+          credits[catKey].push(name);
+          save(FILES.credits, credits);
+          return send(`✅ "${name}" zu *${CREDIT_CATEGORIES.find(c => c.key === catKey).label}* hinzugefügt.`);
+        }
+
+        if (sub === 'remove' || sub === 'rm' || sub === 'del') {
+          if (!hasAdminPerms(sender)) return send('❌ Kein Zugriff.');
+          const catInput = args[1];
+          const name = args.slice(2).join(' ').trim();
+          const catKey = resolveCreditCategory(catInput);
+          if (!catKey || !name) {
+            return send(`❌ Nutzung: ${PREFIX}credits remove <kategorie> <name>`);
+          }
+          const before = credits[catKey].length;
+          credits[catKey] = credits[catKey].filter(n => n.toLowerCase() !== name.toLowerCase());
+          if (credits[catKey].length === before) {
+            return send(`❌ "${name}" wurde in ${CREDIT_CATEGORIES.find(c => c.key === catKey).label} nicht gefunden.`);
+          }
+          save(FILES.credits, credits);
+          return send(`✅ "${name}" aus *${CREDIT_CATEGORIES.find(c => c.key === catKey).label}* entfernt.`);
+        }
+
+        return send(`❌ Nutzung:\n${PREFIX}credits - Credits anzeigen\n${PREFIX}credits add <kategorie> <name>\n${PREFIX}credits remove <kategorie> <name>\n${PREFIX}credits categories - verfügbare Kategorien`);
+      }
+
       // CMBAN / CMDBAN
       if (cmd === 'cmdban' || cmd === 'bancmd') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Nur Owner/CoOwner.');
@@ -1549,11 +1641,9 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
           }
 
           if (ppUrl) {
-            if (!isTeamMember) {
-              try { await sock.sendPresenceUpdate('composing', from); } catch (e) {}
-              await sleep(5000);
-              try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
-            }
+            try { await sock.sendPresenceUpdate('composing', from); } catch (e) {}
+            await sleep(5000);
+            try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
             await sock.sendMessage(from, { image: { url: ppUrl }, caption });
             return;
           }
@@ -2395,95 +2485,4 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
           const groups = await sock.groupFetchAllParticipating();
           let list = '📋 *Gruppenliste*\n\n';
           for (const [id, group] of Object.entries(groups)) {
-            list += `*${group.subject || 'Unbekannt'}*\nID: ${id}\nMitglieder: ${group.participants?.length || 0}\n\n`;
-          }
-          await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: list });
-          return send('📨 Gruppenliste privat zugeschickt.');
-        } catch (error) {
-          return send('❌ Fehler beim Abrufen der Gruppenliste.');
-        }
-      }
-
-      if (cmd === 'broadcast') {
-        if (!(isOwner || isCoOwner)) return send('Kein Zugriff.');
-        const textMsg = args.join(' ');
-        if (!textMsg) return send('Usage: $broadcast <text>');
-        const chats = await sock.groupFetchAllParticipating();
-        const gids = Object.keys(chats).filter(gid => broadcastSettings[gid] !== false);
-        send(`📣 Broadcast an ${gids.length} Gruppen...`);
-        for (const g of gids) { try { await sock.sendMessage(g, { text: `📣 Broadcast:\n${textMsg}` }); await sleep(300); } catch {} }
-        return send('✅ Broadcast abgeschlossen.');
-      }
-
-      if (cmd === 'stats' || cmd === 'profile') {
-        const u = users[sender];
-        return send(`📊 Profil:\nLevel: ${u.level}\nXP: ${u.xp}\nCoins: ${u.coins}\nNachrichten: ${u.msgCount}`);
-      }
-      if (cmd === 'userinfo') {
-        const t = args[0] ? normalizeJid(args[0]) : sender;
-        ensureUser(t);
-        const u = users[t];
-        return send(`👤 ${t}\nLevel: ${u.level}\nXP: ${u.xp}\nCoins: ${u.coins}\nRank: ${ranks[t] || u.rank}`);
-      }
-      if (cmd === 'top') {
-        const top = Object.entries(users).sort((a, b) => (b[1].level * 1000 + (b[1].xp || 0)) - (a[1].level * 1000 + (a[1].xp || 0))).slice(0, 10);
-        let out = '🏆 Top Spieler\n';
-        top.forEach(([jid, u], i) => out += `${i + 1}. ${jid.split('@')[0]} - Lv.${u.level} (${u.xp} XP)\n`);
-        return send(out);
-      }
-
-      // YEETBAN
-      if (cmd === 'yeetban') {
-        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) return send('Kein Zugriff.');
-        let target = args[0];
-        try {
-          const ctx = m.message?.extendedTextMessage?.contextInfo;
-          if (!target && ctx?.participant) target = ctx.participant;
-          if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
-        } catch (e) {}
-        if (!target) return send('Usage: $yeetban <num|jid>');
-        const jid = normalizeJid(target);
-        const reason = args.slice(1).join(' ') || 'Kein Grund';
-        bans[jid] = { by: sender, at: new Date().toISOString(), reason };
-        save(FILES.bans, bans);
-        try {
-          const groups = await sock.groupFetchAllParticipating();
-          let removed = 0, failed = 0;
-          for (const gid of Object.keys(groups)) {
-            try {
-              const meta = await getGroupMetaSafe(gid);
-              if (!meta?.participants) { failed++; continue; }
-              const rawJid = jid.split('@')[0];
-              const targetParticipant = meta.participants.find(p => (p.id || '').split('@')[0] === rawJid);
-              if (!targetParticipant) { failed++; continue; }
-              await sock.groupParticipantsUpdate(gid, [targetParticipant.id], 'remove');
-              await sleep(500);
-              removed++;
-            } catch (e) { failed++; }
-          }
-          return send(`✅ Yeetban: ${jid} — entfernt aus ${removed} Gruppen, fehlgeschlagen: ${failed}`);
-        } catch (e) {
-          return send('❌ Yeetban fehlgeschlagen.');
-        }
-      }
-
-      // Unbekannter Befehl
-      return send('❓ Unbekannter Befehl — $help für eine Liste der Befehle.');
-
-    } catch (err) {
-      console.error('messages.upsert error:', err);
-      log(`ERROR: ${err?.message || String(err)}`);
-    }
-  });
-
-  console.log(`✅ Sword-art-online-bot Session "${sessionName}" gestartet.`);
-  return sock;
-}
-
-// ========== MAIN ==========
-initTelegramConnect();
-
-(async () => {
-  let existingSessions = [];
-  try {
-    existingSessions = fs.readdirSync(SESSIONS_DIR
+            list += `*${group.subject || 'Unbekannt'}*\nID:
