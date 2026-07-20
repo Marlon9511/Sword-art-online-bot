@@ -2475,7 +2475,76 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
         return send(out);
       }
 
-      // YEETBAN
+            // YEETBAN
       if (cmd === 'yeetban') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) return send('Kein Zugriff.');
-        
+        let target = args[0];
+        try {
+          const ctx = m.message?.extendedTextMessage?.contextInfo;
+          if (!target && ctx?.participant) target = ctx.participant;
+          if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+        } catch (e) {}
+        if (!target) return send('Usage: $yeetban <num|jid>');
+        const jid = normalizeJid(target);
+        if (isPrimaryOwner(jid)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gebannt/entfernt werden.');
+        const reason = args.slice(1).join(' ') || 'Kein Grund';
+        bans[jid] = { by: sender, at: new Date().toISOString(), reason };
+        save(FILES.bans, bans);
+        try {
+          const groups = await sock.groupFetchAllParticipating();
+          let removed = 0, failed = 0;
+          for (const gid of Object.keys(groups)) {
+            try {
+              const meta = await getGroupMetaSafe(gid);
+              if (!meta?.participants) { failed++; continue; }
+              const rawJid = jid.split('@')[0];
+              const targetParticipant = meta.participants.find(p => (p.id || '').split('@')[0] === rawJid);
+              if (!targetParticipant) { failed++; continue; }
+              await sock.groupParticipantsUpdate(gid, [targetParticipant.id], 'remove');
+              await sleep(500);
+              removed++;
+            } catch (e) { failed++; }
+          }
+          return send(`✅ Yeetban: ${jid} — entfernt aus ${removed} Gruppen, fehlgeschlagen: ${failed}`);
+        } catch (e) {
+          return send('❌ Yeetban fehlgeschlagen.');
+        }
+      }
+
+      // Unbekannter Befehl
+      return send('❓ Unbekannter Befehl — $help für eine Liste der Befehle.');
+
+    } catch (err) {
+      console.error('messages.upsert error:', err);
+      log(`ERROR: ${err?.message || String(err)}`);
+    }
+  });
+
+  console.log(`✅ Sword-art-online-bot Session "${sessionName}" gestartet.`);
+  return sock;
+}
+
+// ========== MAIN ==========
+initTelegramConnect();
+
+(async () => {
+  let existingSessions = [];
+  try {
+    existingSessions = fs.readdirSync(SESSIONS_DIR, { withFileTypes: true })
+      .filter(d => d.isDirectory())
+      .map(d => d.name);
+  } catch (e) {
+    existingSessions = [];
+  }
+
+  if (existingSessions.length === 0) {
+    // Noch keine Session vorhanden -> Standard-Session anlegen (QR-Login)
+    await startBot('default');
+  } else {
+    // Alle vorhandenen Sessions parallel wieder starten
+    for (const sessionName of existingSessions) {
+      await startBot(sessionName);
+      await sleep(1000); // kleine Pause, um Rate-Limits beim Verbindungsaufbau zu vermeiden
+    }
+  }
+})();
