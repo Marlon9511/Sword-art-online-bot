@@ -535,12 +535,34 @@ function getMentionDisplay(jid, contacts = {}) {
   return `@${String(display || normalizedJid.split('@')[0]).replace(/\n/g, ' ').trim()}`;
 }
 
-// Zeigt IMMER die Nummer als klickbare @-Markierung (keine Namen) —
-// genutzt bei Support-Anfragen, damit direkt erkennbar/anklickbar ist, wer es ist.
-function getNumberMention(jid) {
-  const normalizedJid = normalizeJid(jid);
-  const num = String(normalizedJid || '').split('@')[0];
-  return `@${num}`;
+// Löst eine @lid-JID über Baileys' offizielle LID<->Nummer-Zuordnung zur echten
+// Telefonnummer auf (falls Baileys sie schon kennt). Ohne das würde man einfach
+// die LID-Ziffern als "Nummer" anzeigen, was wie eine falsche Nummer aussieht
+// (z.B. mit einer zufälligen Ländervorwahl wie +850).
+async function resolvePhoneJid(jid, sock) {
+  const n = normalizeJid(jid);
+  if (!n) return null;
+  if (n.endsWith('@s.whatsapp.net')) return n;
+  if (n.endsWith('@lid')) {
+    try {
+      const pn = await sock?.signalRepository?.lidMapping?.getPNForLID(n);
+      if (pn) {
+        const num = String(pn).split('@')[0].replace(/[^0-9]/g, '');
+        if (num) return `${num}@s.whatsapp.net`;
+      }
+    } catch (e) {}
+  }
+  return null;
+}
+
+// Zeigt die ECHTE Telefonnummer als klickbare @-Markierung. Kann Baileys die
+// LID nicht auflösen, wird KEINE Ziffernfolge gezeigt (die sonst wie eine
+// falsche Nummer aussehen würde), sondern ein neutraler Platzhaltertext —
+// die Markierung bleibt trotzdem über das mentions-Array anklickbar.
+async function getNumberMention(jid, sock) {
+  const resolved = await resolvePhoneJid(jid, sock);
+  if (resolved) return `@${resolved.split('@')[0]}`;
+  return '@Nutzer';
 }
 
 // Sucht die JID eines registrierten Nutzers anhand des gespeicherten Namens (z.B. bei $setrole @kirito).
@@ -971,6 +993,8 @@ async function startBot(sessionName = 'default', hooks = {}) {
       const isOwner = isAuthorized(sender, ['OWNER', 'COOWNER']);
       const isCoOwner = isAuthorized(sender, ['COOWNER']);
       const isAdmin = isAuthorized(sender, ['ADMIN']);
+      // Team-Mitglieder = alle Ränge außer VIP, USER und ADMIN
+      const isTeamMember = isAuthorized(sender, ['OWNER', 'COOWNER', 'MOD', 'SUPPORTER', 'TEST_SUPPORTER']);
 
       if (BOT_OFFLINE && !isOwner) {
         try { await sock.sendMessage(from, { text: '⚠️ Der Bot ist derzeit im Offline-Modus.' }); } catch (e) {}
@@ -979,9 +1003,11 @@ async function startBot(sessionName = 'default', hooks = {}) {
 
       const send = async (text, opts = {}) => {
         try {
-          try { await sock.sendPresenceUpdate('composing', from); } catch (e) {}
-          await sleep(3000);
-          try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
+          if (!isTeamMember) {
+            try { await sock.sendPresenceUpdate('composing', from); } catch (e) {}
+            await sleep(3000);
+            try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
+          }
           const sendOpts = { ...opts };
           if (sendOpts.mentions) {
             const mentionArray = Array.isArray(sendOpts.mentions) ? sendOpts.mentions : [sendOpts.mentions];
@@ -1190,7 +1216,7 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
         // Bestätigung/Log in der internen Support-Gruppe — statt "Supporter" steht hier der Team-Rang
         try {
           await sock.sendMessage(SUPPORT_CONFIG.SUPPORT_GROUP, {
-            text: `📝 Antwort auf Ticket #${ticket.id}:\n\n${answerText}\n\n${rankLabel}: ${getNumberMention(sender)}`,
+            text: `📝 Antwort auf Ticket #${ticket.id}:\n\n${answerText}\n\n${rankLabel}: ${await getNumberMention(sender, sock)}`,
             mentions: [sender]
           });
         } catch (e) {
@@ -1200,7 +1226,7 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
         // Antwort direkt an den Ticket-Ersteller, mit klickbarer @-Markierung des Teammitglieds
         try {
           await sock.sendMessage(ticket.sender, {
-            text: `📩 Antwort auf dein Support-Ticket #${ticket.id}:\n\n${answerText}\n\nBeantwortet von: ${rankLabel} ${getNumberMention(sender)}`,
+            text: `📩 Antwort auf dein Support-Ticket #${ticket.id}:\n\n${answerText}\n\nBeantwortet von: ${rankLabel} ${await getNumberMention(sender, sock)}`,
             mentions: [sender]
           });
         } catch (e) {
@@ -1330,7 +1356,7 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
           return send('❌ Fehler beim Speichern: ' + e.message);
         }
 
-        const displayMentions = normalizedJids.map(j => getNumberMention(j)).join(', ');
+        const displayMentions = (await Promise.all(normalizedJids.map(j => getNumberMention(j, sock)))).join(', ');
         return send(
           `✅ Rolle *${roleUpper}* (${prettyRank(roleUpper)}) erfolgreich gesetzt für:\n${displayMentions}\n\n` +
           `💾 Gespeichert in: ranks.json, users.json, owner.json`,
@@ -1523,9 +1549,11 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
           }
 
           if (ppUrl) {
-            try { await sock.sendPresenceUpdate('composing', from); } catch (e) {}
-            await sleep(5000);
-            try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
+            if (!isTeamMember) {
+              try { await sock.sendPresenceUpdate('composing', from); } catch (e) {}
+              await sleep(5000);
+              try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
+            }
             await sock.sendMessage(from, { image: { url: ppUrl }, caption });
             return;
           }
@@ -2043,7 +2071,7 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
         save(FILES.tickets, tickets);
         try {
           await sock.sendMessage(SUPPORT_CONFIG.TICKET_GROUP, {
-            text: `🎫 Neues Ticket #${ticketId}\nVon: ${getNumberMention(sender)}\n\nNachricht:\n${text}`,
+            text: `🎫 Neues Ticket #${ticketId}\nVon: ${await getNumberMention(sender, sock)}\n\nNachricht:\n${text}`,
             mentions: [sender]
           });
           return send(`✅ Ticket #${ticketId} erstellt.`);
@@ -2065,7 +2093,7 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
           return send(
             `🎫 Ticket #${ticket.id}\n` +
             `Status: ${ticket.status}\n` +
-            `Von: ${getNumberMention(ticket.sender)}\n` +
+            `Von: ${await getNumberMention(ticket.sender, sock)}\n` +
             `Nachricht: ${messageText}\n` +
             `Antwort: ${ticket.answer || 'Keine'}\n` +
             `Erstellt: ${new Date(ticket.timestamp).toLocaleString()}`,
@@ -2076,12 +2104,11 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
         const ticketValues = Object.values(tickets);
         const visibleTickets = ticketValues.filter(t => !filter || filter === 'all' || t.status.toLowerCase() === filter);
         const mentions = [...new Set(visibleTickets.map(t => t.sender))];
-        const list = visibleTickets
-          .map(t => {
-            const msg = String(t.message || t.text || '').slice(0, 50);
-            return `${t.id} | ${t.status} | ${getNumberMention(t.sender)} | ${msg}${msg.length >= 50 ? '…' : ''}`;
-          })
-          .join('\n') || '(keine)';
+        const listLines = await Promise.all(visibleTickets.map(async t => {
+          const msg = String(t.message || t.text || '').slice(0, 50);
+          return `${t.id} | ${t.status} | ${await getNumberMention(t.sender, sock)} | ${msg}${msg.length >= 50 ? '…' : ''}`;
+        }));
+        const list = listLines.join('\n') || '(keine)';
         const subtitle = filter ? ` (${filter === 'all' ? 'alle' : filter})` : '';
         return send(`🎫 Tickets${subtitle}:\n${list}`, { mentions });
       }
@@ -2296,7 +2323,7 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
           save(FILES.owner, { ownerLid: OWNER_LID, ownerPriv: OWNER_PRIV, coownerLid: COOWNER_LID });
         } catch (e) {}
 
-        return send(`✅ Rang von ${getNumberMention(jid)} auf ${r} gesetzt.`, { mentions: [jid] });
+        return send(`✅ Rang von ${await getNumberMention(jid, sock)} auf ${r} gesetzt.`, { mentions: [jid] });
       }
 
       if (cmd === 'datadelete') {
@@ -2459,21 +2486,4 @@ initTelegramConnect();
 (async () => {
   let existingSessions = [];
   try {
-    existingSessions = fs.readdirSync(SESSIONS_DIR, { withFileTypes: true })
-      .filter(d => d.isDirectory())
-      .map(d => d.name);
-  } catch (e) {
-    existingSessions = [];
-  }
-
-  if (existingSessions.length === 0) {
-    // Noch keine Session vorhanden -> Standard-Session anlegen (QR-Login)
-    await startBot('default');
-  } else {
-    // Alle vorhandenen Sessions parallel wieder starten
-    for (const sessionName of existingSessions) {
-      await startBot(sessionName);
-      await sleep(1000); // kleine Pause, um Rate-Limits beim Verbindungsaufbau zu vermeiden
-    }
-  }
-})();
+    existingSessions = fs.readdirSync(SESSIONS_DIR
