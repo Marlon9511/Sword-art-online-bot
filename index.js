@@ -42,71 +42,7 @@ const ensureFile = (filePath, defaultData = {}) => {
     }
   }
 };
-const CREDITS_FILE = path.join(__dirname, 'credits.json');
 
-// Datei anlegen, falls sie noch nicht existiert
-function loadCredits() {
-    if (!fs.existsSync(CREDITS_FILE)) {
-        fs.writeFileSync(CREDITS_FILE, JSON.stringify([], null, 2));
-    }
-    return JSON.parse(fs.readFileSync(CREDITS_FILE, 'utf-8'));
-}
-
-function saveCredits(credits) {
-    fs.writeFileSync(CREDITS_FILE, JSON.stringify(credits, null, 2));
-}
-
-// .credits -> Liste anzeigen
-async function showCredits(sock, chatId) {
-    const credits = loadCredits();
-
-    if (credits.length === 0) {
-        return sock.sendMessage(chatId, { text: "📋 Noch keine Credits eingetragen." });
-    }
-
-    let text = "✨ *Credits* ✨\n\n";
-    credits.forEach((c, i) => {
-        text += `${i + 1}. *${c.name}* — ${c.role}\n`;
-    });
-    text += "\n❤️ Danke euch allen!";
-
-    await sock.sendMessage(chatId, { text });
-}
-
-// .addcredit Name | Rolle
-async function addCredit(sock, chatId, args) {
-    const input = args.join(' ');
-    const [name, role] = input.split('|').map(s => s?.trim());
-
-    if (!name || !role) {
-        return sock.sendMessage(chatId, {
-            text: "⚠️ Nutzung: .addcredit Name | Rolle\nBeispiel: .addcredit Max | Coding Hilfe"
-        });
-    }
-
-    const credits = loadCredits();
-    credits.push({ name, role });
-    saveCredits(credits);
-
-    await sock.sendMessage(chatId, { text: `✅ *${name}* wurde zu den Credits hinzugefügt.` });
-}
-
-// .delcredit Nummer
-async function delCredit(sock, chatId, args) {
-    const index = parseInt(args[0]) - 1;
-    const credits = loadCredits();
-
-    if (isNaN(index) || index < 0 || index >= credits.length) {
-        return sock.sendMessage(chatId, { text: "⚠️ Ungültige Nummer. Nutze .credits um die Liste mit Nummern zu sehen." });
-    }
-
-    const removed = credits.splice(index, 1)[0];
-    saveCredits(credits);
-
-    await sock.sendMessage(chatId, { text: `🗑️ *${removed.name}* wurde aus den Credits entfernt.` });
-}
-
-module.exports = { showCredits, addCredit, delCredit };
 const BASE_DIR = path.resolve('./');
 const SESSIONS_DIR = path.join(BASE_DIR, 'sessions');
 const DATA_PATH = path.join(BASE_DIR, 'data');
