@@ -2429,14 +2429,34 @@ ${PREFIX}delcredit <nummer> - Helfer aus Credits entfernen\n\n`;
         const code = (link.match(/chat\.whatsapp\.com\/([A-Za-z0-9_-]+)/)?.[1]) || link;
         try { await sock.groupAcceptInvite(code); return send('✅ Erfolgreich beigetreten'); } catch (e) { return send('❌ Beitritt fehlgeschlagen'); }
       }
-      if (cmd === 'leave') {
-        if (!from?.endsWith('@g.us')) return send('Nur in Gruppen.');
-        if (!(isOwner || isCoOwner)) return send('Kein Zugriff.');
-        try {
-          await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: `Bot verlässt Gruppe: ${from}` });
-          await sock.groupLeave(from);
-        } catch (e) { return send('❌ Konnte Gruppe nicht verlassen.'); }
-      }
+      const isGroupChat = from?.endsWith('@g.us');
+
+  // Fall 1: Privatchat -> JID als Argument nötig
+  if (!isGroupChat) {
+    if (!isOwner) return send('Kein Zugriff.'); // im Privatchat nur Owner, kein CoOwner
+
+    const targetJid = args?.[0]?.trim();
+    if (!targetJid || !targetJid.endsWith('@g.us')) {
+      return send('Nutze: ?leave <gruppen-jid>\nBeispiel: ?leave 120363437195661019@g.us');
+    }
+
+    try {
+      await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: `Bot verlässt Gruppe: ${targetJid}` });
+      await sock.groupLeave(targetJid);
+      return send(`✅ Gruppe ${targetJid} verlassen.`);
+    } catch (e) {
+      return send('❌ Konnte Gruppe nicht verlassen (falsche JID oder Bot nicht Mitglied).');
+    }
+  }
+
+  // Fall 2: Innerhalb einer Gruppe -> bisheriges Verhalten
+  if (!(isOwner || isCoOwner)) return send('Kein Zugriff.');
+  try {
+    await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: `Bot verlässt Gruppe: ${from}` });
+    await sock.groupLeave(from);
+  } catch (e) {
+    return send('❌ Konnte Gruppe nicht verlassen.');
+  }
 
       if (cmd === 'grouplist' || cmd === 'gl') {
         if (!isOwner) return send('Kein Zugriff.');
