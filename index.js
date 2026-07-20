@@ -2248,35 +2248,12 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
       }
 
       if (cmd === 'promote') {
-  if (!isOwner) return send('Nur Owner/Co-Owner darf promoten.');
-  const ctx = m.message?.extendedTextMessage?.contextInfo;
-  let target = args[0];
-  if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
-  if (!target && ctx?.participant) target = ctx.participant;
-  if (!target) return send(`Usage: ${PREFIX}promote <num|jid|@user> (auch als Antwort auf eine Nachricht möglich)`);
-
-  const jid = normalizeJid(target);
-  ranks[jid] = 'ADMIN';
-  save(FILES.ranks, ranks);
-
-  if (isGroup) {
-    try {
-      const groupMetadata = await getGroupMetaSafe(from);
-      const rawId = jid.split('@')[0];
-      const participant = groupMetadata?.participants?.find(p =>
-        isSameJid(p.id, jid) || (p.id || '').split('@')[0] === rawId
-      );
-      if (participant) {
-        await sock.groupParticipantsUpdate(from, [participant.id], 'promote');
-        return send(`✅ @${rawId} wurde zum ADMIN befördert (Bot-Rang + Gruppen-Admin).`, { mentions: [jid] });
+        if (!isOwner) return send('Nur Owner/Co-Owner darf promoten.');
+        const t = args[0]; if (!t) return send('Usage: $promote <num|jid>');
+        const jid = normalizeJid(t);
+        ranks[jid] = 'ADMIN'; save(FILES.ranks, ranks);
+        return send(`✅ ${jid} zum ADMIN befördert.`);
       }
-      return send(`✅ ${jid} zum ADMIN befördert (Bot-Rang). ⚠️ Nutzer wurde nicht in dieser Gruppe gefunden, konnte also nicht als Gruppen-Admin gesetzt werden.`);
-    
-
-}
-  }
-
-  return send(`✅ ${jid} zum ADMIN befördert (Bot-Rang). ℹ️ Kein Gruppenkontext — Gruppen-Admin-Rechte wurden nicht gesetzt.`);
       if (cmd === 'demote') {
         if (!isOwner) return send('Nur Owner/Co-Owner darf demoten.');
         const t = args[0]; if (!t) return send('Usage: $demote <num|jid>');
