@@ -71,7 +71,8 @@ const FILES = {
   owner: { file: 'owner.json', default: {} },
   teamTodos: { file: 'team-todos.json', default: {} },
   groupInvites: { file: 'group-invites.json', default: {} },
-  groupSettings: { file: 'group-settings.json', default: {} }
+  groupSettings: { file: 'group-settings.json', default: {} },
+  credits: { file: 'credits.json', default: { list: [] } }
 };
 
 Object.values(FILES).forEach(({ file, default: def }) => {
@@ -454,6 +455,7 @@ let pets = normalizeDataKeys(load(FILES.pets.file));
 let tickets = normalizeDataKeys(load(FILES.tickets.file));
 let ranks = normalizeDataKeys(load(FILES.ranks.file));
 let commandBans = load(FILES.commandBans.file) || {};
+let credits = load(FILES.credits.file) || { list: [] };
 
 console.log('Loaded ranks:', ranks);
 
@@ -618,6 +620,7 @@ function persistAll() {
   save(FILES.ranks, ranks);
   save(FILES.broadcastSettings, broadcastSettings);
   save(FILES.deleted, deletedUsers);
+  save(FILES.credits, credits);
   try {
     save(FILES.owner, { ownerLid: OWNER_LID, ownerPriv: OWNER_PRIV, coownerLid: COOWNER_LID });
   } catch (e) { console.error('Failed to save owner config:', e); }
@@ -1107,6 +1110,7 @@ ${PREFIX}adopt <name> - Adoptiere ein Haustier
 ${PREFIX}feed - Füttere dein Haustier
 ${PREFIX}fish - Gehe angeln
 ${PREFIX}afk [grund] - Setze deinen AFK-Status mit optionalem Grund
+${PREFIX}credits - Zeigt alle Helfer des Bots
 
 *💬 Chat & Gruppen:*
 ${PREFIX}gi - Gruppeneinstellungen anzeigen
@@ -1148,7 +1152,9 @@ ${PREFIX}listroles - Alle Rollen anzeigen
 ${PREFIX}newsession <name> - Neue Bot-Session starten (weitere Nummer)
 ${PREFIX}sessions - Aktive Sessions anzeigen
 ${PREFIX}stopsession <name> - Session stoppen (Login-Daten bleiben)
-${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
+${PREFIX}deletesession <name> - Session stoppen UND komplett löschen
+${PREFIX}addcredit Name | Rolle - Helfer zu Credits hinzufügen
+${PREFIX}delcredit <nummer> - Helfer aus Credits entfernen\n\n`;
         }
 
         helpText += `_Tipp: Nutze die Befehle ohne Parameter für mehr Info_`;
@@ -2470,81 +2476,4 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
       }
       if (cmd === 'top') {
         const top = Object.entries(users).sort((a, b) => (b[1].level * 1000 + (b[1].xp || 0)) - (a[1].level * 1000 + (a[1].xp || 0))).slice(0, 10);
-        let out = '🏆 Top Spieler\n';
-        top.forEach(([jid, u], i) => out += `${i + 1}. ${jid.split('@')[0]} - Lv.${u.level} (${u.xp} XP)\n`);
-        return send(out);
-      }
-
-            // YEETBAN
-      if (cmd === 'yeetban') {
-        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) return send('Kein Zugriff.');
-        let target = args[0];
-        try {
-          const ctx = m.message?.extendedTextMessage?.contextInfo;
-          if (!target && ctx?.participant) target = ctx.participant;
-          if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
-        } catch (e) {}
-        if (!target) return send('Usage: $yeetban <num|jid>');
-        const jid = normalizeJid(target);
-        if (isPrimaryOwner(jid)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gebannt/entfernt werden.');
-        const reason = args.slice(1).join(' ') || 'Kein Grund';
-        bans[jid] = { by: sender, at: new Date().toISOString(), reason };
-        save(FILES.bans, bans);
-        try {
-          const groups = await sock.groupFetchAllParticipating();
-          let removed = 0, failed = 0;
-          for (const gid of Object.keys(groups)) {
-            try {
-              const meta = await getGroupMetaSafe(gid);
-              if (!meta?.participants) { failed++; continue; }
-              const rawJid = jid.split('@')[0];
-              const targetParticipant = meta.participants.find(p => (p.id || '').split('@')[0] === rawJid);
-              if (!targetParticipant) { failed++; continue; }
-              await sock.groupParticipantsUpdate(gid, [targetParticipant.id], 'remove');
-              await sleep(500);
-              removed++;
-            } catch (e) { failed++; }
-          }
-          return send(`✅ Yeetban: ${jid} — entfernt aus ${removed} Gruppen, fehlgeschlagen: ${failed}`);
-        } catch (e) {
-          return send('❌ Yeetban fehlgeschlagen.');
-        }
-      }
-
-      // Unbekannter Befehl
-      return send('❓ Unbekannter Befehl — $help für eine Liste der Befehle.');
-
-    } catch (err) {
-      console.error('messages.upsert error:', err);
-      log(`ERROR: ${err?.message || String(err)}`);
-    }
-  });
-
-  console.log(`✅ Sword-art-online-bot Session "${sessionName}" gestartet.`);
-  return sock;
-}
-
-// ========== MAIN ==========
-initTelegramConnect();
-
-(async () => {
-  let existingSessions = [];
-  try {
-    existingSessions = fs.readdirSync(SESSIONS_DIR, { withFileTypes: true })
-      .filter(d => d.isDirectory())
-      .map(d => d.name);
-  } catch (e) {
-    existingSessions = [];
-  }
-
-  if (existingSessions.length === 0) {
-    // Noch keine Session vorhanden -> Standard-Session anlegen (QR-Login)
-    await startBot('default');
-  } else {
-    // Alle vorhandenen Sessions parallel wieder starten
-    for (const sessionName of existingSessions) {
-      await startBot(sessionName);
-      await sleep(1000); // kleine Pause, um Rate-Limits beim Verbindungsaufbau zu vermeiden
-    }
-  }
-})();
+        let out = '
