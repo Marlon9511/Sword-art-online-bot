@@ -2271,10 +2271,9 @@ ${PREFIX}deletesession <name> - Session stoppen UND komplett löschen\n\n`;
         return send(`✅ @${rawId} wurde zum ADMIN befördert (Bot-Rang + Gruppen-Admin).`, { mentions: [jid] });
       }
       return send(`✅ ${jid} zum ADMIN befördert (Bot-Rang). ⚠️ Nutzer wurde nicht in dieser Gruppe gefunden, konnte also nicht als Gruppen-Admin gesetzt werden.`);
-    } catch (e) {
-      console.error('[promote] Gruppen-Admin fehlgeschlagen:', e);
-      return send(`✅ ${jid} zum ADMIN befördert (Bot-Rang). ⚠️ Gruppen-Admin fehlgeschlagen: ` + (e?.message || 'Unbekannter Fehler'));
-    }
+    
+
+
   }
 
   return send(`✅ ${jid} zum ADMIN befördert (Bot-Rang). ℹ️ Kein Gruppenkontext — Gruppen-Admin-Rechte wurden nicht gesetzt.`);
