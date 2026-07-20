@@ -2589,3 +2589,6 @@ initTelegramConnect();
     for (const sessionName of existingSessions) {
       await startBot(sessionName);
       await sleep(1000);
+    }
+  }
+})();
