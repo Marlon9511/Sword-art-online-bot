@@ -2431,7 +2431,9 @@ ${PREFIX}delcredit <nummer> - Helfer aus Credits entfernen\n\n`;
       }
       const isGroupChat = from?.endsWith('@g.us');
 
-  // Fall 1: Privatchat -> JID als Argument nötig
+ 
+// leave 
+ if (cmd === 'leave') (
   if (!isGroupChat) {
     if (!isOwner) return send('Kein Zugriff.'); // im Privatchat nur Owner, kein CoOwner
 
