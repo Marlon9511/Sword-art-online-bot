@@ -1593,14 +1593,18 @@ ${PREFIX}delcredit <nummer> - Helfer aus Credits entfernen\n\n`;
         process.exit(0);
       }
 
-      // WHOAMI / ME
+ // WHOAMI / ME
       if (cmd === 'whoami' || cmd === 'me') {
         const normalizedSender = normalizeJid(sender);
         const user = users[normalizedSender] || {};
         const username = user.name || user.registrationName || sender.split('@')[0];
         const coins = user.coins || 0;
         const r = ranks[normalizedSender] || user.rank || '(none)';
-        const caption = `User: ${username}\nCoins: ${coins}\nRank: ${r}`;
+        const level = user.level || 1;
+        const xp = user.xp || 0;
+        const neededXp = 100 + (level * 50);
+        const remainingXp = Math.max(0, neededXp - xp);
+        const caption = `User: ${username}\nCoins: ${coins}\nRank: ${r}\nLevel: ${level}\nXP: ${xp} / ${neededXp}\nNoch ${remainingXp} XP bis Level ${level + 1}`;
 
         try {
           const candidates = [];
@@ -1647,7 +1651,6 @@ ${PREFIX}delcredit <nummer> - Helfer aus Credits entfernen\n\n`;
 
         return send(caption);
       }
-
       // PING
       if (cmd === 'ping') {
         const startTime = Date.now();
