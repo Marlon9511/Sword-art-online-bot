@@ -1091,6 +1091,24 @@ async function startBot(sessionName = 'default', hooks = {}) {
         try { save(FILES.users, users); } catch (e) {}
         return send(`🔕 Du bist jetzt AFK: ${reason}`);
       }
+const SHORT_URL = 'https://youtube.com/shorts/Tnj-yTpHpoY?si=nZXYlSHtpdT42Awi';
+const CACHE_PATH = path.join(__dirname, 'cache', 'menu-edit.mp4');
+
+function downloadShortIfNeeded() {
+  return new Promise((resolve, reject) => {
+    if (fs.existsSync(CACHE_PATH)) return resolve(CACHE_PATH);
+
+    fs.mkdirSync(path.dirname(CACHE_PATH), { recursive: true });
+
+    // -f mp4 wählt ein Format, das WhatsApp gut abspielen kann
+    const cmd = `yt-dlp -f "mp4" -o "${CACHE_PATH}" "${SHORT_URL}"`;
+
+    exec(cmd, (err) => {
+      if (err) return reject(err);
+      resolve(CACHE_PATH);
+    });
+  });
+}
 
       // HELP / MENU
       if (cmd === 'help' || cmd === 'menu') {
@@ -1160,7 +1178,19 @@ ${PREFIX}delcredit <nummer> - Helfer aus Credits entfernen\n\n`;
         helpText += `_Tipp: Nutze die Befehle ohne Parameter für mehr Info_`;
         return send(helpText);
       }
-
+try {
+    const videoPath = await downloadShortIfNeeded();
+    await sock.sendMessage(from, {
+      video: fs.readFileSync(videoPath),
+      caption: helpText,
+      mimetype: 'video/mp4'
+    }, { quoted: msg });
+  } catch (e) {
+    console.error('Video send failed, fallback to text:', e);
+    await sock.sendMessage(from, { text: helpText }, { quoted: msg });
+  }
+  return;
+}
       // Cooldown
       if (!isOwner && cmd !== 'help' && cmd !== 'menu') {
         const cooldownCommands = [
