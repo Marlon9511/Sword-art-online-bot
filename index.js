@@ -359,7 +359,7 @@ function normalizeJid(jid) {
   if (jid.startsWith('@')) jid = jid.substring(1);
   if (/^\d+$/.test(jid)) return `${jid}@s.whatsapp.net`;
   if (jid.includes('@')) return jid;
-  const num = jid.replace(/\D+/g, '');
+  const num = String(pn).split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
   return num ? `${num}@s.whatsapp.net` : jid;
 }
 
