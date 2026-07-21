@@ -2652,4 +2652,5 @@ initTelegramConnect();
       await sleep(1000);
     }
   }
+}
 })();
