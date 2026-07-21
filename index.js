@@ -2432,8 +2432,11 @@ ${PREFIX}delcredit <nummer> - Helfer aus Credits entfernen\n\n`;
       const isGroupChat = from?.endsWith('@g.us');
 
  
-// leave 
- if (cmd === 'leave') (
+// leave
+if (cmd === 'leave') {
+  const isGroupChat = from?.endsWith('@g.us');
+
+  // Fall 1: Privatchat -> JID als Argument nötig
   if (!isGroupChat) {
     if (!isOwner) return send('Kein Zugriff.'); // im Privatchat nur Owner, kein CoOwner
 
@@ -2456,9 +2459,11 @@ ${PREFIX}delcredit <nummer> - Helfer aus Credits entfernen\n\n`;
   try {
     await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: `Bot verlässt Gruppe: ${from}` });
     await sock.groupLeave(from);
+    return;
   } catch (e) {
     return send('❌ Konnte Gruppe nicht verlassen.');
   }
+}
 
       if (cmd === 'grouplist' || cmd === 'gl') {
         if (!isOwner) return send('Kein Zugriff.');
