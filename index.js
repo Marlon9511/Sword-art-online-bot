@@ -16,7 +16,6 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const CACHE_PATH = path.join(BASE_DIR, 'cache', 'menu-edit.mp4');
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const question = (q) => new Promise(resolve => rl.question(q, resolve));
@@ -58,6 +57,7 @@ ensureDir(DATA_PATH);
 // hier einfügen:
 const SHORT_URL = 'https://youtube.com/shorts/Tnj-yTpHpoY?si=nZXYlSHtpdT42Awi';
 
+const CACHE_PATH = path.join(BASE_DIR, 'cache', 'menu-edit.mp4');
 
 function downloadShortIfNeeded() {
   return new Promise((resolve, reject) => {
