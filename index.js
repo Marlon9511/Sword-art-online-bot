@@ -1617,40 +1617,21 @@ ${PREFIX}delcredit <nummer> - Helfer aus Credits entfernen\n\n`;
             if (OWNER_LID) candidates.push(OWNER_LID);
           }
 
-          const getPPUrl = async (jid) => {
+         const getPPUrl = async (jid) => {
             const types = ['image', 'preview'];
             for (const type of types) {
               try {
                 const result = await Promise.race([
                   sock.profilePictureUrl(jid, type),
-                  new Promise((_, reject) => setTimeout(() => reject(new Error('pp timeout')), 2000))
+                  new Promise((_, reject) => setTimeout(() => reject(new Error('pp timeout')), 5000))
                 ]);
                 if (result) return result;
-              } catch (e) {}
+              } catch (e) {
+                console.error(`[whoami] PP-Fehler für ${jid} (${type}):`, e?.message || e);
+              }
             }
             return null;
           };
-
-          let ppUrl = null;
-          for (const c of candidates) {
-            if (!c) continue;
-            ppUrl = await getPPUrl(c);
-            if (ppUrl) break;
-          }
-
-          if (ppUrl) {
-            if (!isTeamMember) {
-              try { await sock.sendPresenceUpdate('composing', from); } catch (e) {}
-              await sleep(5000);
-              try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
-            }
-            await sock.sendMessage(from, { image: { url: ppUrl }, caption });
-            return;
-          }
-        } catch (e) {}
-
-        return send(caption);
-      }
       // PING
       if (cmd === 'ping') {
         const startTime = Date.now();
