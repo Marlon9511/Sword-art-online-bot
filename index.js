@@ -593,7 +593,7 @@ async function resolvePhoneJid(jid, sock) {
     try {
       const pn = await sock?.signalRepository?.lidMapping?.getPNForLID(n);
       if (pn) {
-        const num = String(pn).split('@')[0].replace(/[^0-9]/g, '');
+        const num = String(pn).split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
         if (num) return `${num}@s.whatsapp.net`;
       }
     } catch (e) {}
