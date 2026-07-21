@@ -53,9 +53,7 @@ const DATA_PATH = path.join(BASE_DIR, 'data');
 
 ensureDir(SESSIONS_DIR);
 ensureDir(DATA_PATH);
-const BASE_DIR = path.resolve('./');
-const SESSIONS_DIR = path.join(BASE_DIR, 'sessions');
-const DATA_PATH = path.join(BASE_DIR, 'data');
+ 
 
 // hier einfügen:
 const SHORT_URL = 'https://youtube.com/shorts/Tnj-yTpHpoY?si=nZXYlSHtpdT42Awi';
