@@ -1109,8 +1109,7 @@ function downloadShortIfNeeded() {
     });
   });
 }
-
-      // HELP / MENU
+// HELP / MENU
       if (cmd === 'help' || cmd === 'menu') {
         let helpText = `🤖 *Bot Command Übersicht*\n\n`;
 
@@ -1176,21 +1175,21 @@ ${PREFIX}delcredit <nummer> - Helfer aus Credits entfernen\n\n`;
         }
 
         helpText += `_Tipp: Nutze die Befehle ohne Parameter für mehr Info_`;
-        return send(helpText);
+
+        try {
+          const videoPath = await downloadShortIfNeeded();
+          await sock.sendMessage(from, {
+            video: fs.readFileSync(videoPath),
+            caption: helpText,
+            mimetype: 'video/mp4'
+          }, { quoted: m });
+        } catch (e) {
+          console.error('Video send failed, fallback to text:', e);
+          await sock.sendMessage(from, { text: helpText }, { quoted: m });
+        }
+        return;
       }
-try {
-    const videoPath = await downloadShortIfNeeded();
-    await sock.sendMessage(from, {
-      video: fs.readFileSync(videoPath),
-      caption: helpText,
-      mimetype: 'video/mp4'
-    }, { quoted: msg });
-  } catch (e) {
-    console.error('Video send failed, fallback to text:', e);
-    await sock.sendMessage(from, { text: helpText }, { quoted: msg });
-  }
-  return;
-}
+   
       // Cooldown
       if (!isOwner && cmd !== 'help' && cmd !== 'menu') {
         const cooldownCommands = [
