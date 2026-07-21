@@ -82,9 +82,6 @@ Object.values(FILES).forEach(({ file, default: def }) => {
 const activeSessions = new Map();
 const registeredUsers = JSON.parse(fs.readFileSync(USERS_FILE, 'utf-8')).registeredUsers;
 
-if (cmd === 'dsgvo') {
-  return send(DSGVO_TEXT.trim());
-}
 const DSGVO_TEXT = `
 Datenschutzerklärung und Einwilligung:
 
@@ -2577,9 +2574,13 @@ ${PREFIX}delcredit <nummer> - Helfer aus Credits entfernen\n\n`;
         save(FILES.credits, credits);
         return send(`🗑️ *${removed.name}* wurde aus den Credits entfernt.`);
       }
+ //dsgvo
+if (cmd === 'dsgvo') {
+  return send(DSGVO_TEXT.trim());
+}
 
       // Unbekannter Befehl
-      return send('❓ Unbekannter Befehl — $help für eine Liste der Befehle.');
+      return send('❓ Unbekannter Befehl — ${prefix}help für eine Liste der Befehle.');
 
     } catch (err) {
       console.error('messages.upsert error:', err);
