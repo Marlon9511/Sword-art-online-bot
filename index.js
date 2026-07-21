@@ -82,6 +82,9 @@ Object.values(FILES).forEach(({ file, default: def }) => {
 const activeSessions = new Map();
 const registeredUsers = JSON.parse(fs.readFileSync(USERS_FILE, 'utf-8')).registeredUsers;
 
+if (cmd === 'dsgvo') {
+  return send(DSGVO_TEXT.trim());
+}
 const DSGVO_TEXT = `
 Datenschutzerklärung und Einwilligung:
 
