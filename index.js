@@ -1608,12 +1608,15 @@ ${PREFIX}delcredit <nummer> - Helfer aus Credits entfernen\n\n`;
 
         try {
           const candidates = [];
-          const pjid = toParticipantJid(normalizedSender);
-          if (pjid) candidates.push(pjid);
-          if (normalizedSender) candidates.push(normalizedSender);
+
+          // Echte Nummer über die offizielle LID->PN-Zuordnung auflösen (falls sender eine @lid ist)
+          const resolved = await resolvePhoneJid(normalizedSender, sock);
+          if (resolved) candidates.push(resolved);
+
+          candidates.push(normalizedSender);
+
           if (isSameJid(normalizedSender, OWNER_LID) || isSameJid(normalizedSender, OWNER_PRIV)) {
             if (OWNER_PRIV) candidates.push(OWNER_PRIV);
-            if (toParticipantJid(OWNER_PRIV)) candidates.push(toParticipantJid(OWNER_PRIV));
             if (OWNER_LID) candidates.push(OWNER_LID);
           }
 
@@ -1623,7 +1626,7 @@ ${PREFIX}delcredit <nummer> - Helfer aus Credits entfernen\n\n`;
               try {
                 const result = await Promise.race([
                   sock.profilePictureUrl(jid, type),
-                  new Promise((_, reject) => setTimeout(() => reject(new Error('pp timeout')), 5000))
+                  new Promise((_, reject) => setTimeout(() => reject(new Error('pp timeout')), 8000))
                 ]);
                 if (result) return result;
               } catch (e) {
@@ -1634,8 +1637,10 @@ ${PREFIX}delcredit <nummer> - Helfer aus Credits entfernen\n\n`;
           };
 
           let ppUrl = null;
+          const tried = new Set();
           for (const c of candidates) {
-            if (!c) continue;
+            if (!c || tried.has(c)) continue;
+            tried.add(c);
             ppUrl = await getPPUrl(c);
             if (ppUrl) break;
           }
@@ -1643,11 +1648,13 @@ ${PREFIX}delcredit <nummer> - Helfer aus Credits entfernen\n\n`;
           if (ppUrl) {
             if (!isTeamMember) {
               try { await sock.sendPresenceUpdate('composing', from); } catch (e) {}
-              await sleep(5000);
+              await sleep(3000);
               try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
             }
             await sock.sendMessage(from, { image: { url: ppUrl }, caption });
             return;
+          } else {
+            console.error('[whoami] Kein Profilbild gefunden für Kandidaten:', [...tried]);
           }
         } catch (e) {
           console.error('[whoami] Allgemeiner Fehler:', e?.message || e);
