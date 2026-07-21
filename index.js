@@ -87,10 +87,10 @@ Datenschutzerklärung und Einwilligung:
 
 1. Ich stimme der Verarbeitung meiner Nachrichten und Daten durch den Bot zu.
 2. Meine Daten werden nur zur Bereitstellung des Dienstes verwendet.
-3. Ich kann meine Einwillung jederzeit widerrufen (Befehl: $unregister).
+3. Ich kann meine Einwillung jederzeit widerrufen (Befehl: ?unregister).
 4. Meine Daten werden bei Widerruf gelöscht.
 
-Zum Registrieren antworten Sie bitte mit "$register confirm".
+Zum Registrieren antworten Sie bitte mit "?register confirm".
 `;
 
 const saveRegisteredUsers = () => {
