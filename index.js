@@ -57,7 +57,7 @@ ensureDir(DATA_PATH);
 
 // hier einfügen:
 const SHORT_URL = 'https://youtube.com/shorts/Tnj-yTpHpoY?si=nZXYlSHtpdT42Awi';
-const CACHE_PATH = path.join(BASE_DIR, 'cache', 'menu-edit.mp4');
+
 
 function downloadShortIfNeeded() {
   return new Promise((resolve, reject) => {
