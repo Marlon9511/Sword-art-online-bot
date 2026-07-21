@@ -53,7 +53,25 @@ const DATA_PATH = path.join(BASE_DIR, 'data');
 
 ensureDir(SESSIONS_DIR);
 ensureDir(DATA_PATH);
+const BASE_DIR = path.resolve('./');
+const SESSIONS_DIR = path.join(BASE_DIR, 'sessions');
+const DATA_PATH = path.join(BASE_DIR, 'data');
 
+// hier einfügen:
+const SHORT_URL = 'https://youtube.com/shorts/Tnj-yTpHpoY?si=nZXYlSHtpdT42Awi';
+const CACHE_PATH = path.join(BASE_DIR, 'cache', 'menu-edit.mp4');
+
+function downloadShortIfNeeded() {
+  return new Promise((resolve, reject) => {
+    if (fs.existsSync(CACHE_PATH)) return resolve(CACHE_PATH);
+    fs.mkdirSync(path.dirname(CACHE_PATH), { recursive: true });
+    const cmd = `yt-dlp -f "mp4" -o "${CACHE_PATH}" "${SHORT_URL}"`;
+    exec(cmd, (err) => {
+      if (err) return reject(err);
+      resolve(CACHE_PATH);
+    });
+  });
+}
 const USERS_FILE = path.join(DATA_PATH, 'users.json');
 const RESTART_FILE = path.join(DATA_PATH, 'restart.json');
 const LOG_FILE = path.join(BASE_DIR, 'logs.txt');
