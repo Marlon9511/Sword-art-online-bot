@@ -11,8 +11,12 @@ import chalk from 'chalk';
 import readline from "readline";
 import gradient from "gradient-string";
 import { initTelegramConnect, setActiveSock, sendQrToTelegram } from './telegram-connect.js';
+import { fileURLToPath } from 'url';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
+const CACHE_PATH = path.join(BASE_DIR, 'cache', 'menu-edit.mp4');
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const question = (q) => new Promise(resolve => rl.question(q, resolve));
