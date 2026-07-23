@@ -1131,71 +1131,85 @@ function downloadShortIfNeeded() {
 }
 // HELP / MENU
       if (cmd === 'help' || cmd === 'menu') {
-        let helpText = `🤖 *Bot Command Übersicht*\n\n`;
+        const divider = '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈';
+        let helpText = `╭───────────────╮\n│   🤖 *BOT MENÜ*   │\n╰───────────────╯\n\n`;
 
-        helpText += `*📱 Basis-Befehle:*
-${PREFIX}help - Zeigt diese Hilfe an
-${PREFIX}ping - Prüft ob der Bot online ist
-${PREFIX}owner - Kontaktiere den Owner
-${PREFIX}whoami - Zeigt deine Nutzerinfo
-${PREFIX}me - Zeigt deine Statistiken
-${PREFIX}pet - Zeigt dein Haustier-Status
-${PREFIX}daily - Tägliche Belohnung abholen
-${PREFIX}blackjack - Starte ein Blackjack-Spiel
-${PREFIX}slot - Spielautomaten-Spiel
-${PREFIX}adopt <name> - Adoptiere ein Haustier
-${PREFIX}feed - Füttere dein Haustier
-${PREFIX}fish - Gehe angeln
-${PREFIX}afk [grund] - Setze deinen AFK-Status mit optionalem Grund
-${PREFIX}credits - Zeigt alle Helfer des Bots
+        helpText += `📱 *BASIS*\n${divider}\n`;
+        helpText += `▸ ${PREFIX}help — Diese Hilfe\n`;
+        helpText += `▸ ${PREFIX}ping — Bot-Status prüfen\n`;
+        helpText += `▸ ${PREFIX}owner — Owner kontaktieren\n`;
+        helpText += `▸ ${PREFIX}whoami / ${PREFIX}me — Deine Nutzerinfo\n`;
+        helpText += `▸ ${PREFIX}afk [grund] — AFK-Status setzen\n`;
+        helpText += `▸ ${PREFIX}credits — Alle Helfer des Bots\n\n`;
 
-*💬 Chat & Gruppen:*
-${PREFIX}gi - Gruppeneinstellungen anzeigen
-${PREFIX}welcome-an - Welcome aktivieren
-${PREFIX}welcome-aus - Welcome deaktivieren
-${PREFIX}welcome-set <text> - Welcome-Text setzen
-${PREFIX}hidetag - Nachricht mit verstecktem Tag
-${PREFIX}delete - Als Reply: löscht die Nachricht (eigene immer, fremde nur als Admin)\n\n`;
+        helpText += `🎮 *SPIELE & WIRTSCHAFT*\n${divider}\n`;
+        helpText += `▸ ${PREFIX}daily — Tägliche Belohnung\n`;
+        helpText += `▸ ${PREFIX}blackjack — Blackjack spielen\n`;
+        helpText += `▸ ${PREFIX}slot — Spielautomat\n`;
+        helpText += `▸ ${PREFIX}fish — Angeln gehen\n`;
+        helpText += `▸ ${PREFIX}pet — Haustier-Status\n`;
+        helpText += `▸ ${PREFIX}adopt <name> — Haustier adoptieren\n`;
+        helpText += `▸ ${PREFIX}feed — Haustier füttern\n\n`;
 
-        helpText += `*⚙️ Aktuelles Präfix:* ${PREFIX}
-`;
+        helpText += `💬 *CHAT & GRUPPEN*\n${divider}\n`;
+        helpText += `▸ ${PREFIX}gi — Gruppeneinstellungen anzeigen\n`;
+        helpText += `▸ ${PREFIX}welcome-an / -aus — Welcome an/aus\n`;
+        helpText += `▸ ${PREFIX}welcome-set <text> — Welcome-Text setzen\n`;
+        helpText += `▸ ${PREFIX}antilink-an / -aus — Anti-WhatsApp-Link-Kick an/aus\n`;
+        helpText += `▸ ${PREFIX}hidetag <text> — Nachricht mit verstecktem Tag\n`;
+        helpText += `▸ ${PREFIX}delete — Als Reply: Nachricht löschen\n\n`;
+
+        helpText += `⚙️ *Aktuelles Präfix:* ${PREFIX}\n`;
+
         if (isAuthorized(sender, ['OWNER', 'COOWNER', 'MOD', 'SUPPORTER', 'TEST_SUPPORTER'])) {
-          helpText += `*🎫 Support-System:*
-${PREFIX}answer <ticket-id> <text> - Ticket beantworten
-${PREFIX}support <nachricht> - Support-Ticket erstellen
-${PREFIX}tickets [id|status] - Tickets anzeigen
-${PREFIX}cleartickets - Alle Tickets löschen (Zähler auf 0001)\n\n`;
+          helpText += `\n🎫 *SUPPORT-SYSTEM*\n${divider}\n`;
+          helpText += `▸ ${PREFIX}support <nachricht> — Ticket erstellen\n`;
+          helpText += `▸ ${PREFIX}answer <id> <text> — Ticket beantworten\n`;
+          helpText += `▸ ${PREFIX}tickets [id|status] — Tickets anzeigen\n`;
+          helpText += `▸ ${PREFIX}cleartickets — Alle Tickets löschen\n`;
         }
 
         if (isAdmin) {
-          helpText += `*⚔️ Admin-Befehle:*
-${PREFIX}warn @user - Nutzer verwarnen
-${PREFIX}kick @user - Nutzer entfernen
-${PREFIX}promote @user - Zum Admin machen
-${PREFIX}demote @user - Admin-Rechte entziehen
-${PREFIX}addxp <@nutzer> <menge> - XP schenken
-${PREFIX}addcash <@nutzer> <menge> - Coins schenken
-${PREFIX}addvip <@nutzer> <zeit> - VIP-Status geben\n\n`;
+          helpText += `\n⚔️ *ADMIN*\n${divider}\n`;
+          helpText += `▸ ${PREFIX}warn @user — Verwarnen\n`;
+          helpText += `▸ ${PREFIX}kick @user — Entfernen\n`;
+          helpText += `▸ ${PREFIX}promote / ${PREFIX}demote @user — Admin-Rechte\n`;
+          helpText += `▸ ${PREFIX}addxp <@user> <menge> — XP schenken\n`;
+          helpText += `▸ ${PREFIX}addcash <@user> <menge> — Coins schenken\n`;
+          helpText += `▸ ${PREFIX}addvip <@user> <zeit> — VIP geben\n`;
         }
 
         if (hasAdminPerms(sender)) {
-          helpText += `*👑 Owner Befehle:*
-${PREFIX}broadcast <text> - Nachricht an alle Gruppen
-${PREFIX}restart - Bot neu starten
-${PREFIX}updateprofile - Profil aktualisieren
-      ${PREFIX}bancmd <befehl> [ban|unban] - cmdban befehl (unban oder ban)
-${PREFIX}setrole @user <rolle> - Nutzerrolle setzen (auch als Antwort auf eine Nachricht: ${PREFIX}setrole <rolle>)
-${PREFIX}listroles - Alle Rollen anzeigen
-${PREFIX}newsession <name> - Neue Bot-Session starten (weitere Nummer)
-${PREFIX}sessions - Aktive Sessions anzeigen
-${PREFIX}stopsession <name> - Session stoppen (Login-Daten bleiben)
-${PREFIX}deletesession <name> - Session stoppen UND komplett löschen
-${PREFIX}addcredit Name | Rolle - Helfer zu Credits hinzufügen
-${PREFIX}delcredit <nummer> - Helfer aus Credits entfernen\n\n`;
+          helpText += `\n👑 *OWNER*\n${divider}\n`;
+          helpText += `▸ ${PREFIX}broadcast <text> — An alle Gruppen senden\n`;
+          helpText += `▸ ${PREFIX}restart — Bot neu starten\n`;
+          helpText += `▸ ${PREFIX}updateprofile — Profil aktualisieren\n`;
+          helpText += `▸ ${PREFIX}bancmd <befehl> [ban|unban] — Befehl sperren\n`;
+          helpText += `▸ ${PREFIX}setrole @user <rolle> — Rolle setzen\n`;
+          helpText += `▸ ${PREFIX}listroles — Alle Rollen anzeigen\n`;
+          helpText += `▸ ${PREFIX}newsession <name> — Neue Session starten\n`;
+          helpText += `▸ ${PREFIX}sessions — Aktive Sessions anzeigen\n`;
+          helpText += `▸ ${PREFIX}stopsession <name> — Session stoppen\n`;
+          helpText += `▸ ${PREFIX}deletesession <name> — Session löschen\n`;
+          helpText += `▸ ${PREFIX}addcredit Name | Rolle — Helfer hinzufügen\n`;
+          helpText += `▸ ${PREFIX}delcredit <nummer> — Helfer entfernen\n`;
         }
 
-        helpText += `_Tipp: Nutze die Befehle ohne Parameter für mehr Info_`;
+        helpText += `\n${divider}\n_💡 Tipp: Nutze Befehle ohne Parameter für mehr Info_`;
 
+        try {
+          const videoPath = await downloadShortIfNeeded();
+          await sock.sendMessage(from, {
+            video: fs.readFileSync(videoPath),
+            caption: helpText,
+            mimetype: 'video/mp4'
+          }, { quoted: m });
+        } catch (e) {
+          console.error('Video send failed, fallback to text:', e);
+          await sock.sendMessage(from, { text: helpText }, { quoted: m });
+        }
+        return;
+      }
         try {
           const videoPath = await downloadShortIfNeeded();
           await sock.sendMessage(from, {
