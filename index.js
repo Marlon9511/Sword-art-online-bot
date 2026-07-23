@@ -927,7 +927,6 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
         } catch (e) { console.error('[antilink] Fehler:', e); }
       }
 
-      }
       const activePrefix = isGroup ? getGroupPrefix(from) : PREFIX;
       if (!body || !body.startsWith(activePrefix)) return;
       const isCmd = true;
