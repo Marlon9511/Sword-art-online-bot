@@ -1197,19 +1197,7 @@ function downloadShortIfNeeded() {
 
         helpText += `\n${divider}\n_💡 Tipp: Nutze Befehle ohne Parameter für mehr Info_`;
 
-        try {
-          const videoPath = await downloadShortIfNeeded();
-          await sock.sendMessage(from, {
-            video: fs.readFileSync(videoPath),
-            caption: helpText,
-            mimetype: 'video/mp4'
-          }, { quoted: m });
-        } catch (e) {
-          console.error('Video send failed, fallback to text:', e);
-          await sock.sendMessage(from, { text: helpText }, { quoted: m });
-        }
-        return;
-      }
+        
         try {
           const videoPath = await downloadShortIfNeeded();
           await sock.sendMessage(from, {
