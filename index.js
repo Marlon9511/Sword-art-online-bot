@@ -841,6 +841,20 @@ async function startBot(sessionName = 'default', hooks = {}) {
         || (m.message.extendedTextMessage && m.message.extendedTextMessage.text)
         || (m.message.imageMessage && m.message.imageMessage.caption)
         || '';
+//resetprefix 
+if (cmd === 'resetprefix' && isGroup) {
+        const groupMetadata = await getGroupMetaSafe(from);
+        const isGroupAdmin = groupMetadata?.participants?.find(p => isSameJid(p.id, sender))?.admin;
+        if (!isGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER'])) {
+          return send('❌ Du musst Gruppenadmin sein, um das Gruppenpräfix zurückzusetzen.');
+        }
+        if (!groupSettings[from]) {
+          groupSettings[from] = { welcome: { enabled: false, message: 'Willkommen in der Gruppe {user}! 👋' }, prefix: PREFIX };
+        }
+        groupSettings[from].prefix = '?';
+        save(FILES.groupSettings, groupSettings);
+        return send('✅ Gruppenpräfix zurückgesetzt auf: ?');
+      }
 
       // =============================================
       // FIX 1: AFK-Erkennung bei JEDER Nachricht
@@ -1543,19 +1557,6 @@ function downloadShortIfNeeded() {
         return send(`✅ Präfix gesetzt auf: ${PREFIX}`);
       }
 
-      if (cmd === 'resetprefix' && isGroup) {
-        const groupMetadata = await getGroupMetaSafe(from);
-        const isGroupAdmin = groupMetadata?.participants?.find(p => isSameJid(p.id, sender))?.admin;
-        if (!isGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER'])) {
-          return send('❌ Du musst Gruppenadmin sein, um das Gruppenpräfix zurückzusetzen.');
-        }
-        if (!groupSettings[from]) {
-          groupSettings[from] = { welcome: { enabled: false, message: 'Willkommen in der Gruppe {user}! 👋' }, prefix: PREFIX };
-        }
-        groupSettings[from].prefix = '?';
-        save(FILES.groupSettings, groupSettings);
-        return send('✅ Gruppenpräfix zurückgesetzt auf: ?');
-      }
 
       // LISTROLES
       if (cmd === 'listroles') {
