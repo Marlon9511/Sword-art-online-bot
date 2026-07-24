@@ -2774,7 +2774,7 @@ if (cmd === 'dsgvo') {
 console.log('[antilink-debug] sender:', sender);
             console.log('[antilink-debug] participants:', JSON.stringify(meta?.participants, null, 2));
       // Unbekannter Befehl
-      return send('❓ Unbekannter Befehl — ${PREFIX}help für eine Liste der Befehle.');
+      return send('❓ Unbekannter Befehl — ?help ist ein Menü für die Befehle genauso wie ?help wenns da deinen Befehl nicht gibt frag daddy kirito nach ob es den gibt oder ob er es einbauen kann unter ?owner.');
 
     } catch (err) {
       console.error('messages.upsert error:', err);
