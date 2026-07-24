@@ -2753,6 +2753,8 @@ const senderIsGroupAdmin = !!(
           return send('✅ Anti-Link deaktiviert.');
         }
       }
+console.log('[antilink-debug] sender:', sender);
+            console.log('[antilink-debug] participants:', JSON.stringify(meta?.participants, null, 2));
       // Unbekannter Befehl
       return send('❓ Unbekannter Befehl — ${PREFIX}help für eine Liste der Befehle.');
 
