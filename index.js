@@ -842,8 +842,8 @@ async function startBot(sessionName = 'default', hooks = {}) {
         || (m.message.imageMessage && m.message.imageMessage.caption)
         || '';
 // ganz am Anfang der Nachrichtenverarbeitung, VOR der normalen Präfix-Prüfung
-const rawBody = (messageText || '').trim();
-// erstes "Wort" ohne führende Sonderzeichen (egal welches Präfix davor steht)
+// (send() gibt es an dieser Stelle noch nicht -> direkt sock.sendMessage verwenden)
+const rawBody = (body || '').trim();
 const noPrefixMatch = rawBody.match(/^[^\w]*(\w+)/);
 const cmdNoPrefix = noPrefixMatch ? noPrefixMatch[1].toLowerCase() : '';
 
@@ -851,14 +851,16 @@ if (cmdNoPrefix === 'resetprefix' && isGroup) {
   const groupMetadata = await getGroupMetaSafe(from);
   const isGroupAdmin = groupMetadata?.participants?.find(p => isSameJid(p.id, sender))?.admin;
   if (!isGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER'])) {
-    return send('❌ Du musst Gruppenadmin sein, um das Gruppenpräfix zurückzusetzen.');
+    await sock.sendMessage(from, { text: '❌ Du musst Gruppenadmin sein, um das Gruppenpräfix zurückzusetzen.' });
+    return;
   }
   if (!groupSettings[from]) {
     groupSettings[from] = { welcome: { enabled: false, message: 'Willkommen in der Gruppe {user}! 👋' }, prefix: PREFIX };
   }
   groupSettings[from].prefix = '?';
   save(FILES.groupSettings, groupSettings);
-  return send('✅ Gruppenpräfix zurückgesetzt auf: ?');
+  await sock.sendMessage(from, { text: '✅ Gruppenpräfix zurückgesetzt auf: ?' });
+  return;
 }
 
 // ... danach erst die normale Präfix-Prüfung und cmd-Extraktion für alle anderen Befehle
