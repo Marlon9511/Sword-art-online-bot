@@ -2756,7 +2756,7 @@ if (cmd === 'dsgvo') {
       }
 
       // Unbekannter Befehl
-      return send('❓ Unbekannter Befehl — ?help ist ein Menü für die Befehle genauso wie ?menh wenns da deinen Befehl nicht gibt frag daddy kirito nach ob es den gibt oder ob er es einbauen kann unter ?owner.');
+      return send('❓ Unbekannter Befehl — ?help ist ein Menü für die Befehle genauso wie ?menu wenns da deinen Befehl nicht gibt frag daddy kirito nach ob es den gibt oder ob er es einbauen kann unter ?owner.');
 
     } catch (err) {
       console.error('messages.upsert error:', err);
