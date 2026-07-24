@@ -2721,7 +2721,16 @@ if (cmd === 'dsgvo') {
 // Anti-Link Controls
       if ((cmd === 'antilink-an' || cmd === 'antilink-aus') && isGroup) {
         const groupMetadata = await getGroupMetaSafe(from);
-        const isGroupAdmin = groupMetadata?.participants?.find(p => isSameJid(p.id, sender))?.admin;
+        const senderCandidates = [sender, toParticipantJid(sender), toLidJid(sender)].filter(Boolean);
+const senderParticipant = meta?.participants?.find(p =>
+  senderCandidates.some(c => isSameJid(p.id, c))
+);
+const senderIsGroupAdmin = !!(
+  senderParticipant?.admin === 'admin' ||
+  senderParticipant?.admin === 'superadmin' ||
+  senderParticipant?.admin === true ||
+  senderParticipant?.isAdmin === true
+);
 
         if (!isGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) {
           return send('❌ Du musst Admin in dieser Gruppe sein.');
