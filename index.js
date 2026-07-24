@@ -880,7 +880,16 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
           if (antilinkSettings?.enabled) {
             const meta = await getGroupMetaSafe(from);
 
-            const senderIsGroupAdmin = meta?.participants?.find(p => isSameJid(p.id, sender))?.admin;
+            const senderCandidates = [sender, toParticipantJid(sender), toLidJid(sender)].filter(Boolean);
+            const senderParticipant = meta?.participants?.find(p =>
+              senderCandidates.some(c => isSameJid(p.id, c))
+            );
+            const senderIsGroupAdmin = !!(
+              senderParticipant?.admin === 'admin' ||
+              senderParticipant?.admin === 'superadmin' ||
+              senderParticipant?.admin === true ||
+              senderParticipant?.isAdmin === true
+            );
             const senderIsTeam = isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD']);
 
             if (!senderIsGroupAdmin && !senderIsTeam) {
@@ -926,7 +935,6 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
           }
         } catch (e) { console.error('[antilink] Fehler:', e); }
       }
-
       const activePrefix = isGroup ? getGroupPrefix(from) : PREFIX;
       if (!body || !body.startsWith(activePrefix)) return;
       const isCmd = true;
