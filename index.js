@@ -53,7 +53,7 @@ const DATA_PATH = path.join(BASE_DIR, 'data');
 ensureDir(SESSIONS_DIR);
 ensureDir(DATA_PATH);
  
-
+const meta = await sock.groupMetadata(from); // make sure this line exists before meta is used
 // hier einfügen:
 const SHORT_URL = 'https://youtube.com/shorts/Tnj-yTpHpoY?si=nZXYlSHtpdT42Awi';
 
