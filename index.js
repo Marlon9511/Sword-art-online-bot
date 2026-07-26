@@ -2740,7 +2740,7 @@ if (cmd === 'dsgvo') {
           senderParticipant?.isAdmin === true
         );
 
-        if (!senderIsGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) {
+        if (!senderIsGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER', 'GROUPADMIN'])) {
           return send('❌ Du musst Admin in dieser Gruppe sein.');
         }
 
