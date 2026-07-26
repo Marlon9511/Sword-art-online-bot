@@ -1709,7 +1709,7 @@ const FALLBACK_PP_URL = 'https://raw.githubusercontent.com/Marlon9511/Sword-art-
             ppUrl = await getPPUrl(c);
             if (ppUrl) break;
           }
-
+console.log('[whoami] Socket-Status:', sock.ws?.readyState, '| User:', !!sock.user);
           // Kein echtes Profilbild gefunden -> Fallback nutzen
           if (!ppUrl) {
             console.error('[whoami] Kein Profilbild gefunden für Kandidaten:', [...tried]);
