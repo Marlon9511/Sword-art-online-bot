@@ -1655,7 +1655,7 @@ function downloadShortIfNeeded() {
         process.exit(0);
       }
 
- // WHOAMI / ME
+// WHOAMI / ME
       if (cmd === 'whoami' || cmd === 'me') {
         const normalizedSender = normalizeJid(sender);
         const user = users[normalizedSender] || {};
@@ -1667,6 +1667,9 @@ function downloadShortIfNeeded() {
         const neededXp = 100 + (level * 50);
         const remainingXp = Math.max(0, neededXp - xp);
         const caption = `User: ${username}\nCoins: ${coins}\nRank: ${r}\nLevel: ${level}\nXP: ${xp} / ${neededXp}\nNoch ${remainingXp} XP bis Level ${level + 1}`;
+
+        // Fallback-Bild, falls kein echtes Profilbild gefunden wird
+        const FALLBACK_PP_URL = 'https://raw.githubusercontent.com/Marlon9511/Sword-art-online-bot/main/assets/5d553cd8911378163e989839dff229f3.webp.jpg';
 
         try {
           const candidates = [];
@@ -1707,6 +1710,12 @@ function downloadShortIfNeeded() {
             if (ppUrl) break;
           }
 
+          // Kein echtes Profilbild gefunden -> Fallback nutzen
+          if (!ppUrl) {
+            console.error('[whoami] Kein Profilbild gefunden für Kandidaten:', [...tried]);
+            ppUrl = FALLBACK_PP_URL;
+          }
+
           if (ppUrl) {
             if (!isTeamMember) {
               try { await sock.sendPresenceUpdate('composing', from); } catch (e) {}
@@ -1715,8 +1724,6 @@ function downloadShortIfNeeded() {
             }
             await sock.sendMessage(from, { image: { url: ppUrl }, caption });
             return;
-          } else {
-            console.error('[whoami] Kein Profilbild gefunden für Kandidaten:', [...tried]);
           }
         } catch (e) {
           console.error('[whoami] Allgemeiner Fehler:', e?.message || e);
