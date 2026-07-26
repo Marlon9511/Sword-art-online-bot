@@ -1669,7 +1669,7 @@ function downloadShortIfNeeded() {
         const caption = `User: ${username}\nCoins: ${coins}\nRank: ${r}\nLevel: ${level}\nXP: ${xp} / ${neededXp}\nNoch ${remainingXp} XP bis Level ${level + 1}`;
 
         // Fallback-Bild, falls kein echtes Profilbild gefunden wird
-        const FALLBACK_PP_URL = 'https://raw.githubusercontent.com/Marlon9511/Sword-art-online-bot/main/assets/5d553cd8911378163e989839dff229f3.webp.jpg';
+const FALLBACK_PP_URL = 'https://raw.githubusercontent.com/Marlon9511/Sword-art-online-bot/main/5d553cd8911378163e989839dff229f3.webp.jpg';
 
         try {
           const candidates = [];
