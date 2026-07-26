@@ -1685,21 +1685,21 @@ const FALLBACK_PP_URL = 'https://raw.githubusercontent.com/Marlon9511/Sword-art-
             if (OWNER_LID) candidates.push(OWNER_LID);
           }
 
-          const getPPUrl = async (jid) => {
-            const types = ['image', 'preview'];
-            for (const type of types) {
-              try {
-                const result = await Promise.race([
-                  sock.profilePictureUrl(jid, type),
-                  new Promise((_, reject) => setTimeout(() => reject(new Error('pp timeout')), 8000))
-                ]);
-                if (result) return result;
-              } catch (e) {
-                console.error(`[whoami] PP-Fehler für ${jid} (${type}):`, e?.message || e);
-              }
-            }
-            return null;
-          };
+        const getPPUrl = async (jid) => {
+  const types = ['image', 'preview'];
+  for (const type of types) {
+    try {
+      const result = await Promise.race([
+        sock.profilePictureUrl(jid, type),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('pp timeout (15s)')), 15000))
+      ]);
+      if (result) return result;
+    } catch (e) {
+      console.error(`[whoami] PP-Fehler für ${jid} (${type}):`, e); // volles Error-Objekt statt nur .message
+    }
+  }
+  return null;
+};
 
           let ppUrl = null;
           const tried = new Set();
