@@ -880,52 +880,74 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
       // ANTI-LINK: WhatsApp-Gruppen-/Kanal-Links erkennen
       // und den Absender kicken (nur wenn pro Gruppe aktiviert)
       // =============================================
- if (isGroup && body && !m.key.fromMe && whatsappLinkRegex.test(body)) {
-  try {
-    const antilinkSettings = groupSettings[from]?.antilink;
-    if (antilinkSettings?.enabled) {
-      // WICHTIG: frische Metadaten holen, nicht aus Cache,
-      // damit Admin-Status aktuell ist
-      const meta = await sock.groupMetadata(from).catch(() => null);
-      if (!meta) return; // kein Risiko eingehen ohne Metadaten
+// Erkennt WhatsApp-Gruppeneinladungs- und Kanal-Links
+const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/channel)\/[a-zA-Z0-9]+/i;
+// =============================================
+      // ANTI-LINK: WhatsApp-Gruppen-/Kanal-Links erkennen
+      // und den Absender kicken (nur wenn pro Gruppe aktiviert)
+      // =============================================
+      if (isGroup && body && !m.key.fromMe && whatsappLinkRegex.test(body)) {
+        try {
+          const antilinkSettings = groupSettings[from]?.antilink;
+          if (antilinkSettings?.enabled) {
+            const meta = await getGroupMetaSafe(from);
 
-      const senderCandidates = [sender, toParticipantJid(sender), toLidJid(sender)].filter(Boolean);
-      const senderParticipant = meta.participants?.find(p =>
-        senderCandidates.some(c => isSameJid(p.id, c))
-      );
+            const senderCandidates = [sender, toParticipantJid(sender), toLidJid(sender)].filter(Boolean);
+            const senderParticipant = meta?.participants?.find(p =>
+              senderCandidates.some(c => isSameJid(p.id, c))
+            );
+            const senderIsGroupAdmin = !!(
+              senderParticipant?.admin === 'GroupAdmin' ||
+              senderParticipant?.admin === 'superadmin' ||
+              senderParticipant?.admin === true ||
+              senderParticipant?.isAdmin === true
+            );
+            const senderIsTeam = isAuthorized(sender, ['OWNER', 'COOWNER', 'GROUPADMIN', 'MOD']);
 
-      // FAIL-SAFE: Wenn der Teilnehmer nicht eindeutig zugeordnet
-      // werden kann, NICHT kicken (statt default "kein Admin")
-      if (!senderParticipant) {
-        console.warn('[antilink] Absender konnte nicht im Gruppen-Teilnehmerlisting gefunden werden, überspringe Kick:', sender);
-        return;
+            if (!senderIsGroupAdmin && !senderIsTeam) {
+              const allBotIds = [...getBotSelfIds(sock)];
+              const botPart = (meta?.participants || []).find(p => {
+                const pids = [
+                  p.id,
+                  p.id?.split('@')[0],
+                  `${p.id?.split('@')[0]}@s.whatsapp.net`,
+                ].filter(Boolean).map(String);
+                return pids.some(pid => allBotIds.includes(pid));
+              });
+              const botIsAdmin = !!(
+                botPart?.admin === 'admin' ||
+                botPart?.admin === 'superadmin' ||
+                botPart?.admin === true ||
+                botPart?.isAdmin === true
+              );
+
+              if (botIsAdmin) {
+                try {
+                  await sock.sendMessage(from, {
+                    delete: { remoteJid: from, id: m.key.id, fromMe: false, participant: sender }
+                  });
+                } catch (e) { console.error('[antilink] Löschen fehlgeschlagen:', e?.message || e); }
+
+                try {
+                  await sock.sendMessage(from, {
+                    text: `🚫 @${sender.split('@')[0]} wurde wegen eines WhatsApp-Links entfernt.`,
+                    mentions: [sender]
+                  });
+                } catch (e) {}
+
+                try {
+                  await sock.groupParticipantsUpdate(from, [sender], 'remove');
+                } catch (e) { console.error('[antilink] Kick fehlgeschlagen:', e?.message || e); }
+              } else {
+                console.log('[antilink] Bot ist kein Admin, kann Link-Poster nicht entfernen.');
+              }
+
+              return;
+            }
+          }
+        } catch (e) { console.error('[antilink] Fehler:', e); }
       }
 
-      const senderIsGroupAdmin = !!(
-        senderParticipant.admin === 'admin' ||
-        senderParticipant.admin === 'superadmin' ||
-        senderParticipant.admin === true ||
-        senderParticipant.isAdmin === true
-      );
-      const senderIsTeam = isAuthorized(sender, ['OWNER', 'COOWNER', 'GROUPADMIN', 'MOD']);
-
-      if (!senderIsGroupAdmin && !senderIsTeam) {
-        // ... Rest wie gehabt (löschen + kicken)
-      }
-      // Wenn senderIsGroupAdmin || senderIsTeam → einfach nichts tun,
-      // Funktion läuft normal weiter (kein return nötig, aber schadet nicht)
-    }
-  } catch (e) { console.error('[antilink] Fehler:', e); }
-}
-const meta = await sock.groupMetadata(from).catch(() => null);
-if (!meta) return;
-
-const senderCandidates = [sender, toParticipantJid(sender), toLidJid(sender)].filter(Boolean);
-
-// DEBUG - danach wieder entfernen
-console.log('[antilink-debug] sender:', sender);
-console.log('[antilink-debug] senderCandidates:', senderCandidates);
-console.log('[antilink-debug] participant IDs:', meta.participants?.map(p => p.id));
 
 const senderParticipant = meta.participants?.find(p =>
   senderCandidates.some(c => isSameJid(p.id, c))
