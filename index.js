@@ -918,11 +918,6 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
       }
 
 
-const senderParticipant = meta.participants?.find(p =>
-  senderCandidates.some(c => isSameJid(p.id, c))
-);
-
-
       const activePrefix = isGroup ? getGroupPrefix(from) : PREFIX;
       if (!body || !body.startsWith(activePrefix)) return;
       const isCmd = true;
