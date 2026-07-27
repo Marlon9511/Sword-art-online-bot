@@ -384,9 +384,7 @@ function isSameJid(a, b) {
   return normalizeJid(a) === normalizeJid(b);
 }
 
-// Ermittelt alle bekannten eigenen Identitäten des Bots (JID/LID/Nummer),
-// komplett dynamisch aus dem aktiven Socket — es muss keine LID mehr
-// hart im Script eingetragen werden.
+
 function getBotSelfIds(sock) {
   const ids = new Set();
 
@@ -413,10 +411,7 @@ function getBotSelfIds(sock) {
   return ids;
 }
 
-// Findet den AFK-Eintrag eines Users auch dann, wenn WhatsApp die Nachricht
-// unter einer anderen JID-Form schickt als die, unter der $afk gesetzt wurde
-// (z.B. @lid beim Setzen, @s.whatsapp.net bei der nächsten Nachricht, oder umgekehrt).
-// Gibt den tatsächlichen Schlüssel in `users` zurück, unter dem der AFK-Eintrag liegt, oder null.
+
 function findAfkKey(rawJid) {
   const candidates = new Set(
     [normalizeJid(rawJid), toParticipantJid(rawJid), toLidJid(rawJid)].filter(Boolean)
@@ -492,10 +487,7 @@ if (ownerCfg.roles) {
   ROLES.COOWNER = [COOWNER_LID];
 }
 
-// ========== GESCHÜTZTER HAUPT-OWNER ==========
-// Wer beim Start als Owner hinterlegt ist (OWNER_LID/OWNER_PRIV), bleibt IMMER Owner.
-// Kein Befehl ($setrank, $setrole, o.ä.) kann diese Person jemals degradieren
-// oder durch jemand anderen ersetzen — der Owner-Rang ist für sie konstant.
+
 const PRIMARY_OWNER_IDS = new Set(
   [OWNER_LID, OWNER_PRIV].filter(Boolean).map(normalizeJid)
 );
@@ -505,8 +497,8 @@ function isPrimaryOwner(jid) {
   return n ? PRIMARY_OWNER_IDS.has(n) : false;
 }
 
-// Stellt sicher, dass der/die Haupt-Owner in ranks/users/ROLES.OWNER immer als
-// OWNER geführt werden — wird nach jeder rang-relevanten Änderung aufgerufen.
+
+
 function protectPrimaryOwner() {
   for (const jid of PRIMARY_OWNER_IDS) {
     ranks[jid] = 'OWNER';
@@ -564,10 +556,7 @@ function getMentionDisplay(jid, contacts = {}) {
   return `@${String(display || normalizedJid.split('@')[0]).replace(/\n/g, ' ').trim()}`;
 }
 
-// Löst eine @lid-JID über Baileys' offizielle LID<->Nummer-Zuordnung zur echten
-// Telefonnummer auf (falls Baileys sie schon kennt). Ohne das würde man einfach
-// die LID-Ziffern als "Nummer" anzeigen, was wie eine falsche Nummer aussieht
-// (z.B. mit einer zufälligen Ländervorwahl wie +850).
+
 async function resolvePhoneJid(jid, sock) {
   const n = normalizeJid(jid);
   if (!n) return null;
@@ -584,17 +573,13 @@ async function resolvePhoneJid(jid, sock) {
   return null;
 }
 
-// Zeigt die ECHTE Telefonnummer als klickbare @-Markierung. Kann Baileys die
-// LID nicht auflösen, wird KEINE Ziffernfolge gezeigt (die sonst wie eine
-// falsche Nummer aussehen würde), sondern ein neutraler Platzhaltertext —
-// die Markierung bleibt trotzdem über das mentions-Array anklickbar.
+
 async function getNumberMention(jid, sock) {
   const resolved = await resolvePhoneJid(jid, sock);
   if (resolved) return `@${resolved.split('@')[0]}`;
   return '@Nutzer';
 }
 
-// Sucht die JID eines registrierten Nutzers anhand des gespeicherten Namens (z.B. bei $setrole @kirito).
 function findUserJidByName(name) {
   const target = String(name || '').trim().toLowerCase();
   if (!target) return null;
@@ -641,7 +626,7 @@ function bjVal(card) { if (['J', 'Q', 'K'].includes(card.value)) return 10; if (
 function bjScore(hand) { let s = 0, ac = 0; for (const c of hand) { if (c.value === 'A') { ac++; s += 11; } else s += bjVal(c); } while (s > 21 && ac > 0) { s -= 10; ac--; } return s; }
 
 // ========== START BOT ==========
-// sessionName: Ordnername unter /sessions für diese Bot-Instanz.
+
 // hooks: optionale { onQr(qrBuffer, sessionName), onOpen(botId, sessionName) },
 //        werden z.B. vom $newsession-Befehl genutzt, um QR/Status in den
 //        anfragenden Chat statt an OWNER_PRIV zu schicken.
@@ -666,8 +651,7 @@ async function startBot(sessionName = 'default', hooks = {}) {
 
   activeSessions.set(sessionName, sock);
 
-  // Der Telegram-QR-Relay bleibt an die erste/Standard-Session gekoppelt,
-  // damit zusätzliche Sessions ihn nicht überschreiben.
+  
   if (sessionName === 'default') {
     setActiveSock(sock);
   }
@@ -824,8 +808,8 @@ async function startBot(sessionName = 'default', hooks = {}) {
         || (m.message.extendedTextMessage && m.message.extendedTextMessage.text)
         || (m.message.imageMessage && m.message.imageMessage.caption)
         || '';
-// ganz am Anfang der Nachrichtenverarbeitung, VOR der normalen Präfix-Prüfung
-// (send() gibt es an dieser Stelle noch nicht -> direkt sock.sendMessage verwenden)
+
+
 const rawBody = (body || '').trim();
 const noPrefixMatch = rawBody.match(/^[^\w]*(\w+)/);
 const cmdNoPrefix = noPrefixMatch ? noPrefixMatch[1].toLowerCase() : '';
@@ -846,15 +830,9 @@ if (cmdNoPrefix === 'resetprefix' && isGroup) {
   return;
 }
 
-// ... danach erst die normale Präfix-Prüfung und cmd-Extraktion für alle anderen Befehle
 
-      // =============================================
-      // FIX 1: AFK-Erkennung bei JEDER Nachricht
-      // (auch ohne Prefix — nicht nur bei Commands)
-      // FIX 2: Erkennt den AFK-Eintrag auch, wenn die Rückkehr-Nachricht
-      // unter einer anderen JID-Form (LID vs. Telefonnummer) ankommt
-      // als die, unter der $afk ursprünglich gesetzt wurde.
-      // =============================================
+
+   
       if (body && !m.key.fromMe) {
         const afkKey = findAfkKey(sender);
         if (afkKey) {
@@ -874,15 +852,9 @@ if (cmdNoPrefix === 'resetprefix' && isGroup) {
         }
       }
 
-      // ANTI-LINK: WhatsApp-Gruppen-/Kanal-Links erkennen
-      // und den Absender kicken (nur wenn pro Gruppe aktiviert)
-      // =============================================
-// Erkennt WhatsApp-Gruppeneinladungs- und Kanal-Links
+   
 const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/channel)\/[a-zA-Z0-9]+/i;
-// =============================================
-      // ANTI-LINK: WhatsApp-Gruppen-/Kanal-Links erkennen
-      // und den Absender kicken (nur wenn pro Gruppe aktiviert)
-      // =============================================
+
       if (isGroup && body && !m.key.fromMe && whatsappLinkRegex.test(body)) {
         try {
           const antilinkSettings = groupSettings[from]?.antilink;
@@ -1092,9 +1064,7 @@ const senderParticipant = meta.participants?.find(p =>
 
       ensureUser(sender);
 
-      // NOTE: AFK-Rückkehr wurde bereits OBEN (vor dem Prefix-Check) behandelt,
-      // sodass es auch ohne Command-Prefix funktioniert.
-
+      
       if (!m.key.fromMe) {
         users[sender].xp = (users[sender].xp || 0) + 5;
         users[sender].msgCount = (users[sender].msgCount || 0) + 1;
@@ -1377,7 +1347,8 @@ function downloadShortIfNeeded() {
         const answererRank = ranks[normalizedAnswerer] || users[normalizedAnswerer]?.rank || 'USER';
         const rankLabel = prettyRank(answererRank);
 
-        // Bestätigung/Log in der internen Support-Gruppe — statt "Supporter" steht hier der Team-Rang
+        
+
         try {
           await sock.sendMessage(SUPPORT_CONFIG.SUPPORT_GROUP, {
             text: `📝 Antwort auf Ticket #${ticket.id}:\n\n${answerText}\n\n${rankLabel}: ${await getNumberMention(sender, sock)}`,
@@ -1387,7 +1358,7 @@ function downloadShortIfNeeded() {
           console.error('[answer] Konnte Support-Gruppe nicht benachrichtigen (falsche Gruppen-ID oder Bot nicht mehr Mitglied?):', e);
         }
 
-        // Antwort direkt an den Ticket-Ersteller, mit klickbarer @-Markierung des Teammitglieds
+       
         try {
           await sock.sendMessage(ticket.sender, {
             text: `📩 Antwort auf dein Support-Ticket #${ticket.id}:\n\n${answerText}\n\nBeantwortet von: ${rankLabel} ${await getNumberMention(sender, sock)}`,
@@ -1397,7 +1368,7 @@ function downloadShortIfNeeded() {
           console.error('[answer] Konnte Antwort nicht direkt an den Nutzer senden:', e);
         }
 
-        // Ticket nach Beantwortung löschen, damit die Nummerierung wieder bei 0001 beginnt
+        
         delete tickets[ticket.id];
         save(FILES.tickets, tickets);
         ticketCounter = Object.keys(tickets).length;
@@ -1405,10 +1376,7 @@ function downloadShortIfNeeded() {
         return send(`✅ Antwort für Ticket #${ticket.id} gesendet und Ticket gelöscht.`);
       }
 
-      // =============================================
-      // FIX 2: SETROLE — Ränge werden DAUERHAFT in
-      // ranks.json + users.json gespeichert
-      // =============================================
+ 
       if (cmd === 'setrole') {
         if (!isAuthorized(sender, ['OWNER'])) return send('❌ Nur für Owner.');
 
@@ -1419,7 +1387,7 @@ function downloadShortIfNeeded() {
           return send(`❌ Nutzung:\n${PREFIX}setrole @user <ROLLE>\noder: ${PREFIX}setrole <ROLLE> @user\noder: als Antwort auf eine Nachricht einfach ${PREFIX}setrole <ROLLE>\nVerfügbare Rollen: ${Object.keys(ROLES).join(', ')}`);
         }
 
-        // Rolle darf vorne ODER hinten stehen (oder, bei Reply, das einzige Argument sein)
+        
         const firstUpper = args[0].toUpperCase();
         const lastUpper = args[args.length - 1].toUpperCase();
 
@@ -1437,8 +1405,6 @@ function downloadShortIfNeeded() {
           return send(`❌ Ungültige Rolle. Verfügbar: ${Object.keys(ROLES).join(', ')}\nNutzung: ${PREFIX}setrole @user <ROLLE> oder ${PREFIX}setrole <ROLLE> @user`);
         }
 
-        // Ziel-JIDs sammeln: 1) Antwort auf eine Nachricht (Absender der zitierten Nachricht),
-        // 2) echte @-Mentions, 3) Nummern/JIDs im Text, 4) registrierte Namen (z.B. "kirito")
         const mentioned = ctx?.mentionedJid || [];
         let jidList = [];
         if (ctx?.participant) jidList.push(ctx.participant);
@@ -1455,7 +1421,7 @@ function downloadShortIfNeeded() {
           }
         }
 
-        // Letzter Fallback: Sender selbst
+        
         if (jidList.length === 0) {
           jidList = [sender];
         }
@@ -1465,7 +1431,8 @@ function downloadShortIfNeeded() {
 
         const normalizedJids = Array.from(new Set(validJids));
 
-        // Der Haupt-Owner ist geschützt: sein Rang kann nie weggenommen werden
+        
+
         if (roleUpper !== 'OWNER' && normalizedJids.some(isPrimaryOwner)) {
           return send('❌ Der Haupt-Owner ist geschützt und kann nicht heruntergestuft werden.');
         }
