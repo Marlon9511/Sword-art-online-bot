@@ -873,10 +873,7 @@ if (cmdNoPrefix === 'resetprefix' && isGroup) {
           } catch (e) {}
         }
       }
-//ANTILINK
-// Erkennt WhatsApp-Gruppeneinladungs- und Kanal-Links
-const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/channel)\/[a-zA-Z0-9]+/i;
-// =============================================
+
       // ANTI-LINK: WhatsApp-Gruppen-/Kanal-Links erkennen
       // und den Absender kicken (nur wenn pro Gruppe aktiviert)
       // =============================================
