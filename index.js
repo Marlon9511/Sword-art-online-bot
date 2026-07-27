@@ -893,12 +893,12 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
             const senderParticipant = meta?.participants?.find(p =>
               senderCandidates.some(c => isSameJid(p.id, c))
             );
-            const senderIsGroupAdmin = !!(
-              senderParticipant?.admin === 'GroupAdmin' ||
-              senderParticipant?.admin === 'superadmin' ||
-              senderParticipant?.admin === true ||
-              senderParticipant?.isAdmin === true
-            );
+           const senderIsGroupAdmin = !!(
+  senderParticipant?.admin === 'admin' ||
+  senderParticipant?.admin === 'superadmin' ||
+  senderParticipant?.admin === true ||
+  senderParticipant?.isAdmin === true
+);
             const senderIsTeam = isAuthorized(sender, ['OWNER', 'COOWNER', 'GROUPADMIN', 'MOD']);
 
             if (!senderIsGroupAdmin && !senderIsTeam) {
