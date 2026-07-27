@@ -917,6 +917,20 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
     }
   } catch (e) { console.error('[antilink] Fehler:', e); }
 }
+const meta = await sock.groupMetadata(from).catch(() => null);
+if (!meta) return;
+
+const senderCandidates = [sender, toParticipantJid(sender), toLidJid(sender)].filter(Boolean);
+
+// DEBUG - danach wieder entfernen
+console.log('[antilink-debug] sender:', sender);
+console.log('[antilink-debug] senderCandidates:', senderCandidates);
+console.log('[antilink-debug] participant IDs:', meta.participants?.map(p => p.id));
+
+const senderParticipant = meta.participants?.find(p =>
+  senderCandidates.some(c => isSameJid(p.id, c))
+);
+console.log('[antilink-debug] gefunden:', senderParticipant);
       const activePrefix = isGroup ? getGroupPrefix(from) : PREFIX;
       if (!body || !body.startsWith(activePrefix)) return;
       const isCmd = true;
