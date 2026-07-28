@@ -73,6 +73,7 @@ const FILES = {
   deleted: { file: 'deleted.json', default: {} },
   owner: { file: 'owner.json', default: {} },
   teamTodos: { file: 'team-todos.json', default: {} },
+  userTodos: { file: 'user-todos.json', default: {} },
   groupInvites: { file: 'group-invites.json', default: {} },
   groupSettings: { file: 'group-settings.json', default: {} },
   credits: { file: 'credits.json', default: { list: [] } }
@@ -201,6 +202,9 @@ const saveBotState = () => {
 
 const _teamTodosPath = path.join(DATA_PATH, FILES.teamTodos.file);
 if (!fs.existsSync(_teamTodosPath)) fs.writeFileSync(_teamTodosPath, '{}');
+
+const _userTodosPath = path.join(DATA_PATH, FILES.userTodos.file);
+if (!fs.existsSync(_userTodosPath)) fs.writeFileSync(_userTodosPath, '{}');
 
 const _groupInvitesPath = path.join(DATA_PATH, FILES.groupInvites.file);
 if (!fs.existsSync(_groupInvitesPath)) fs.writeFileSync(_groupInvitesPath, '{}');
@@ -471,6 +475,8 @@ let groupSettings = normalizeDataKeys(load(FILES.groupSettings.file));
 let ticketCounter = Object.keys(tickets).length;
 let teamTodos = load(FILES.teamTodos.file) || {};
 let todoCounter = Object.keys(teamTodos).length;
+let userTodos = load(FILES.userTodos.file) || {};
+let userTodoCounter = Object.keys(userTodos).length;
 let groupInvites = load(FILES.groupInvites.file) || {};
 let broadcastSettings = load(FILES.broadcastSettings.file);
 let deletedUsers = normalizeDataKeys(load(FILES.deleted.file));
@@ -1188,6 +1194,7 @@ function downloadShortIfNeeded() {
         helpText += `▸ ${PREFIX}owner — Owner kontaktieren\n`;
         helpText += `▸ ${PREFIX}whoami / ${PREFIX}me — Deine Nutzerinfo\n`;
         helpText += `▸ ${PREFIX}afk [grund] — AFK-Status setzen\n`;
+        helpText += `▸ ${PREFIX}usertodo add <text> — Befehl vorschlagen\n`;
         helpText += `▸ ${PREFIX}credits — Alle Helfer des Bots\n\n`;
 
         helpText += `🎮 *SPIELE & WIRTSCHAFT*\n${divider}\n`;
@@ -1241,6 +1248,7 @@ function downloadShortIfNeeded() {
           helpText += `▸ ${PREFIX}deletesession <name> — Session löschen\n`;
           helpText += `▸ ${PREFIX}addcredit Name | Rolle — Helfer hinzufügen\n`;
           helpText += `▸ ${PREFIX}delcredit <nummer> — Helfer entfernen\n`;
+          helpText += `▸ ${PREFIX}usertodo — Von Usern vorgeschlagene Befehle ansehen\n`;
         }
 
         helpText += `\n${divider}\n_💡 Tipp: Nutze Befehle ohne Parameter für mehr Info_`;
@@ -2321,6 +2329,63 @@ console.log('[whoami] Socket-Status:', sock.ws?.readyState, '| User:', !!sock.us
         return send('Usage: $todo add <text> | list | done <id> | remove <id>');
       }
 
+      // USER TODOS — Befehlsvorschläge von Usern, nur Owner/CoOwner können die Liste einsehen
+      if (cmd === 'usertodo' || cmd === 'usertodos') {
+        const sub = (args[0] || '').toLowerCase();
+
+        // ?usertodo add <text> — jeder registrierte User darf vorschlagen
+        if (sub === 'add') {
+          const text = args.slice(1).join(' ').trim();
+          if (!text) return send(`❌ Nutzung: ${PREFIX}usertodo add <befehlsvorschlag>`);
+          userTodoCounter++;
+          const utId = `UT${String(userTodoCounter).padStart(3, '0')}`;
+          userTodos[utId] = {
+            id: utId,
+            text,
+            sender,
+            status: 'open',
+            created: Date.now()
+          };
+          save(FILES.userTodos, userTodos);
+          return send(`✅ Dein Vorschlag wurde gespeichert (${utId})! Der Owner schaut sich das an.`);
+        }
+
+        // ?usertodo done <id> / ?usertodo remove <id> — nur Owner/CoOwner
+        if (sub === 'done' || sub === 'complete') {
+          if (!isOwner) return send('❌ Nur der Owner kann Vorschläge als erledigt markieren.');
+          const id = args[1];
+          if (!id || !userTodos[id]) return send(`Usage: ${PREFIX}usertodo done <id>`);
+          userTodos[id].status = 'done';
+          userTodos[id].doneBy = sender;
+          save(FILES.userTodos, userTodos);
+          return send(`✅ Vorschlag ${id} als erledigt markiert.`);
+        }
+        if (sub === 'remove' || sub === 'rm' || sub === 'delete') {
+          if (!isOwner) return send('❌ Nur der Owner kann Vorschläge entfernen.');
+          const id = args[1];
+          if (!id || !userTodos[id]) return send(`Usage: ${PREFIX}usertodo remove <id>`);
+          delete userTodos[id];
+          save(FILES.userTodos, userTodos);
+          return send(`🗑️ Vorschlag ${id} entfernt.`);
+        }
+
+        // ?usertodo (ohne Argument) oder ?usertodo list — nur Owner/CoOwner dürfen die Liste öffnen
+        if (!sub || sub === 'list') {
+          if (!isOwner) return send('❌ Nur der Owner kann sich die Vorschlagsliste ansehen. Nutze stattdessen: ' + PREFIX + 'usertodo add <text>');
+          const all = Object.values(userTodos);
+          if (!all.length) return send('📋 Es liegen noch keine User-Vorschläge vor.');
+          const lines = await Promise.all(all.map(async t => {
+            const who = await getNumberMention(t.sender, sock);
+            const status = t.status === 'done' ? '✅' : '🕓';
+            return `${status} ${t.id} — ${t.text}\n   von: ${who}`;
+          }));
+          const mentions = all.map(t => t.sender);
+          return send(`📋 *Von Usern vorgeschlagene Befehle*\n\n${lines.join('\n\n')}\n\n_${PREFIX}usertodo done <id> / ${PREFIX}usertodo remove <id>_`, { mentions });
+        }
+
+        return send(`Usage: ${PREFIX}usertodo add <text>${isOwner ? ` | list | done <id> | remove <id>` : ''}`);
+      }
+
       // MODERATION
       if (cmd === 'ban') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) return send('Kein Zugriff.');
@@ -2458,6 +2523,15 @@ console.log('[whoami] Socket-Status:', sock.ws?.readyState, '| User:', !!sock.us
         if (r === 'OWNER') {
           // Bestehende Owner werden NICHT mehr entmachtet — der/die Haupt-Owner
           // bleibt in jedem Fall Owner. Diese Person wird zusätzlich Owner.
+          ranks[jid] = 'OWNER';
+          i
+        if (!jid) return send('Usage: $setrank <@mention|num|jid> <OWNER|COOWNER|ADMIN|MOD|VIP|USER>');
+
+        // Der Haupt-Owner ist geschützt: sein Rang kann NIE weggenommen werden.
+        if (isPrimaryOwner(jid) && r !== 'OWNER') {
+          return send('❌ Der Haupt-Owner ist geschützt und kann nicht heruntergestuft werden.');
+        }
+
           ranks[jid] = 'OWNER';
           if (!ROLES.OWNER.some(id => isSameJid(id, jid))) ROLES.OWNER.push(jid);
         } else if (r === 'COOWNER') {
