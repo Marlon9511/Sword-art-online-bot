@@ -927,7 +927,10 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
       const activePrefix = isGroup ? getGroupPrefix(from) : PREFIX;
       if (!body || !body.startsWith(activePrefix)) return;
       const isCmd = true;
+const afterPrefix = body.slice(activePrefix.length).trim();
+if (!afterPrefix) return;
 
+const isCmd = true;
       if (isGroup) {
         try {
           const meta = await getGroupMetaSafe(from);
