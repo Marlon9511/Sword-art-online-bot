@@ -2520,124 +2520,350 @@ console.log('[whoami] Socket-Status:', sock.ws?.readyState, '| User:', !!sock.us
         ranks[jid] = 'ADMIN'; save(FILES.ranks, ranks);
         return send(`✅ ${jid} zum ADMIN befördert.`);
       }
-      if (cmd === 'demote') {
-        if (!isOwner) return send('Nur Owner/Co-Owner darf demoten.');                            const t = args[0]; if (!t) return send('Usage: $demote <num|jid>');                       const jid = normalizeJid(t);                                                              ranks[jid] = 'USER'; save(FILES.ranks, ranks);                                            return send(`✅ ${jid} demoted.`);
+         if (cmd === 'demote') {
+        if (!isOwner) return send('Nur Owner/Co-Owner darf demoten.');
+        const t = args[0]; if (!t) return send('Usage: $demote <num|jid>');
+        const jid = normalizeJid(t);
+        ranks[jid] = 'USER'; save(FILES.ranks, ranks);
+        return send(`✅ ${jid} demoted.`);
       }
-                                                                                                if (cmd === 'setrank') {                                                                    if (!isOwner) return send('❌ Nur der Inhaber.');                                         const r = (args[args.length - 1] || '').toUpperCase();                                    if (!r) return send('Usage: $setrank <@mention|num|jid> <OWNER|COOWNER|ADMIN|MOD|VIP|USER>');
-                                                                                                  const allowed = ['OWNER', 'COOWNER', 'ADMIN', 'MOD', 'VIP', 'USER'];                      if (!allowed.includes(r)) return send('Ungültiger Rang.');                                                                                                                          let jid;
-        const mentioned = m.message?.extendedTextMessage?.contextInfo?.mentionedJid;
-        if (mentioned && mentioned.length > 0) {                                                    jid = mentioned[0];                                                                     } else {                                                                                    jid = normalizeJid(args[0]);                                                            }
 
-        if (!jid) return send('Usage: $setrank <@mention|num|jid> <OWNER|COOWNER|ADMIN|MOD|VIP|USER>');                                                                                                                                                                               // Der Haupt-Owner ist geschützt: sein Rang kann NIE weggenommen werden.                  if (isPrimaryOwner(jid) && r !== 'OWNER') {
-          return send('❌ Der Haupt-Owner ist geschützt und kann nicht heruntergestuft werden.');                                                                                           }                                                                                                                                                                                   if (r === 'OWNER') {                                                                        // Bestehende Owner werden NICHT mehr entmachtet — der/die Haupt-Owner
-          // bleibt in jedem Fall Owner. Diese Person wird zusätzlich Owner.
-          ranks[jid] = 'OWNER';                                                                     i                                                                                       if (!jid) return send('Usage: $setrank <@mention|num|jid> <OWNER|COOWNER|ADMIN|MOD|VIP|USER>');                                                                             
-        // Der Haupt-Owner ist geschützt: sein Rang kann NIE weggenommen werden.
-        if (isPrimaryOwner(jid) && r !== 'OWNER') {                                                 return send('❌ Der Haupt-Owner ist geschützt und kann nicht heruntergestuft werden.');                                                                                           }                                                                                 
-          ranks[jid] = 'OWNER';
-          if (!ROLES.OWNER.some(id => isSameJid(id, jid))) ROLES.OWNER.push(jid);                 } else if (r === 'COOWNER') {                                                               for (const k of Object.keys(ranks)) { if (ranks[k] === 'COOWNER' && !isPrimaryOwner(k)) ranks[k] = 'USER'; }                                                                        ranks[jid] = 'COOWNER'; COOWNER_LID = jid;
-        } else {
-          ranks[jid] = r;                                                                         }                                                                                                                                                                                   protectPrimaryOwner();                                                            
-        try {
-          save(FILES.ranks, ranks);                                                                 save(FILES.users, users);                                                                 save(FILES.owner, { ownerLid: OWNER_LID, ownerPriv: OWNER_PRIV, coownerLid: COOWNER_LID, roles: ROLES });                                                                         } catch (e) {}
-
-        return send(`✅ Rang von ${await getNumberMention(jid, sock)} auf ${r} gesetzt.`, { mentions: [jid] });                                                                           }                                                                                                                                                                                   if (cmd === 'datadelete') {
+      if (cmd === 'setrank') {
         if (!isOwner) return send('❌ Nur der Inhaber.');
-        const t = args[0]; if (!t) return send('Usage: $datadelete <num|jid>');                   const jid = normalizeJid(t);                                                              if (isPrimaryOwner(jid)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gelöscht/gebannt werden.');                                                                   delete users[jid]; delete pets[jid]; delete ranks[jid]; delete joinreqs[jid];
+        const r = (args[args.length - 1] || '').toUpperCase();
+        if (!r) return send('Usage: $setrank <@mention|num|jid> <OWNER|COOWNER|ADMIN|MOD|VIP|USER>');
+
+        const allowed = ['OWNER', 'COOWNER', 'ADMIN', 'MOD', 'VIP', 'USER'];
+        if (!allowed.includes(r)) return send('Ungültiger Rang.');
+
+        let jid;
+        const mentioned = m.message?.extendedTextMessage?.contextInfo?.mentionedJid;
+        if (mentioned && mentioned.length > 0) {
+          jid = mentioned[0];
+        } else {
+          jid = normalizeJid(args[0]);
+        }
+
+        if (!jid) return send('Usage: $setrank <@mention|num|jid> <OWNER|COOWNER|ADMIN|MOD|VIP|USER>');
+
+        // Der Haupt-Owner ist geschützt: sein Rang kann NIE weggenommen werden.
+        if (isPrimaryOwner(jid) && r !== 'OWNER') {
+          return send('❌ Der Haupt-Owner ist geschützt und kann nicht heruntergestuft werden.');
+        }
+
+        if (r === 'OWNER') {
+          // Bestehende Owner werden NICHT mehr entmachtet — der/die Haupt-Owner
+          // bleibt in jedem Fall Owner. Diese Person wird zusätzlich Owner.
+          ranks[jid] = 'OWNER';
+          if (!ROLES.OWNER.some(id => isSameJid(id, jid))) ROLES.OWNER.push(jid);
+        } else if (r === 'COOWNER') {
+          for (const k of Object.keys(ranks)) { if (ranks[k] === 'COOWNER' && !isPrimaryOwner(k)) ranks[k] = 'USER'; }
+          ranks[jid] = 'COOWNER'; COOWNER_LID = jid;
+        } else {
+          ranks[jid] = r;
+        }
+
+        protectPrimaryOwner();
+
+        try {
+          save(FILES.ranks, ranks);
+          save(FILES.users, users);
+          save(FILES.owner, { ownerLid: OWNER_LID, ownerPriv: OWNER_PRIV, coownerLid: COOWNER_LID, roles: ROLES });
+        } catch (e) {}
+
+        return send(`✅ Rang von ${await getNumberMention(jid, sock)} auf ${r} gesetzt.`, { mentions: [jid] });
+      }
+
+      if (cmd === 'datadelete') {
+        if (!isOwner) return send('❌ Nur der Inhaber.');
+        const t = args[0]; if (!t) return send('Usage: $datadelete <num|jid>');
+        const jid = normalizeJid(t);
+        if (isPrimaryOwner(jid)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gelöscht/gebannt werden.');
+        delete users[jid]; delete pets[jid]; delete ranks[jid]; delete joinreqs[jid];
         for (const id of Object.keys(tickets)) {
-          if (tickets[id]?.user && isSameJid(tickets[id].user, jid)) delete tickets[id];          }                                                                                         deletedUsers[jid] = { by: sender, at: new Date().toISOString() };                         bans[jid] = { by: sender, at: new Date().toISOString(), reason: 'Data deleted by owner' };
+          if (tickets[id]?.user && isSameJid(tickets[id].user, jid)) delete tickets[id];
+        }
+        deletedUsers[jid] = { by: sender, at: new Date().toISOString() };
+        bans[jid] = { by: sender, at: new Date().toISOString(), reason: 'Data deleted by owner' };
         save(FILES.users, users); save(FILES.pets, pets); save(FILES.ranks, ranks);
-        save(FILES.joinreq, joinreqs); save(FILES.tickets, tickets);                              save(FILES.deleted, deletedUsers); save(FILES.bans, bans);                                try { await sock.sendMessage(jid, { text: '🚫 Dein Account wurde gelöscht.' }); } catch (e) {}                                                                                      return send(`✅ Daten von ${jid} gelöscht.`);
+        save(FILES.joinreq, joinreqs); save(FILES.tickets, tickets);
+        save(FILES.deleted, deletedUsers); save(FILES.bans, bans);
+        try { await sock.sendMessage(jid, { text: '🚫 Dein Account wurde gelöscht.' }); } catch (e) {}
+        return send(`✅ Daten von ${jid} gelöscht.`);
       }
-                                                                                                if (cmd === 'selfpromote' || cmd === 'sp') {                                                try {                                                                                       if (!from?.endsWith('@g.us')) return send('⚠ Nur in Gruppen.');                           if (sender !== OWNER_LID) if (sender !== COOWNER_LID) return send('⛔ Nur der Owner kann diesen Befehl nutzen.');
-          await sock.groupParticipantsUpdate(from, [sender], 'promote');                            return send('🔰 Selfpromote ausgeführt.');                                              } catch (e) {                                                                               return send('❌ Selfpromote fehlgeschlagen.');                                          }
-      }
-                                                                                                if (cmd === 'selfdemote' || cmd === 'sd') {                                                 try {                                                                                       if (!from?.endsWith('@g.us')) return send('⚠ Nur in Gruppen.');                           if (sender !== OWNER_LID) if (sender !== COOWNER_LID) return send('⛔ Nur der Owner kann diesen Befehl nutzen.');
-          await sock.groupParticipantsUpdate(from, [sender], 'demote');                             return send('🔱 Selfdemote ausgeführt.');                                               } catch (e) {                                                                               return send('❌ Selfdemote fehlgeschlagen.');                                           }
-      }
-                                                                                                if (cmd === 'joinreq') {                                                                    const link = args[0];                                                                     if (!link) return send('Usage: $joinreq <link>');                                         joinreqs[sender] = { link, at: new Date().toISOString() };
-        save(FILES.joinreq, joinreqs);
-        try { await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: `📩 Joinrequest von ${sender}: ${link}` }); } catch {}                                                               return send('✅ Anfrage gesendet.');                                                    }                                                                                         if (cmd === 'join') {
-        if (!(isOwner || isCoOwner)) return send('Kein Zugriff.');
-        const link = args[0] || Object.values(joinreqs)[0]?.link;                                 if (!link) return send('Kein Link gefunden.');                                            const code = (link.match(/chat\.whatsapp\.com\/([A-Za-z0-9_-]+)/)?.[1]) || link;          try { await sock.groupAcceptInvite(code); return send('✅ Erfolgreich beigetreten'); } catch (e) { return send('❌ Beitritt fehlgeschlagen'); }
-      }
-      const isGroupChat = from?.endsWith('@g.us');                                                                                                                                                                                                                            // leave                                                                                  if (cmd === 'leave') {
-  const isGroupChat = from?.endsWith('@g.us');
-                                                                                            // Fall 1: Privatchat -> JID als Argument nötig                                           if (!isGroupChat) {                                                                         if (!isOwner) return send('Kein Zugriff.'); // im Privatchat nur Owner, kein CoOwner  
-    const targetJid = args?.[0]?.trim();
-    if (!targetJid || !targetJid.endsWith('@g.us')) {                                           return send('Nutze: ?leave <gruppen-jid>\nBeispiel: ?leave 120363437195661019@g.us');                                                                                             }                                                                                     
-    try {
-      await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: `Bot verlässt Gruppe: ${targetJid}` });                                                                                    await sock.groupLeave(targetJid);                                                         return send(`✅ Gruppe ${targetJid} verlassen.`);                                       } catch (e) {
-      return send('❌ Konnte Gruppe nicht verlassen (falsche JID oder Bot nicht Mitglied).');                                                                                           }                                                                                       }                                                                                                                                                                                   // Fall 2: Innerhalb einer Gruppe -> bisheriges Verhalten
-  if (!(isOwner || isCoOwner)) return send('Kein Zugriff.');
-  try {                                                                                       await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: `Bot verlässt Gruppe: ${from}` });                                                                                         await sock.groupLeave(from);                                                              return;
-  } catch (e) {
-    return send('❌ Konnte Gruppe nicht verlassen.');                                       }                                                                                       }                                                                                                                                                                                         if (cmd === 'grouplist' || cmd === 'gl') {
-        if (!isOwner) return send('Kein Zugriff.');
-        try {                                                                                       const groups = await sock.groupFetchAllParticipating();                                   let list = '📋 *Gruppenliste*\n\n';                                                       for (const [id, group] of Object.entries(groups)) {                                         list += `*${group.subject || 'Unbekannt'}*\nID: ${id}\nMitglieder: ${group.participants?.length || 0}\n\n`;
-          }                                                                                         await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: list });                         return send('📨 Gruppenliste privat zugeschickt.');                                     } catch (error) {                                                                           return send('❌ Fehler beim Abrufen der Gruppenliste.');
-        }
-      }                                                                                                                                                                                   if (cmd === 'broadcast') {                                                                  if (!(isOwner || isCoOwner)) return send('Kein Zugriff.');                                const textMsg = args.join(' ');
-        if (!textMsg) return send('Usage: $broadcast <text>');
-        const chats = await sock.groupFetchAllParticipating();                                    const gids = Object.keys(chats).filter(gid => broadcastSettings[gid] !== false);          send(`📣 Broadcast an ${gids.length} Gruppen...`);                                        for (const g of gids) { try { await sock.sendMessage(g, { text: `📣 Broadcast:\n${textMsg}` }); await sleep(300); } catch {} }
-        return send('✅ Broadcast abgeschlossen.');
-      }                                                                                                                                                                                   if (cmd === 'stats' || cmd === 'profile') {                                                 const u = users[sender];                                                                  return send(`📊 Profil:\nLevel: ${u.level}\nXP: ${u.xp}\nCoins: ${u.coins}\nNachrichten: ${u.msgCount}`);
-      }                                                                                         if (cmd === 'userinfo') {                                                                   const t = args[0] ? normalizeJid(args[0]) : sender;                                       ensureUser(t);                                                                            const u = users[t];
-        return send(`👤 ${t}\nLevel: ${u.level}\nXP: ${u.xp}\nCoins: ${u.coins}\nRank: ${ranks[t] || u.rank}`);                                                                           }                                                                                    if (cmd === 'top') {                                                                             const top = Object.entries(users)                                                           .sort((a, b) => (b[1].level * 1000 + (b[1].xp || 0)) - (a[1].level * 1000 + (a[1].xp || 0)))
-          .slice(0, 10);                                                                                                                                                                    const lines = await Promise.all(top.map(async ([jid, u], i) => {                            const displayName = u.name || u.registrationName || await getNumberMention(jid, sock);
-          return `${i + 1}. ${displayName} - Lv.${u.level} (${u.xp} XP)`;
-        }));                                                                                                                                                                                const mentions = top.map(([jid]) => jid);                                                 return send(`🏆 Top Spieler\n${lines.join('\n')}`, { mentions });                       }
 
-            // YEETBAN                                                                          if (cmd === 'yeetban') {                                                                    if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) return send('Kein Zugriff.');                                                                                             let target = args[0];
+      if (cmd === 'selfpromote' || cmd === 'sp') {
         try {
-          const ctx = m.message?.extendedTextMessage?.contextInfo;                                  if (!target && ctx?.participant) target = ctx.participant;                                if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];                 } catch (e) {}                                                                            if (!target) return send('Usage: $yeetban <num|jid>');
-        const jid = normalizeJid(target);
-        if (isPrimaryOwner(jid)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gebannt/entfernt werden.');                                                                   const reason = args.slice(1).join(' ') || 'Kein Grund';                                   bans[jid] = { by: sender, at: new Date().toISOString(), reason };                         save(FILES.bans, bans);
-        try {
-          const groups = await sock.groupFetchAllParticipating();                                   let removed = 0, failed = 0;                                                              for (const gid of Object.keys(groups)) {                                                    try {                                                                                       const meta = await getGroupMetaSafe(gid);
-              if (!meta?.participants) { failed++; continue; }
-              const rawJid = jid.split('@')[0];                                                         const targetParticipant = meta.participants.find(p => (p.id || '').split('@')[0] === rawJid);                                                                                       if (!targetParticipant) { failed++; continue; }                                           await sock.groupParticipantsUpdate(gid, [targetParticipant.id], 'remove');
-              await sleep(500);
-              removed++;                                                                              } catch (e) { failed++; }                                                               }                                                                                         return send(`✅ Yeetban: ${jid} — entfernt aus ${removed} Gruppen, fehlgeschlagen: ${failed}`);
+          if (!from?.endsWith('@g.us')) return send('⚠ Nur in Gruppen.');
+          if (sender !== OWNER_LID) if (sender !== COOWNER_LID) return send('⛔ Nur der Owner kann diesen Befehl nutzen.');
+          await sock.groupParticipantsUpdate(from, [sender], 'promote');
+          return send('🔰 Selfpromote ausgeführt.');
         } catch (e) {
-          return send('❌ Yeetban fehlgeschlagen.');                                              }                                                                                       }                                                                                                                                                                                   // CREDITS
+          return send('❌ Selfpromote fehlgeschlagen.');
+        }
+      }
+
+      if (cmd === 'selfdemote' || cmd === 'sd') {
+        try {
+          if (!from?.endsWith('@g.us')) return send('⚠ Nur in Gruppen.');
+          if (sender !== OWNER_LID) if (sender !== COOWNER_LID) return send('⛔ Nur der Owner kann diesen Befehl nutzen.');
+          await sock.groupParticipantsUpdate(from, [sender], 'demote');
+          return send('🔱 Selfdemote ausgeführt.');
+        } catch (e) {
+          return send('❌ Selfdemote fehlgeschlagen.');
+        }
+      }
+
+      if (cmd === 'joinreq') {
+        const link = args[0];
+        if (!link) return send('Usage: $joinreq <link>');
+        joinreqs[sender] = { link, at: new Date().toISOString() };
+        save(FILES.joinreq, joinreqs);
+        try { await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: `📩 Joinrequest von ${sender}: ${link}` }); } catch {}
+        return send('✅ Anfrage gesendet.');
+      }
+      if (cmd === 'join') {
+        if (!(isOwner || isCoOwner)) return send('Kein Zugriff.');
+        const link = args[0] || Object.values(joinreqs)[0]?.link;
+        if (!link) return send('Kein Link gefunden.');
+        const code = (link.match(/chat\.whatsapp\.com\/([A-Za-z0-9_-]+)/)?.[1]) || link;
+        try { await sock.groupAcceptInvite(code); return send('✅ Erfolgreich beigetreten'); } catch (e) { return send('❌ Beitritt fehlgeschlagen'); }
+      }
+      const isGroupChat = from?.endsWith('@g.us');
+
+ 
+// leave
+if (cmd === 'leave') {
+  const isGroupChat = from?.endsWith('@g.us');
+
+  // Fall 1: Privatchat -> JID als Argument nötig
+  if (!isGroupChat) {
+    if (!isOwner) return send('Kein Zugriff.'); // im Privatchat nur Owner, kein CoOwner
+
+    const targetJid = args?.[0]?.trim();
+    if (!targetJid || !targetJid.endsWith('@g.us')) {
+      return send('Nutze: ?leave <gruppen-jid>\nBeispiel: ?leave 120363437195661019@g.us');
+    }
+
+    try {
+      await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: `Bot verlässt Gruppe: ${targetJid}` });
+      await sock.groupLeave(targetJid);
+      return send(`✅ Gruppe ${targetJid} verlassen.`);
+    } catch (e) {
+      return send('❌ Konnte Gruppe nicht verlassen (falsche JID oder Bot nicht Mitglied).');
+    }
+  }
+
+  // Fall 2: Innerhalb einer Gruppe -> bisheriges Verhalten
+  if (!(isOwner || isCoOwner)) return send('Kein Zugriff.');
+  try {
+    await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: `Bot verlässt Gruppe: ${from}` });
+    await sock.groupLeave(from);
+    return;
+  } catch (e) {
+    return send('❌ Konnte Gruppe nicht verlassen.');
+  }
+}
+
+      if (cmd === 'grouplist' || cmd === 'gl') {
+        if (!isOwner) return send('Kein Zugriff.');
+        try {
+          const groups = await sock.groupFetchAllParticipating();
+          let list = '📋 *Gruppenliste*\n\n';
+          for (const [id, group] of Object.entries(groups)) {
+            list += `*${group.subject || 'Unbekannt'}*\nID: ${id}\nMitglieder: ${group.participants?.length || 0}\n\n`;
+          }
+          await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: list });
+          return send('📨 Gruppenliste privat zugeschickt.');
+        } catch (error) {
+          return send('❌ Fehler beim Abrufen der Gruppenliste.');
+        }
+      }
+
+      if (cmd === 'broadcast') {
+        if (!(isOwner || isCoOwner)) return send('Kein Zugriff.');
+        const textMsg = args.join(' ');
+        if (!textMsg) return send('Usage: $broadcast <text>');
+        const chats = await sock.groupFetchAllParticipating();
+        const gids = Object.keys(chats).filter(gid => broadcastSettings[gid] !== false);
+        send(`📣 Broadcast an ${gids.length} Gruppen...`);
+        for (const g of gids) { try { await sock.sendMessage(g, { text: `📣 Broadcast:\n${textMsg}` }); await sleep(300); } catch {} }
+        return send('✅ Broadcast abgeschlossen.');
+      }
+
+      if (cmd === 'stats' || cmd === 'profile') {
+        const u = users[sender];
+        return send(`📊 Profil:\nLevel: ${u.level}\nXP: ${u.xp}\nCoins: ${u.coins}\nNachrichten: ${u.msgCount}`);
+      }
+      if (cmd === 'userinfo') {
+        const t = args[0] ? normalizeJid(args[0]) : sender;
+        ensureUser(t);
+        const u = users[t];
+        return send(`👤 ${t}\nLevel: ${u.level}\nXP: ${u.xp}\nCoins: ${u.coins}\nRank: ${ranks[t] || u.rank}`);
+      }
+ if (cmd === 'top') {
+        const top = Object.entries(users)
+          .sort((a, b) => (b[1].level * 1000 + (b[1].xp || 0)) - (a[1].level * 1000 + (a[1].xp || 0)))
+          .slice(0, 10);
+
+        const lines = await Promise.all(top.map(async ([jid, u], i) => {
+          const displayName = u.name || u.registrationName || await getNumberMention(jid, sock);
+          return `${i + 1}. ${displayName} - Lv.${u.level} (${u.xp} XP)`;
+        }));
+
+        const mentions = top.map(([jid]) => jid);
+        return send(`🏆 Top Spieler\n${lines.join('\n')}`, { mentions });
+      }
+
+            // YEETBAN
+      if (cmd === 'yeetban') {
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) return send('Kein Zugriff.');
+        let target = args[0];
+        try {
+          const ctx = m.message?.extendedTextMessage?.contextInfo;
+          if (!target && ctx?.participant) target = ctx.participant;
+          if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+        } catch (e) {}
+        if (!target) return send('Usage: $yeetban <num|jid>');
+        const jid = normalizeJid(target);
+        if (isPrimaryOwner(jid)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gebannt/entfernt werden.');
+        const reason = args.slice(1).join(' ') || 'Kein Grund';
+        bans[jid] = { by: sender, at: new Date().toISOString(), reason };
+        save(FILES.bans, bans);
+        try {
+          const groups = await sock.groupFetchAllParticipating();
+          let removed = 0, failed = 0;
+          for (const gid of Object.keys(groups)) {
+            try {
+              const meta = await getGroupMetaSafe(gid);
+              if (!meta?.participants) { failed++; continue; }
+              const rawJid = jid.split('@')[0];
+              const targetParticipant = meta.participants.find(p => (p.id || '').split('@')[0] === rawJid);
+              if (!targetParticipant) { failed++; continue; }
+              await sock.groupParticipantsUpdate(gid, [targetParticipant.id], 'remove');
+              await sleep(500);
+              removed++;
+            } catch (e) { failed++; }
+          }
+          return send(`✅ Yeetban: ${jid} — entfernt aus ${removed} Gruppen, fehlgeschlagen: ${failed}`);
+        } catch (e) {
+          return send('❌ Yeetban fehlgeschlagen.');
+        }
+      }
+
+      // CREDITS
       if (cmd === 'credits') {
-        if (!credits.list || credits.list.length === 0) {                                           return send('📋 Noch keine Credits eingetragen.');                                      }                                                                                         let out = '✨ *Credits* ✨\n\n';                                                          credits.list.forEach((c, i) => {
+        if (!credits.list || credits.list.length === 0) {
+          return send('📋 Noch keine Credits eingetragen.');
+        }
+        let out = '✨ *Credits* ✨\n\n';
+        credits.list.forEach((c, i) => {
           out += `${i + 1}. *${c.name}* — ${c.role}\n`;
-        });                                                                                       out += '\n❤️ Danke euch allen!';                                                           return send(out);                                                                       }                                                                                   
+        });
+        out += '\n❤️ Danke euch allen!';
+        return send(out);
+      }
+
       // ADDCREDIT
-      if (cmd === 'addcredit') {                                                                  if (!isAuthorized(sender, ['OWNER'])) return send('❌ Nur der Inhaber darf Credits hinzufügen.');                                                                                   const input = args.join(' ');                                                             const [name, role] = input.split('|').map(s => s?.trim());
+      if (cmd === 'addcredit') {
+        if (!isAuthorized(sender, ['OWNER'])) return send('❌ Nur der Inhaber darf Credits hinzufügen.');
+        const input = args.join(' ');
+        const [name, role] = input.split('|').map(s => s?.trim());
         if (!name || !role) {
-          return send(`❌ Nutzung: ${PREFIX}addcredit Name | Rolle\nBeispiel: ${PREFIX}addcredit Max | Coding Hilfe`);                                                                      }                                                                                         credits.list.push({ name, role });                                                        save(FILES.credits, credits);
+          return send(`❌ Nutzung: ${PREFIX}addcredit Name | Rolle\nBeispiel: ${PREFIX}addcredit Max | Coding Hilfe`);
+        }
+        credits.list.push({ name, role });
+        save(FILES.credits, credits);
         return send(`✅ *${name}* wurde zu den Credits hinzugefügt.`);
-      }                                                                                                                                                                                   // DELCREDIT                                                                              if (cmd === 'delcredit') {                                                                  if (!isAuthorized(sender, ['OWNER'])) return send('❌ Nur der Inhaber darf Credits entfernen.');
-        const index = parseInt(args[0]) - 1;                                                      if (isNaN(index) || index < 0 || index >= credits.list.length) {                            return send(`❌ Ungültige Nummer. Nutze ${PREFIX}credits um die Liste mit Nummern zu sehen.`);                                                                                    }
+      }
+
+      // DELCREDIT
+      if (cmd === 'delcredit') {
+        if (!isAuthorized(sender, ['OWNER'])) return send('❌ Nur der Inhaber darf Credits entfernen.');
+        const index = parseInt(args[0]) - 1;
+        if (isNaN(index) || index < 0 || index >= credits.list.length) {
+          return send(`❌ Ungültige Nummer. Nutze ${PREFIX}credits um die Liste mit Nummern zu sehen.`);
+        }
         const removed = credits.list.splice(index, 1)[0];
-        save(FILES.credits, credits);                                                             return send(`🗑️ *${removed.name}* wurde aus den Credits entfernt.`);                     }                                                                                    //dsgvo                                                                                  if (cmd === 'dsgvo') {
+        save(FILES.credits, credits);
+        return send(`🗑️ *${removed.name}* wurde aus den Credits entfernt.`);
+      }
+ //dsgvo
+if (cmd === 'dsgvo') {
   return send(DSGVO_TEXT.trim());
-}                                                                                                                                                                                                                                                                             // Anti-Link Controls                                                                           if ((cmd === 'antilink-an' || cmd === 'antilink-aus') && isGroup) {
+}
+
+
+// Anti-Link Controls
+      if ((cmd === 'antilink-an' || cmd === 'antilink-aus') && isGroup) {
         const groupMetadata = await getGroupMetaSafe(from);
-        const senderCandidates = [sender, toParticipantJid(sender), toLidJid(sender)].filter(Boolean);                                                                                      const senderParticipant = groupMetadata?.participants?.find(p =>                            senderCandidates.some(c => isSameJid(p.id, c))                                          );
+        const senderCandidates = [sender, toParticipantJid(sender), toLidJid(sender)].filter(Boolean);
+        const senderParticipant = groupMetadata?.participants?.find(p =>
+          senderCandidates.some(c => isSameJid(p.id, c))
+        );
         const senderIsGroupAdmin = !!(
-          senderParticipant?.admin === 'admin' ||                                                   senderParticipant?.admin === 'superadmin' ||                                              senderParticipant?.admin === true ||                                                      senderParticipant?.isAdmin === true                                                     );
+          senderParticipant?.admin === 'admin' ||
+          senderParticipant?.admin === 'superadmin' ||
+          senderParticipant?.admin === true ||
+          senderParticipant?.isAdmin === true
+        );
 
-        if (!senderIsGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER', 'GROUPADMIN'])) {                                                                                               return send('❌ Du musst Admin in dieser Gruppe sein.');                                }                                                                                 
+        if (!senderIsGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER', 'GROUPADMIN'])) {
+          return send('❌ Du musst Admin in dieser Gruppe sein.');
+        }
+
         if (!groupSettings[from]) {
-          groupSettings[from] = { welcome: { enabled: false, message: 'Willkommen in der Gruppe {user}! 👋' }, antilink: { enabled: false } };                                              }                                                                                         if (!groupSettings[from].antilink) groupSettings[from].antilink = { enabled: false };
+          groupSettings[from] = { welcome: { enabled: false, message: 'Willkommen in der Gruppe {user}! 👋' }, antilink: { enabled: false } };
+        }
+        if (!groupSettings[from].antilink) groupSettings[from].antilink = { enabled: false };
 
-        if (cmd === 'antilink-an') {                                                                groupSettings[from].antilink.enabled = true;                                              save(FILES.groupSettings, groupSettings);                                                 return send('✅ Anti-Link aktiviert: Wer einen WhatsApp-Link postet, wird gekickt (Admins ausgenommen).');
+        if (cmd === 'antilink-an') {
+          groupSettings[from].antilink.enabled = true;
+          save(FILES.groupSettings, groupSettings);
+          return send('✅ Anti-Link aktiviert: Wer einen WhatsApp-Link postet, wird gekickt (Admins ausgenommen).');
         }
-                                                                                                  if (cmd === 'antilink-aus') {                                                               groupSettings[from].antilink.enabled = false;                                             save(FILES.groupSettings, groupSettings);                                                 return send('✅ Anti-Link deaktiviert.');
+
+        if (cmd === 'antilink-aus') {
+          groupSettings[from].antilink.enabled = false;
+          save(FILES.groupSettings, groupSettings);
+          return send('✅ Anti-Link deaktiviert.');
         }
-      }                                                                                                                                                                                   // Unbekannter Befehl                                                                     return send('❓ Unbekannter Befehl — ?help ist ein Menü für die Befehle genauso wie ?menu wenns da deinen Befehl nicht gibt frag daddy kirito nach ob es den gibt oder ob er es einbauen kann unter ?owner.');
-                                                                                              } catch (err) {                                                                             console.error('messages.upsert error:', err);                                             log(`ERROR: ${err?.message || String(err)}`);                                           }
+      }
+
+      // Unbekannter Befehl
+      return send('❓ Unbekannter Befehl — ?help ist ein Menü für die Befehle genauso wie ?menu wenns da deinen Befehl nicht gibt frag daddy kirito nach ob es den gibt oder ob er es einbauen kann unter ?owner.');
+
+    } catch (err) {
+      console.error('messages.upsert error:', err);
+      log(`ERROR: ${err?.message || String(err)}`);
+    }
   });
-                                                                                            console.log(`✅ Sword-art-online-bot Session "${sessionName}" gestartet.`);               return sock;                                                                            }                                                                                         
-// ========== MAIN ==========
-initTelegramConnect();                                                                                                                                                              (async () => {                                                                              let existingSessions = [];                                                                try {
-    existingSessions = fs.readdirSync(SESSIONS_DIR, { withFileTypes: true })
-      .filter(d => d.isDirectory())                                                             .map(d => d.name);                                                                    } catch (e) {                                                                               existingSessions = [];                                                                  }
 
-  if (existingSessions.length === 0) {                                                        // Noch keine Session vorhanden -> Standard-Session anlegen (QR-Login)                    await startBot('default');                                                              } else {                                                                                    // Alle vorhandenen Sessions parallel wieder starten
+  console.log(`✅ Sword-art-online-bot Session "${sessionName}" gestartet.`);
+  return sock;
+}
+
+// ========== MAIN ==========
+initTelegramConnect();
+
+(async () => {
+  let existingSessions = [];
+  try {
+    existingSessions = fs.readdirSync(SESSIONS_DIR, { withFileTypes: true })
+      .filter(d => d.isDirectory())
+      .map(d => d.name);
+  } catch (e) {
+    existingSessions = [];
+  }
+
+  if (existingSessions.length === 0) {
+    // Noch keine Session vorhanden -> Standard-Session anlegen (QR-Login)
+    await startBot('default');
+  } else {
+    // Alle vorhandenen Sessions parallel wieder starten
     for (const sessionName of existingSessions) {
-      await startBot(sessionName);                                                              await sleep(1000);                                                                      }                                                                                       }
+      await startBot(sessionName);
+      await sleep(1000);
+    }
+  }
+})();
