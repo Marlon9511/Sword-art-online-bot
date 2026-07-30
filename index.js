@@ -831,6 +831,26 @@ if (cmdNoPrefix === 'resetprefix' && isGroup) {
     await sock.sendMessage(from, { text: '❌ Du musst Gruppenadmin sein, um das Gruppenpräfix zurückzusetzen.' });
     return;
   }
+
+function logMessage(msg, richtung) {
+    const zeile = `${new Date().toISOString()} | ${richtung} | Chat: ${msg.from || msg.to} | ${msg.body}\n`;
+    console.log(zeile.trim());
+    fs.appendFileSync('log.txt', zeile);
+}
+
+// Eingehende Nachrichten (von anderen)
+client.on('message', msg => {
+    logMessage(msg, 'EINGEHEND');
+});
+
+// Ausgehende Nachrichten (die du selbst schreibst)
+client.on('message_create', msg => {
+    if (msg.fromMe) {
+        logMessage(msg, 'GESENDET');
+    }
+});
+
+client.initialize();
   if (!groupSettings[from]) {
     groupSettings[from] = { welcome: { enabled: false, message: 'Willkommen in der Gruppe {user}! 👋' }, prefix: PREFIX };
   }
