@@ -2585,7 +2585,78 @@ if (cmd === 'purge' || cmd === 'clearchat') {
         let groupMetadata;
         if (!permitted && isGroup) {
           groupMetadata = await getGroupMetaSafe(from);
-          const isGroupAdmin = groupMetadata?.participants?.find(p => isSameJid(p.id, sender))?.admin;
+          const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
+          permitted = !!isGroupAdmin;
+        }
+        if (!permitted) return send('Kein Zugriff.');
+
+        if (!isGroup) return send('❌ Nur in Gruppen.');
+
+        groupMetadata = groupMetadata || await getGroupMetaSafe(from);
+        const normalizedTarget = normalizeJid(target);
+        const rawId = target.replace(/^@/, '').split('@')[0];
+
+        const targetParticipant = groupMetadata?.participants?.find(p => 
+          isSameJid(p.id, normalizedTarget) || 
+          (p.id || '').split('@')[0] === rawId
+        );
+
+        if (!targetParticipant) return send('❌ Benutzer nicht gefunden.');
+
+        console.log('[kick-debug] Ziel:', { id: targetParticipant.id, jid: normalizedTarget, raw: rawId });
+
+        try {
+          await sock.groupParticipantsUpdate(from, [targetParticipant.id], 'remove');
+          return send(`✅ @${targetParticipant.id.split('@')[0]} entfernt.`, { mentions: [targetParticipant.id] });
+        } catch (e) {
+          console.error('[kick] Fehler:', e?.message, e?.response?.status);
+          if (e?.message?.includes('not admin') || e?.message?.includes('admin')) {
+            return send('❌ Ich bin kein Gruppenadmin und kann niemanden kicken.');
+          }
+          return send('❌ Kicken fehlgeschlagen: ' + (e?.message || 'Unbekannter Fehler'));
+        }
+      }
+
+      if (cmd === 'warn') {
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
+        const t = args[0]; const reason = args.slice(1).join(' ') || 'Kein Grund';
+        if (!t) return send('Usage: $warn <num|jid> <grund>');
+        const jid = normalizeJid(t);
+        ensureUser(jid);
+        users[jid].warns = users[jid].warns || [];
+        users[jid].warns.push({ by: sender, reason, at: new Date().toISOString() });
+        save(FILES.users, users);
+        return send(`⚠ ${jid} verwarnt.`);
+      }
+      if (cmd === 'clearwarns') {
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
+        const t = args[0]; if (!t) return send('Usage: $clearwarns <num|jid>');
+        const jid = normalizeJid(t);
+        if (users[jid]) users[jid].warns = [];
+        save(FILES.users, users);
+        return send(`✅ Warns entfernt für ${jid}`);
+      }
+
+      if (cmd === 'promote') {
+        if (!isOwner) return send('Nur Owner/Co-Owner darf promoten.');
+        const t = args[0]; if (!t) return send('Usage: $promote <num|jid>');
+        const jid = normalizeJid(t);
+        ranks[jid] = 'ADMIN'; save(FILES.ranks, ranks);
+        return send(`✅ ${jid} zum ADMIN befördert.`);
+      }
+
+      if (cmd === 'kick') {
+        const ctx = m.message?.extendedTextMessage?.contextInfo;
+        let target = args[0];
+        if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+        if (!target) return send('Usage: $kick <num|jid|@user>');
+        if (isPrimaryOwner(target)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gekickt werden.');
+
+        let permitted = isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD']);
+        let groupMetadata;
+        if (!permitted && isGroup) {
+          groupMetadata = await getGroupMetaSafe(from);
+          const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
           permitted = !!isGroupAdmin;
         }
         if (!permitted) return send('Kein Zugriff.');
@@ -2900,7 +2971,6 @@ if (cmd === 'leave') {
         save(FILES.credits, credits);
         return send(`✅ *${name}* wurde zu den Credits hinzugefügt.`);
       }
-
       // DELCREDIT
       if (cmd === 'delcredit') {
         if (!isAuthorized(sender, ['OWNER'])) return send('❌ Nur der Inhaber darf Credits entfernen.');
@@ -2921,16 +2991,7 @@ if (cmd === 'dsgvo') {
 // Anti-Link Controls
       if ((cmd === 'antilink-an' || cmd === 'antilink-aus') && isGroup) {
         const groupMetadata = await getGroupMetaSafe(from);
-        const senderCandidates = [sender, toParticipantJid(sender), toLidJid(sender)].filter(Boolean);
-        const senderParticipant = groupMetadata?.participants?.find(p =>
-          senderCandidates.some(c => isSameJid(p.id, c))
-        );
-        const senderIsGroupAdmin = !!(
-          senderParticipant?.admin === 'admin' ||
-          senderParticipant?.admin === 'superadmin' ||
-          senderParticipant?.admin === true ||
-          senderParticipant?.isAdmin === true
-        );
+        const senderIsGroupAdmin = isGroupAdminJid(groupMetadata, sender);
 
         if (!senderIsGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER', 'GROUPADMIN'])) {
           return send('❌ Du musst Admin in dieser Gruppe sein.');
