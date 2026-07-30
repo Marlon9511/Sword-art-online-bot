@@ -389,6 +389,33 @@ function isSameJid(a, b) {
   return normalizeJid(a) === normalizeJid(b);
 }
 
+// ---- FIX: robuster Admin-Check über die reine Rufnummer ----
+// Baileys liefert Gruppenteilnehmer je nach Situation als @lid oder
+// @s.whatsapp.net (teils mit :device-Suffix). isSameJid() vergleicht nur
+// exakt normalisierte Strings und erkennt @lid <-> @s.whatsapp.net NICHT
+// als gleich. Dadurch wurden echte Gruppenadmins nicht erkannt, wenn ihr
+// JID-Typ nicht exakt zum gespeicherten sender-JID passte.
+// extractRawNumber() zieht in jedem Fall nur die reine Ziffernfolge raus,
+// damit der Vergleich unabhängig vom JID-Typ funktioniert.
+function extractRawNumber(jid) {
+  if (!jid) return null;
+  return String(jid).split(':')[0].split('@')[0].replace(/[^0-9]/g, '') || null;
+}
+
+function isGroupAdminJid(groupMeta, jid) {
+  if (!groupMeta?.participants || !jid) return false;
+  const rawNum = extractRawNumber(jid);
+  if (!rawNum) return false;
+  const participant = groupMeta.participants.find(p => extractRawNumber(p.id) === rawNum);
+  if (!participant) return false;
+  return !!(
+    participant.admin === 'admin' ||
+    participant.admin === 'superadmin' ||
+    participant.admin === true ||
+    participant.isAdmin === true
+  );
+}
+
 
 function getBotSelfIds(sock) {
   const ids = new Set();
@@ -842,14 +869,13 @@ const cmdNoPrefix = noPrefixMatch ? noPrefixMatch[1].toLowerCase() : '';
 
 if (cmdNoPrefix === 'resetprefix' && isGroup) {
   const groupMetadata = await getGroupMetaSafe(from);
-  const isGroupAdmin = groupMetadata?.participants?.find(p => isSameJid(p.id, sender))?.admin;
+  const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
   if (!isGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER'])) {
     await sock.sendMessage(from, { text: '❌ Du musst Gruppenadmin sein, um das Gruppenpräfix zurückzusetzen.' });
     return;
   }
 
 
-client.initialize();
   if (!groupSettings[from]) {
     groupSettings[from] = { welcome: { enabled: false, message: 'Willkommen in der Gruppe {user}! 👋' }, prefix: PREFIX };
   }
@@ -892,16 +918,7 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
           if (antilinkSettings?.enabled) {
             const meta = await getGroupMetaSafe(from);
 
-            const senderCandidates = [sender, toParticipantJid(sender), toLidJid(sender)].filter(Boolean);
-            const senderParticipant = meta?.participants?.find(p =>
-              senderCandidates.some(c => isSameJid(p.id, c))
-            );
-           const senderIsGroupAdmin = !!(
-  senderParticipant?.admin === 'admin' ||
-  senderParticipant?.admin === 'superadmin' ||
-  senderParticipant?.admin === true ||
-  senderParticipant?.isAdmin === true
-);
+            const senderIsGroupAdmin = isGroupAdminJid(meta, sender);
             const senderIsTeam = isAuthorized(sender, ['OWNER', 'COOWNER', 'GROUPADMIN', 'MOD']);
 
             if (!senderIsGroupAdmin && !senderIsTeam) {
@@ -1197,15 +1214,6 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
       }
 const SHORT_URL = 'https://youtube.com/shorts/Tnj-yTpHpoY?si=nZXYlSHtpdT42Awi';
 const CACHE_PATH = path.join(__dirname, 'cache', 'menu-edit.mp4');
-
-function downloadShortIfNeeded() {
-  return new Promise((resolve, reject) => {
-    if (fs.existsSync(CACHE_PATH)) return resolve(CACHE_PATH);
-
-    fs.mkdirSync(path.dirname(CACHE_PATH), { recursive: true });
-
-    // -f mp4 wählt ein Format, das WhatsApp gut abspielen kann
-    const cmd = `yt-dlp -f "mp4" -o "${CACHE_PATH}" "${SHORT_URL}"`;
 const YTMP3_CACHE_DIR = path.join(__dirname, 'cache', 'ytmp3');
 
 function downloadYoutubeMp3(url) {
@@ -1239,6 +1247,16 @@ function getYoutubeTitle(url) {
     });
   });
 }
+
+function downloadShortIfNeeded() {
+  return new Promise((resolve, reject) => {
+    if (fs.existsSync(CACHE_PATH)) return resolve(CACHE_PATH);
+
+    fs.mkdirSync(path.dirname(CACHE_PATH), { recursive: true });
+
+    // -f mp4 wählt ein Format, das WhatsApp gut abspielen kann
+    const cmd = `yt-dlp -f "mp4" -o "${CACHE_PATH}" "${SHORT_URL}"`;
+
     exec(cmd, (err) => {
       if (err) return reject(err);
       resolve(CACHE_PATH);
@@ -1275,7 +1293,8 @@ function getYoutubeTitle(url) {
         helpText += `▸ ${PREFIX}welcome-set <text> — Welcome-Text setzen\n`;
         helpText += `▸ ${PREFIX}antilink-an / -aus — Anti-WhatsApp-Link-Kick an/aus\n`;
         helpText += `▸ ${PREFIX}hidetag <text> — Nachricht mit verstecktem Tag\n`;
-        helpText += `▸ ${PREFIX}delete — Als Reply: Nachricht löschen\n\n`;
+        helpText += `▸ ${PREFIX}delete — Als Reply: Nachricht löschen\n`;
+        helpText += `▸ ${PREFIX}ytmp3 <link> — YouTube als MP3\n\n`;
 
         helpText += `⚙️ *Aktuelles Präfix:* ${PREFIX}\n`;
 
@@ -1295,6 +1314,7 @@ function getYoutubeTitle(url) {
           helpText += `▸ ${PREFIX}addxp <@user> <menge> — XP schenken\n`;
           helpText += `▸ ${PREFIX}addcash <@user> <menge> — Coins schenken\n`;
           helpText += `▸ ${PREFIX}addvip <@user> <zeit> — VIP geben\n`;
+          helpText += `▸ ${PREFIX}purge [anzahl] — Nachrichten löschen (alle oder letzte N)\n`;
         }
 
         if (hasAdminPerms(sender)) {
@@ -1348,7 +1368,7 @@ function getYoutubeTitle(url) {
       // Group Settings (gi)
       if (cmd === 'gi' && isGroup) {
         const groupMetadata = await getGroupMetaSafe(from);
-        const isGroupAdmin = groupMetadata?.participants?.find(p => isSameJid(p.id, sender))?.admin;
+        const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
 
         if (!isGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) {
           return send('❌ Du musst Admin in dieser Gruppe sein.');
@@ -1368,7 +1388,7 @@ function getYoutubeTitle(url) {
       // Welcome Controls
       if ((cmd === 'welcome-an' || cmd === 'welcome-aus' || cmd === 'welcome-set') && isGroup) {
         const groupMetadata = await getGroupMetaSafe(from);
-        const isGroupAdmin = groupMetadata?.participants?.find(p => isSameJid(p.id, sender))?.admin;
+        const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
 
         if (!isGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) {
           return send('❌ Du musst Admin in dieser Gruppe sein.');
@@ -1572,7 +1592,7 @@ function getYoutubeTitle(url) {
       if (cmd === 'setprefix') {
         if (isGroup) {
           const groupMetadata = await getGroupMetaSafe(from);
-          const isGroupAdmin = groupMetadata?.participants?.find(p => isSameJid(p.id, sender))?.admin;
+          const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
           if (!isGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER'])) {
             return send('❌ Du musst Gruppenadmin sein, um das Gruppenpräfix zu ändern.');
           }
@@ -1959,7 +1979,7 @@ console.log('[whoami] Socket-Status:', sock.ws?.readyState, '| User:', !!sock.us
       if (cmd === 'hidetag') {
         if (!isGroup) return send('❌ Nur in Gruppen.');
         const groupMetadata = await getGroupMetaSafe(from);
-        const isGroupAdmin = groupMetadata?.participants?.find(p => isSameJid(p.id, sender))?.admin;
+        const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
         if (!isGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) return send('❌ Kein Zugriff.');
         const message = args.join(' ');
         if (!message) return send('❌ Beispiel: $hidetag Wichtige Ankündigung!');
@@ -1994,7 +2014,7 @@ console.log('[whoami] Socket-Status:', sock.ws?.readyState, '| User:', !!sock.us
           let permitted = isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD']);
           if (!permitted) {
             const groupMetadata = await getGroupMetaSafe(from);
-            const isGroupAdmin = groupMetadata?.participants?.find(p => isSameJid(p.id, sender))?.admin;
+            const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
             permitted = !!isGroupAdmin;
           }
           if (!permitted) return send('❌ Du darfst nur eigene Nachrichten oder (als Admin) fremde Nachrichten löschen.');
@@ -2110,7 +2130,7 @@ if (cmd === 'purge' || cmd === 'clearchat') {
   if (!isGroup) return send('❌ Nur in Gruppen.');
   if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) {
     const groupMetadata = await getGroupMetaSafe(from);
-    const isGroupAdmin = groupMetadata?.participants?.find(p => isSameJid(p.id, sender))?.admin;
+    const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
     if (!isGroupAdmin) return send('❌ Du musst Admin sein, um diesen Befehl zu nutzen.');
   }
 
