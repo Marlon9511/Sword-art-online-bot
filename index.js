@@ -2105,7 +2105,7 @@ console.log('[whoami] Socket-Status:', sock.ws?.readyState, '| User:', !!sock.us
         try { await sock.sendMessage(targetJid, { text: `💰 Du hast ${amount} Coins von @${sender.split('@')[0]} erhalten!`, mentions: [sender] }); } catch (e) {}
         return send(`✅ ${amount} Coins an @${targetJid.split('@')[0]} gesendet!`, { mentions: [targetJid] });
       }
-// PURGE / CLEARCHAT — löscht alle bekannten (getrackten) Nachrichten der Gruppe
+// PURGE / CLEARCHAT — löscht alle (oder die letzten N) bekannten Nachrichten der Gruppe
 if (cmd === 'purge' || cmd === 'clearchat') {
   if (!isGroup) return send('❌ Nur in Gruppen.');
   if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) {
@@ -2114,15 +2114,29 @@ if (cmd === 'purge' || cmd === 'clearchat') {
     if (!isGroupAdmin) return send('❌ Du musst Admin sein, um diesen Befehl zu nutzen.');
   }
 
-  const history = groupMessageHistory.get(from) || [];
-  if (!history.length) {
+  const fullHistory = groupMessageHistory.get(from) || [];
+  if (!fullHistory.length) {
     return send('ℹ️ Keine gespeicherten Nachrichten zum Löschen vorhanden (ich kann nur Nachrichten löschen, die ich seit meinem Start gesehen habe).');
   }
 
-  await send(`🧹 Lösche ${history.length} Nachrichten, bitte warten...`);
+  // Optionales Limit: $purge 50 löscht nur die letzten 50 Nachrichten
+  let limit = null;
+  if (args[0]) {
+    const parsed = parseInt(args[0]);
+    if (isNaN(parsed) || parsed <= 0) {
+      return send(`❌ Ungültige Zahl. Nutzung: ${PREFIX}purge [anzahl]\nBeispiel: ${PREFIX}purge 50`);
+    }
+    limit = parsed;
+  }
+
+  // Bei Limit: nur die letzten N Einträge (neueste zuerst gelöscht, wie gewünscht)
+  const toDelete = limit ? fullHistory.slice(-limit) : fullHistory;
+  const remaining = limit ? fullHistory.slice(0, -limit) : [];
+
+  await send(`🧹 Lösche ${toDelete.length} Nachricht(en), bitte warten...`);
 
   let deleted = 0, failed = 0;
-  for (const entry of history) {
+  for (const entry of toDelete) {
     try {
       const isOwnMsg = !entry.participant;
       await sock.sendMessage(from, {
@@ -2140,8 +2154,8 @@ if (cmd === 'purge' || cmd === 'clearchat') {
     }
   }
 
-  groupMessageHistory.set(from, []);
-  return send(`✅ Fertig: ${deleted} Nachrichten gelöscht, ${failed} fehlgeschlagen (z.B. schon gelöscht oder zu alt).`);
+  groupMessageHistory.set(from, remaining);
+  return send(`✅ Fertig: ${deleted} Nachricht(en) gelöscht, ${failed} fehlgeschlagen (z.B. schon gelöscht oder zu alt).`);
 }
       // WORK
       if (cmd === 'work') {
