@@ -624,7 +624,19 @@ function persistAll() {
   } catch (e) { console.error('Failed to save owner config:', e); }
 }
 setInterval(persistAll, 60_000);
+const groupMessageHistory = new Map(); // groupJid -> Array<{ id, participant }>
+const MAX_TRACKED_PER_GROUP = 2000;
 
+function trackGroupMessage(groupJid, msgId, participant) {
+  if (!groupMessageHistory.has(groupJid)) {
+    groupMessageHistory.set(groupJid, []);
+  }
+  const arr = groupMessageHistory.get(groupJid);
+  arr.push({ id: msgId, participant });
+  if (arr.length > MAX_TRACKED_PER_GROUP) {
+    arr.splice(0, arr.length - MAX_TRACKED_PER_GROUP);
+  }
+}
 // ========== GAME HELPERS ==========
 const SLOT_SYMBOLS = ['🍒', '🍋', '🍇', '🍉', '⭐', '💎'];
 function spinSlots() { return [SLOT_SYMBOLS[randInt(0, SLOT_SYMBOLS.length - 1)], SLOT_SYMBOLS[randInt(0, SLOT_SYMBOLS.length - 1)], SLOT_SYMBOLS[randInt(0, SLOT_SYMBOLS.length - 1)]]; }
