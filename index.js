@@ -637,9 +637,7 @@ function trackGroupMessage(groupJid, msgId, participant) {
     arr.splice(0, arr.length - MAX_TRACKED_PER_GROUP);
   }
 }
-if (isGroup && m.key.id) {
-  trackGroupMessage(from, m.key.id, m.key.fromMe ? null : (m.key.participant || sender));
-}
+
 // ========== GAME HELPERS ==========
 const SLOT_SYMBOLS = ['🍒', '🍋', '🍇', '🍉', '⭐', '💎'];
 function spinSlots() { return [SLOT_SYMBOLS[randInt(0, SLOT_SYMBOLS.length - 1)], SLOT_SYMBOLS[randInt(0, SLOT_SYMBOLS.length - 1)], SLOT_SYMBOLS[randInt(0, SLOT_SYMBOLS.length - 1)]]; }
@@ -861,7 +859,9 @@ client.initialize();
   return;
 }
 
-
+if (isGroup && m.key.id) {
+  trackGroupMessage(from, m.key.id, m.key.fromMe ? null : (m.key.participant || sender));
+}
 
    
       if (body && !m.key.fromMe) {
