@@ -2835,7 +2835,41 @@ if (cmd === 'dsgvo') {
           return send('✅ Anti-Link deaktiviert.');
         }
       }
+// YTMP3
+if (cmd === 'ytmp3' || cmd === 'play' && args[0]?.includes('youtu')) {
+  const url = args.join(' ').trim();
+  if (!url || !/youtu\.?be/.test(url)) {
+    return send(`❌ Nutzung: ${PREFIX}ytmp3 <youtube-link>`);
+  }
 
+  const cooldownMsg = checkCooldown(sender, 'ytmp3');
+  if (cooldownMsg && !isOwner) return send(cooldownMsg);
+
+  await send('⏳ Lade Audio herunter, bitte warten...');
+
+  try {
+    const title = await getYoutubeTitle(url);
+    const filePath = await downloadYoutubeMp3(url);
+    const stats = fs.statSync(filePath);
+
+    if (stats.size > 95 * 1024 * 1024) {
+      fs.unlinkSync(filePath);
+      return send('❌ Die Datei ist zu groß für WhatsApp (>95MB).');
+    }
+
+    await sock.sendMessage(from, {
+      audio: fs.readFileSync(filePath),
+      mimetype: 'audio/mpeg',
+      fileName: `${title || 'audio'}.mp3`
+    }, { quoted: m });
+
+    fs.unlinkSync(filePath);
+  } catch (e) {
+    console.error('[ytmp3] Fehler:', e?.message || e);
+    return send('❌ Download fehlgeschlagen. Prüfe den Link oder versuche es später erneut.');
+  }
+  return;
+}
       // Unbekannter Befehl
       return send('❓ Unbekannter Befehl — ?help ist ein Menü für die Befehle genauso wie ?menu wenns da deinen Befehl nicht gibt frag daddy kirito nach ob es den gibt oder ob er es einbauen kann unter ?owner.');
 
