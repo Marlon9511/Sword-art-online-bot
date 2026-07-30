@@ -819,6 +819,9 @@ async function startBot(sessionName = 'default', hooks = {}) {
         || (m.message.imageMessage && m.message.imageMessage.caption)
         || '';
 
+     if (body) {
+        log(`[MSG] ${sender} in ${isGroup ? from : 'PM'}: ${body}`);
+      }
 
 const rawBody = (body || '').trim();
 const noPrefixMatch = rawBody.match(/^[^\w]*(\w+)/);
