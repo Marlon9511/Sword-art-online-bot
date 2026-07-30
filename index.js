@@ -637,6 +637,9 @@ function trackGroupMessage(groupJid, msgId, participant) {
     arr.splice(0, arr.length - MAX_TRACKED_PER_GROUP);
   }
 }
+if (isGroup && m.key.id) {
+  trackGroupMessage(from, m.key.id, m.key.fromMe ? null : (m.key.participant || sender));
+}
 // ========== GAME HELPERS ==========
 const SLOT_SYMBOLS = ['🍒', '🍋', '🍇', '🍉', '⭐', '💎'];
 function spinSlots() { return [SLOT_SYMBOLS[randInt(0, SLOT_SYMBOLS.length - 1)], SLOT_SYMBOLS[randInt(0, SLOT_SYMBOLS.length - 1)], SLOT_SYMBOLS[randInt(0, SLOT_SYMBOLS.length - 1)]]; }
@@ -2102,7 +2105,44 @@ console.log('[whoami] Socket-Status:', sock.ws?.readyState, '| User:', !!sock.us
         try { await sock.sendMessage(targetJid, { text: `💰 Du hast ${amount} Coins von @${sender.split('@')[0]} erhalten!`, mentions: [sender] }); } catch (e) {}
         return send(`✅ ${amount} Coins an @${targetJid.split('@')[0]} gesendet!`, { mentions: [targetJid] });
       }
+// PURGE / CLEARCHAT — löscht alle bekannten (getrackten) Nachrichten der Gruppe
+if (cmd === 'purge' || cmd === 'clearchat') {
+  if (!isGroup) return send('❌ Nur in Gruppen.');
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) {
+    const groupMetadata = await getGroupMetaSafe(from);
+    const isGroupAdmin = groupMetadata?.participants?.find(p => isSameJid(p.id, sender))?.admin;
+    if (!isGroupAdmin) return send('❌ Du musst Admin sein, um diesen Befehl zu nutzen.');
+  }
 
+  const history = groupMessageHistory.get(from) || [];
+  if (!history.length) {
+    return send('ℹ️ Keine gespeicherten Nachrichten zum Löschen vorhanden (ich kann nur Nachrichten löschen, die ich seit meinem Start gesehen habe).');
+  }
+
+  await send(`🧹 Lösche ${history.length} Nachrichten, bitte warten...`);
+
+  let deleted = 0, failed = 0;
+  for (const entry of history) {
+    try {
+      const isOwnMsg = !entry.participant;
+      await sock.sendMessage(from, {
+        delete: {
+          remoteJid: from,
+          id: entry.id,
+          fromMe: isOwnMsg,
+          ...(isOwnMsg ? {} : { participant: entry.participant })
+        }
+      });
+      deleted++;
+      await sleep(200); // kleine Pause, um Rate-Limits zu vermeiden
+    } catch (e) {
+      failed++;
+    }
+  }
+
+  groupMessageHistory.set(from, []);
+  return send(`✅ Fertig: ${deleted} Nachrichten gelöscht, ${failed} fehlgeschlagen (z.B. schon gelöscht oder zu alt).`);
+}
       // WORK
       if (cmd === 'work') {
         const earn = randInt(50, 200);
