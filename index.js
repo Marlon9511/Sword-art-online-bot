@@ -832,23 +832,6 @@ if (cmdNoPrefix === 'resetprefix' && isGroup) {
     return;
   }
 
-function logMessage(msg, richtung) {
-    const zeile = `${new Date().toISOString()} | ${richtung} | Chat: ${msg.from || msg.to} | ${msg.body}\n`;
-    console.log(zeile.trim());
-    fs.appendFileSync('log.txt', zeile);
-}
-
-// Eingehende Nachrichten (von anderen)
-client.on('message', msg => {
-    logMessage(msg, 'EINGEHEND');
-});
-
-// Ausgehende Nachrichten (die du selbst schreibst)
-client.on('message_create', msg => {
-    if (msg.fromMe) {
-        logMessage(msg, 'GESENDET');
-    }
-});
 
 client.initialize();
   if (!groupSettings[from]) {
