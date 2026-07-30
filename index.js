@@ -2868,11 +2868,16 @@ if (cmd === 'dsgvo') {
         }
       }
 // YTMP3
-if (cmd === 'ytmp3' || cmd === 'play' && args[0]?.includes('youtu')) {
-  const url = args.join(' ').trim();
-  if (!url || !/youtu\.?be/.test(url)) {
-    return send(`❌ Nutzung: ${PREFIX}ytmp3 <youtube-link>`);
+if (cmd === 'ytmp3') {
+  const fullText = args.join(' ').trim();
+  const urlMatch = fullText.match(/(https?:\/\/)?(www\.|music\.|m\.)?(youtube\.com\/(watch\?v=|shorts\/)|youtu\.be\/)[\w-]+(\S*)?/i);
+
+  if (!urlMatch) {
+    return send(`❌ Nutzung: ${PREFIX}ytmp3 <youtube-link>\n\nBeispiel:\n${PREFIX}ytmp3 https://youtu.be/dQw4w9WgXcQ`);
   }
+
+  let url = urlMatch[0];
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
 
   const cooldownMsg = checkCooldown(sender, 'ytmp3');
   if (cooldownMsg && !isOwner) return send(cooldownMsg);
