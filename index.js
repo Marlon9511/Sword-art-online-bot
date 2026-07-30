@@ -1191,7 +1191,39 @@ function downloadShortIfNeeded() {
 
     // -f mp4 wählt ein Format, das WhatsApp gut abspielen kann
     const cmd = `yt-dlp -f "mp4" -o "${CACHE_PATH}" "${SHORT_URL}"`;
+const YTMP3_CACHE_DIR = path.join(__dirname, 'cache', 'ytmp3');
 
+function downloadYoutubeMp3(url) {
+  return new Promise((resolve, reject) => {
+    fs.mkdirSync(YTMP3_CACHE_DIR, { recursive: true });
+
+    const outTemplate = path.join(YTMP3_CACHE_DIR, `${Date.now()}-%(title).60s.%(ext)s`);
+
+    // -x = nur Audio extrahieren, --audio-format mp3 = zu mp3 konvertieren (braucht ffmpeg)
+    const cmd = `yt-dlp -x --audio-format mp3 --audio-quality 0 --no-playlist -o "${outTemplate}" "${url}"`;
+
+    exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err, stdout, stderr) => {
+      if (err) return reject(err);
+
+      // Neueste .mp3-Datei im Cache-Ordner finden
+      const files = fs.readdirSync(YTMP3_CACHE_DIR)
+        .filter(f => f.endsWith('.mp3'))
+        .map(f => ({ f, t: fs.statSync(path.join(YTMP3_CACHE_DIR, f)).mtimeMs }))
+        .sort((a, b) => b.t - a.t);
+
+      if (!files.length) return reject(new Error('Keine MP3-Datei erzeugt.'));
+      resolve(path.join(YTMP3_CACHE_DIR, files[0].f));
+    });
+  });
+}
+
+function getYoutubeTitle(url) {
+  return new Promise((resolve) => {
+    exec(`yt-dlp --get-title --no-playlist "${url}"`, (err, stdout) => {
+      resolve(err ? null : stdout.trim());
+    });
+  });
+}
     exec(cmd, (err) => {
       if (err) return reject(err);
       resolve(CACHE_PATH);
