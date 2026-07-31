@@ -1296,7 +1296,7 @@ helpText += `▸ ${PREFIX}poke @user — Anpiksen\n`;
 helpText += `▸ ${PREFIX}cuddle @user — Kuscheln\n`;
 helpText += `▸ ${PREFIX}bite @user — Beißen\n`;
 helpText += `▸ ${PREFIX}punch @user — Schlagen\n\n`;
-/
+
         helpText += `💬 *CHAT & GRUPPEN*\n${divider}\n`;
         helpText += `▸ ${PREFIX}gi — Gruppeneinstellungen anzeigen\n`;
         helpText += `▸ ${PREFIX}welcome-an / -aus — Welcome an/aus\n`;
