@@ -3054,6 +3054,76 @@ if (cmd === 'ytmp3') {
   }
   return;
 }
+const REACTION_COMMANDS = {
+  throw: { emoji: "🤾", verb: "wirft" },
+  slap: { emoji: "👋", verb: "verpasst eine Ohrfeige" },
+  hug: { emoji: "🤗", verb: "umarmt" },
+  kiss: { emoji: "😘", verb: "küsst" },
+  pat: { emoji: "🤚", verb: "tätschelt" },
+  poke: { emoji: "👉", verb: "pikst" },
+  cuddle: { emoji: "🥰", verb: "kuschelt mit" },
+  bite: { emoji: "😬", verb: "beißt" },
+  punch: { emoji: "🥊", verb: "verpasst einen Schlag" },
+};
+
+async function getReactionGifUrl(reaction) {
+  const res = await fetch(`https://api.otakugifs.xyz/gif?reaction=${reaction}`);
+  if (!res.ok) throw new Error(`otakugifs API-Fehler: ${res.status}`);
+  const data = await res.json();
+  return data.url;
+}
+
+
+/* -----------------------------------------------------------
+ * SCHRITT 2: Command-Block
+ * Füge diesen Block irgendwo in deine große if/else-Kette in
+ * "messages.upsert" ein, z.B. direkt nach dem RPS- oder Slot-Block.
+ * Nutzt deine vorhandenen Variablen: cmd, args, m, sender, from,
+ * users, ensureUser, send, isTeamMember, sock.
+ * ---------------------------------------------------------*/
+
+if (REACTION_COMMANDS[cmd]) {
+  const config = REACTION_COMMANDS[cmd];
+
+  // Ziel ermitteln: @mention ODER Reply auf eine Nachricht (gleiches Muster wie bei $kick / $hidetag)
+  const ctx = m.message?.extendedTextMessage?.contextInfo;
+  const mentioned = ctx?.mentionedJid || [];
+  const repliedTo = ctx?.participant;
+  const target = mentioned[0] || repliedTo;
+
+  if (!target) {
+    return send(`❓ Wen soll ich ${cmd}en? Erwähne jemanden mit @user oder antworte auf seine Nachricht mit ${activePrefix}${cmd}`);
+  }
+
+  const targetJid = normalizeJid(target);
+  ensureUser(sender);
+  ensureUser(targetJid);
+
+  try {
+    const gifUrl = await getReactionGifUrl(cmd);
+    const gifResponse = await fetch(gifUrl);
+    const buffer = Buffer.from(await gifResponse.arrayBuffer());
+
+    if (!isTeamMember) {
+      try { await sock.sendPresenceUpdate('composing', from); } catch (e) {}
+      await sleep(1500);
+      try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
+    }
+
+    await sock.sendMessage(from, {
+      video: buffer,
+      gifPlayback: true,
+      caption: `${config.emoji} @${sender.split('@')[0]} ${config.verb} @${targetJid.split('@')[0]}!`,
+      mentions: [sender, targetJid],
+    }, { quoted: m });
+  } catch (err) {
+    console.error(`[${cmd}] Fehler:`, err);
+    return send('⚠️ Konnte gerade kein Gif holen, versuch\'s gleich nochmal.');
+  }
+  return;
+}
+
+
       // Unbekannter Befehl
       return send('❓ Unbekannter Befehl — ?help ist ein Menü für die Befehle genauso wie ?menu wenns da deinen Befehl nicht gibt frag daddy kirito nach ob es den gibt oder ob er es einbauen kann unter ?owner.');
 
