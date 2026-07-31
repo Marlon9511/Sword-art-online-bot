@@ -1361,7 +1361,10 @@ helpText += `▸ ${PREFIX}punch @user — Schlagen\n\n`;
         }
         return;
       }
-   
+   const GAME_COMMANDS = [
+  'daily', 'work', 'blackjack', 'bj', 'bjstart', 'hit', 'stand',
+  'slot', 'rps', 'fish', 'adopt', 'pet', 'petinfo', 'feed', 'play'
+];
       // Cooldown
       if (!isOwner && cmd !== 'help' && cmd !== 'menu') {
         const cooldownCommands = [
