@@ -3141,72 +3141,7 @@ if (REACTION_COMMANDS[cmd]) {
   const repliedTo = ctx?.participant;
   const target = mentioned[0] || repliedTo;
 
-  if (!target) {
-    return send(`❓ Wen soll ich ${cmd}en? Erwähne jemanden mit @user oder antworte auf seine Nachricht mit ${activePrefix}${cmd}`);
-  }
-
-  const targetJid = normalizeJid(target);
-  ensureUser(sender);
-  ensureUser(targetJid);
-
-  try {
-    const gifUrl = await getReactionGifUrl(cmd);
-
-    // GEÄNDERT: statt rohem Gif-Buffer jetzt der konvertierte mp4-Buffer
-    const mp4Buffer = await fetchAndConvertGifToMp4(gifUrl);
-
-    if (!isTeamMember) {
-      try { await sock.sendPresenceUpdate('composing', from); } catch (e) {}
-      await sleep(1500);
-      try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
-    }
-
-    await sock.sendMessage(from, {
-      video: mp4Buffer,
-      gifPlayback: true,
-      mimetype: 'video/mp4', // GEÄNDERT: explizit gesetzt
-      caption: `${config.emoji} @${sender.split('@')[0]} ${config.verb} @${targetJid.split('@')[0]}!`,
-      mentions: [sender, targetJid],
-    }, { quoted: m });
-  } catch (err) {
-    console.error(`[${cmd}] Fehler:`, err);
-    return send('⚠️ Konnte gerade kein Gif holen, versuch\'s gleich nochmal.');
-  }
-  return;
-}
-  if (!target) {
-    return send(`❓ Wen soll ich ${cmd}en? Erwähne jemanden mit @user oder antworte auf seine Nachricht mit ${activePrefix}${cmd}`);
-  }
-
-  const targetJid = normalizeJid(target);
-  ensureUser(sender);
-  ensureUser(targetJid);
-
-  try {
-    const gifUrl = await getReactionGifUrl(cmd);
-    const gifResponse = await fetch(gifUrl);
-    const buffer = Buffer.from(await gifResponse.arrayBuffer());
-
-    if (!isTeamMember) {
-      try { await sock.sendPresenceUpdate('composing', from); } catch (e) {}
-      await sleep(1500);
-      try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
-    }
-
-    await sock.sendMessage(from, {
-      video: buffer,
-      gifPlayback: true,
-      caption: `${config.emoji} @${sender.split('@')[0]} ${config.verb} @${targetJid.split('@')[0]}!`,
-      mentions: [sender, targetJid],
-    }, { quoted: m });
-  } catch (err) {
-    console.error(`[${cmd}] Fehler:`, err);
-    return send('⚠️ Konnte gerade kein Gif holen, versuch\'s gleich nochmal.');
-  }
-  return;
-}
-
-
+  
       // Unbekannter Befehl
       return send('❓ Unbekannter Befehl — ?help ist ein Menü für die Befehle genauso wie ?menu wenns da deinen Befehl nicht gibt frag daddy kirito nach ob es den gibt oder ob er es einbauen kann unter ?owner.');
 
