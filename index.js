@@ -3064,115 +3064,47 @@ if (cmd === 'ytmp3') {
   }
   return;
 }
+const GIPHY_API_KEY = '@marlon952011'; // <-- hier deinen Key eintragen (oder aus process.env laden)
+
 const REACTION_COMMANDS = {
-  throw: { emoji: "🤾", verb: "wirft" },
-  slap: { emoji: "👋", verb: "verpasst eine Ohrfeige" },
-  hug: { emoji: "🤗", verb: "umarmt" },
-  kiss: { emoji: "😘", verb: "küsst" },
-  pat: { emoji: "🤚", verb: "tätschelt" },
-  poke: { emoji: "👉", verb: "pikst" },
-  cuddle: { emoji: "🥰", verb: "kuschelt mit" },
-  bite: { emoji: "😬", verb: "beißt" },
-  punch: { emoji: "🥊", verb: "verpasst einen Schlag" },
+  throw:  { emoji: "🤾", verb: "wirft",                query: "anime throw" },
+  slap:   { emoji: "👋", verb: "verpasst eine Ohrfeige", query: "anime slap" },
+  hug:    { emoji: "🤗", verb: "umarmt",                query: "anime hug" },
+  kiss:   { emoji: "😘", verb: "küsst",                 query: "anime kiss" },
+  pat:    { emoji: "🤚", verb: "tätschelt",             query: "anime pat head" },
+  poke:   { emoji: "👉", verb: "pikst",                 query: "anime poke" },
+  cuddle: { emoji: "🥰", verb: "kuschelt mit",          query: "anime cuddle" },
+  bite:   { emoji: "😬", verb: "beißt",                 query: "anime bite" },
+  punch:  { emoji: "🥊", verb: "verpasst einen Schlag",  query: "anime punch" },
 };
 
+// NEU: Giphy-Suche statt otakugifs. Holt bis zu 25 Treffer und wählt
+// zufällig eins aus, damit nicht immer dasselbe Gif kommt.
 async function getReactionGifUrl(reaction) {
-  const res = await fetch(`https://api.otakugifs.xyz/gif?reaction=${reaction}`);
-  if (!res.ok) throw new Error(`otakugifs API-Fehler: ${res.status}`);
+  const config = REACTION_COMMANDS[reaction];
+  if (!config) throw new Error(`Unbekannte Reaction: ${reaction}`);
+
+  const url = `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(config.query)}&limit=25&rating=pg-13&lang=en`;
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Giphy API-Fehler: ${res.status}`);
+
   const data = await res.json();
-  return data.url;
-}
+  const results = data?.data;
 
-// NEU: Cache-Ordner für die Gif->mp4 Konvertierung (analog zu YTMP3_CACHE_DIR)
-const REACTION_GIF_CACHE_DIR = path.join(__dirname, 'cache', 'reaction-gifs');
-
-// NEU: lädt das Gif runter und wandelt es mit ffmpeg in ein echtes,
-// WhatsApp-kompatibles mp4 um. Das ist der eigentliche Fix -
-// rohe .gif-Bytes als "video" zu schicken spielt bei WhatsApp nicht ab.
-function fetchAndConvertGifToMp4(gifUrl) {
-  return new Promise(async (resolve, reject) => {
-    try {
-      fs.mkdirSync(REACTION_GIF_CACHE_DIR, { recursive: true });
-
-      const stamp = Date.now();
-      const gifPath = path.join(REACTION_GIF_CACHE_DIR, `${stamp}.gif`);
-      const mp4Path = path.join(REACTION_GIF_CACHE_DIR, `${stamp}.mp4`);
-
-      const res = await fetch(gifUrl);
-      if (!res.ok) throw new Error(`Gif-Download fehlgeschlagen: ${res.status}`);
-      const arrBuf = await res.arrayBuffer();
-      fs.writeFileSync(gifPath, Buffer.from(arrBuf));
-
-      // scale auf max. 480px Breite = schneller/leichter auf Termux
-      const cmd = `ffmpeg -y -i "${gifPath}" -movflags faststart -pix_fmt yuv420p -vf "scale='min(480,iw)':'-2'" "${mp4Path}"`;
-
-      exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
-        try { fs.unlinkSync(gifPath); } catch (e) {}
-
-        if (err) {
-          console.error('[reaction-gif] ffmpeg-Fehler:', err.message);
-          return reject(err);
-        }
-
-        try {
-          const mp4Buffer = fs.readFileSync(mp4Path);
-          fs.unlinkSync(mp4Path);
-          resolve(mp4Buffer);
-        } catch (readErr) {
-          reject(readErr);
-        }
-      });
-    } catch (e) {
-      reject(e);
-    }
-  });
-}
-
-
-/* -----------------------------------------------------------
- * SCHRITT 2: Command-Block (ERSETZT deinen alten Block 1:1)
- * ---------------------------------------------------------*/
-
-if (REACTION_COMMANDS[cmd]) {
-  const config = REACTION_COMMANDS[cmd];
-
-  const ctx = m.message?.extendedTextMessage?.contextInfo;
-  const mentioned = ctx?.mentionedJid || [];
-  const repliedTo = ctx?.participant;
-  const target = mentioned[0] || repliedTo;
-
-  if (!target) {
-    return send(`❓ Wen soll ich ${cmd}en? Erwähne jemanden mit @user oder antworte auf seine Nachricht mit ${activePrefix}${cmd}`);
+  if (!Array.isArray(results) || results.length === 0) {
+    throw new Error(`Giphy: keine Ergebnisse für "${config.query}"`);
   }
 
-  const targetJid = normalizeJid(target);
-  ensureUser(sender);
-  ensureUser(targetJid);
+  const pick = results[Math.floor(Math.random() * results.length)];
 
-  try {
-    const gifUrl = await getReactionGifUrl(cmd);
+  // original.mp4 gibt's bei Giphy direkt als GIF-Alternative,
+  // wir nehmen aber weiter das .gif und konvertieren wie gehabt,
+  // damit dein bestehender ffmpeg-Flow unverändert bleibt.
+  const gifUrl = pick?.images?.original?.url;
+  if (!gifUrl) throw new Error('Giphy: keine gif-URL im Ergebnis gefunden');
 
-    // GEÄNDERT: statt rohem Gif-Buffer jetzt der konvertierte mp4-Buffer
-    const mp4Buffer = await fetchAndConvertGifToMp4(gifUrl);
-
-    if (!isTeamMember) {
-      try { await sock.sendPresenceUpdate('composing', from); } catch (e) {}
-      await sleep(1500);
-      try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
-    }
-
-    await sock.sendMessage(from, {
-      video: mp4Buffer,
-      gifPlayback: true,
-      mimetype: 'video/mp4', // GEÄNDERT: explizit gesetzt
-      caption: `${config.emoji} @${sender.split('@')[0]} ${config.verb} @${targetJid.split('@')[0]}!`,
-      mentions: [sender, targetJid],
-    }, { quoted: m });
-  } catch (err) {
-    console.error(`[${cmd}] Fehler:`, err);
-    return send('⚠️ Konnte gerade kein Gif holen, versuch\'s gleich nochmal.');
-  }
-  return;
+  return gifUrl;
 }
   
       // Unbekannter Befehl
