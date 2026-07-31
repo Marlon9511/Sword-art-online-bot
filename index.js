@@ -1374,7 +1374,13 @@ helpText += `▸ ${PREFIX}punch @user — Schlagen\n\n`;
           if (cooldownMessage) return send(cooldownMessage);
         }
       }
-
+// GAMES an/aus Check
+if (isGroup && GAME_COMMANDS.includes(cmd)) {
+  const gamesEnabled = groupSettings[from]?.games?.enabled !== false; // Default: an
+  if (!gamesEnabled) {
+    return send(`🎮 Spiele sind in dieser Gruppe deaktiviert. Ein Admin kann sie mit ${activePrefix}games-an wieder aktivieren.`);
+  }
+}
       // Group Settings (gi)
       if (cmd === 'gi' && isGroup) {
         const groupMetadata = await getGroupMetaSafe(from);
@@ -1427,7 +1433,28 @@ helpText += `▸ ${PREFIX}punch @user — Schlagen\n\n`;
           return send(`✅ Welcome-Text gesetzt auf:\n${args.join(' ')}`);
         }
       }
+if ((cmd === 'games-an' || cmd === 'games-aus') && isGroup) {
+  const groupMetadata = await getGroupMetaSafe(from);
+  const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
+  if (!isGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) {
+    return send('❌ Du musst Admin in dieser Gruppe sein.');
+  }
 
+  if (!groupSettings[from]) {
+    groupSettings[from] = { welcome: { enabled: false, message: 'Willkommen in der Gruppe {user}! 👋' } };
+  }
+  if (!groupSettings[from].games) groupSettings[from].games = { enabled: true };
+
+  if (cmd === 'games-an') {
+    groupSettings[from].games.enabled = true;
+    save(FILES.groupSettings, groupSettings);
+    return send('✅ Spiele-Befehle wurden in dieser Gruppe aktiviert.');
+  }
+
+  groupSettings[from].games.enabled = false;
+  save(FILES.groupSettings, groupSettings);
+  return send('✅ Spiele-Befehle wurden in dieser Gruppe deaktiviert.');
+}
       // Ticket answer
       if (cmd === 'answer') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'MOD', 'SUPPORTER', 'TEST_SUPPORTER'])) return send('❌ Kein Zugriff.');
