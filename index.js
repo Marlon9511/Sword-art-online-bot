@@ -3104,7 +3104,7 @@ function fetchAndConvertGifToMp4(gifUrl) {
       fs.writeFileSync(gifPath, Buffer.from(arrBuf));
 
       // scale auf max. 480px Breite = schneller/leichter auf Termux
-      const cmd = `ffmpeg -y -i "${gifPath}" -movflags faststart -pix_fmt yuv420p -vf "scale='min(480,iw)':'-2'" "${mp4Path}"`;
+      const cmd = `ffmpeg -y -i "${gifPath}" -movflags faststart -pix_fmt yuv420p -vf "scale='trunc(min(480,iw)/2)*2':'-2'" "${mp4Path}"`;
 
       exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
         try { fs.unlinkSync(gifPath); } catch (e) {}
