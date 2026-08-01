@@ -77,6 +77,7 @@ const FILES = {
   groupInvites: { file: 'group-invites.json', default: {} },
   groupSettings: { file: 'group-settings.json', default: {} },
   credits: { file: 'credits.json', default: { list: [] } },
+marriages: { file: 'marriages.json', default: {} },   
   officialGroup: { file: 'official-group.json', default: { link: 'https://chat.whatsapp.com/DBiDcF2s16FEWiGKyZA7Nl' } }
 };
 
@@ -510,6 +511,7 @@ if (Object.keys(ranks).length === 0) {
 let groupSettings = normalizeDataKeys(load(FILES.groupSettings.file));
 let ticketCounter = Object.keys(tickets).length;
 let teamTodos = load(FILES.teamTodos.file) || {};
+let marriages = normalizeDataKeys(load(FILES.marriages.file));
 let todoCounter = Object.keys(teamTodos).length;
 let userTodos = load(FILES.userTodos.file) || {};
 let userTodoCounter = Object.keys(userTodos).length;
