@@ -1301,6 +1301,8 @@ function downloadShortIfNeeded() {
         helpText += `▸ ${PREFIX}afk [grund] — AFK-Status setzen\n`;
         helpText += `▸ ${PREFIX}usertodo add <text> — Befehl vorschlagen\n`;
         helpText += `▸ ${PREFIX}credits — Alle Helfer des Bots\n\n`;
+helpText += `▸ ${PREFIX}marry @user — Heiratsantrag stellen\n`;
+helpText += `▸ ${PREFIX}divorce — Scheidung einreichen\n`;
 
         helpText += `🎮 *SPIELE & WIRTSCHAFT*\n${divider}\n`;
         helpText += `▸ ${PREFIX}daily — Tägliche Belohnung\n`;
