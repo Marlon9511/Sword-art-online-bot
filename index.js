@@ -2701,59 +2701,77 @@ if (cmd === 'purge' || cmd === 'clearchat') {
         return send(`✅ Warns entfernt für ${jid}`);
       }
 
-      // PROMOTE (Duplikat, wird wegen des früheren return oben nie erreicht,
-      // aber mit derselben korrigierten Logik versehen)
-      if (cmd === 'promote') {
-        if (!isGroup) return send('❌ Nur in Gruppen.');
-        if (!isOwner) return send('Nur Owner/Co-Owner darf promoten.');
+if (cmd === 'promote') {
+  if (!isGroup) return send('❌ Nur in Gruppen.');
 
-        const ctx = m.message?.extendedTextMessage?.contextInfo;
-        let target = args[0];
-        if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
-        if (!target && ctx?.participant) target = ctx.participant;
-        if (!target) return send('Usage: $promote <num|jid|@user>');
+  const groupMetadata = await getGroupMetaSafe(from, true);
+  const senderJid = m.key.participant || m.key.remoteJid; // Absender-JID
+  const senderIsGroupAdmin = isSenderGroupAdmin(groupMetadata, senderJid);
 
-        const jid = normalizeJid(target);
-        const groupMetadata = await getGroupMetaSafe(from, true);
-        const rawId = jid.split('@')[0];
-        const targetParticipant = groupMetadata?.participants?.find(p =>
-          isSameJid(p.id, jid) || (p.id || '').split('@')[0] === rawId
-        );
-        if (!targetParticipant) return send('❌ Benutzer nicht in dieser Gruppe gefunden.');
+  if (!isOwner && !senderIsGroupAdmin) {
+    return send('Nur Owner/Co-Owner oder Gruppenadmins dürfen promoten.');
+  }
 
-        try {
-          await sock.groupParticipantsUpdate(from, [targetParticipant.id], 'promote');
-          groupMetaCache.delete(from);
-          return send(`✅ @${targetParticipant.id.split('@')[0]} wurde zum Gruppenadmin befördert.`, { mentions: [targetParticipant.id] });
-        } catch (e) {
-          console.error('[promote] Fehler:', e?.message || e);
-          return send('❌ Beförderung fehlgeschlagen (bin ich Gruppenadmin?).');
-        }
-      }
-      // DEMOTE — entfernt den Ziel-User als echten WhatsApp-Gruppenadmin
-      // und entfernt zusätzlich einen intern gesetzten ADMIN-Rang
+  const ctx = m.message?.extendedTextMessage?.contextInfo;
+  let target = args[0];
+  if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+  if (!target && ctx?.participant) target = ctx.participant;
+  if (!target) return send('Usage: $promote <num|jid|@user>');
+
+  const jid = normalizeJid(target);
+  const rawId = jid.split('@')[0];
+  const targetParticipant = groupMetadata?.participants?.find(p =>
+    isSameJid(p.id, jid) || (p.id || '').split('@')[0] === rawId
+  );
+  if (!targetParticipant) return send('❌ Benutzer nicht in dieser Gruppe gefunden.');
+
+  try {
+    await sock.groupParticipantsUpdate(from, [targetParticipant.id], 'promote');
+    groupMetaCache.delete(from);
+    return send(`✅ @${targetParticipant.id.split('@')[0]} wurde zum Gruppenadmin befördert.`, { mentions: [targetParticipant.id] });
+  } catch (e) {
+    console.error('[promote] Fehler:', e?.message || e);
+    return send('❌ Beförderung fehlgeschlagen (bin ich Gruppenadmin?).');
+  }
+}
       if (cmd === 'demote') {
-        if (!isGroup) return send('❌ Nur in Gruppen.');
-        if (!isOwner) return send('Nur Owner/Co-Owner darf demoten.');
+  if (!isGroup) return send('❌ Nur in Gruppen.');
 
-        const ctx = m.message?.extendedTextMessage?.contextInfo;
-        let target = args[0];
-        if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
-        if (!target && ctx?.participant) target = ctx.participant;
-        if (!target) return send('Usage: $demote <num|jid|@user>');
+  const groupMetadata = await getGroupMetaSafe(from, true);
+  const senderJid = m.key.participant || m.key.remoteJid; // Absender-JID
+  const senderIsGroupAdmin = isSenderGroupAdmin(groupMetadata, senderJid);
 
-        const jid = normalizeJid(target);
-        const groupMetadata = await getGroupMetaSafe(from, true);
-        const rawId = jid.split('@')[0];
-        const targetParticipant = groupMetadata?.participants?.find(p =>
-          isSameJid(p.id, jid) || (p.id || '').split('@')[0] === rawId
-        );
-        if (!targetParticipant) return send('❌ Benutzer nicht in dieser Gruppe gefunden.');
+  if (!isOwner && !senderIsGroupAdmin) {
+    return send('Nur Owner/Co-Owner oder Gruppenadmins dürfen demoten.');
+  }
 
-        try {
-          await sock.groupParticipantsUpdate(from, [targetParticipant.id], 'demote');
-          groupMetaCache.delete(from);
+  const ctx = m.message?.extendedTextMessage?.contextInfo;
+  let target = args[0];
+  if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+  if (!target && ctx?.participant) target = ctx.participant;
+  if (!target) return send('Usage: $demote <num|jid|@user>');
 
+  const jid = normalizeJid(target);
+  const rawId = jid.split('@')[0];
+  const targetParticipant = groupMetadata?.participants?.find(p =>
+    isSameJid(p.id, jid) || (p.id || '').split('@')[0] === rawId
+  );
+  if (!targetParticipant) return send('❌ Benutzer nicht in dieser Gruppe gefunden.');
+
+  try {
+    await sock.groupParticipantsUpdate(from, [targetParticipant.id], 'demote');
+    groupMetaCache.delete(from);
+
+    // Falls ihr intern einen ADMIN-Rang verwaltet (z.B. in einer DB/JSON),
+    // hier den Rang zusätzlich entfernen:
+    // await removeInternalAdminRank(from, targetParticipant.id);
+
+    return send(`✅ @${targetParticipant.id.split('@')[0]} wurde als Gruppenadmin entfernt.`, { mentions: [targetParticipant.id] });
+  } catch (e) {
+    console.error('[demote] Fehler:', e?.message || e);
+    return send('❌ Entfernung fehlgeschlagen (bin ich Gruppenadmin?).');
+  }
+}
           // Internen ADMIN-Rang ebenfalls entfernen, falls gesetzt
           const normJid = normalizeJid(targetParticipant.id);
           if (ranks[normJid] === 'ADMIN') {
