@@ -1812,13 +1812,18 @@ if ((cmd === 'games-an' || cmd === 'games-aus') && isGroup) {
         const xp = user.xp || 0;
         const neededXp = 100 + (level * 50);
         const remainingXp = Math.max(0, neededXp - xp);
-       const marriage = marriages[normalizedSender];
-const marriageLine = marriage
-  ? `💍 Verheiratet mit: @${marriage.partner.split('@')[0]} (seit ${new Date(marriage.since).toLocaleDateString('de-DE')})`
-  : '💍 Status: Single';
-const marriageMentions = marriage ? [marriage.partner] : [];
 
-const caption = `User: ${username}\nCoins: ${coins}\nRank: ${r}\nLevel: ${level}\nXP: ${xp} / ${neededXp}\nNoch ${remainingXp} XP bis Level ${level + 1}\n${marriageLine}`;
+        const marriage = marriages[normalizedSender];
+        let marriageLine = '💍 Status: Single';
+        const marriageMentions = [];
+        if (marriage) {
+          const partnerUser = users[marriage.partner] || {};
+          const partnerName = partnerUser.name || partnerUser.registrationName || marriage.partner.split('@')[0];
+          marriageLine = `💍 Verheiratet mit: ${partnerName} (seit ${new Date(marriage.since).toLocaleDateString('de-DE')})`;
+          marriageMentions.push(marriage.partner);
+        }
+
+        const caption = `User: ${username}\nCoins: ${coins}\nRank: ${r}\nLevel: ${level}\nXP: ${xp} / ${neededXp}\nNoch ${remainingXp} XP bis Level ${level + 1}\n${marriageLine}`;
         // Fallback-Bild, falls kein echtes Profilbild gefunden wird
 const FALLBACK_PP_URL = 'https://raw.githubusercontent.com/Marlon9511/Sword-art-online-bot/main/5d553cd8911378163e989839dff229f3.webp.jpg';
 
