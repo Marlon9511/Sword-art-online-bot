@@ -2734,11 +2734,11 @@ if (cmd === 'promote') {
     return send('❌ Beförderung fehlgeschlagen (bin ich Gruppenadmin?).');
   }
 }
-      if (cmd === 'demote') {
+     if (cmd === 'demote') {
   if (!isGroup) return send('❌ Nur in Gruppen.');
 
   const groupMetadata = await getGroupMetaSafe(from, true);
-  const senderJid = m.key.participant || m.key.remoteJid; // Absender-JID
+  const senderJid = m.key.participant || m.key.remoteJid;
   const senderIsGroupAdmin = isSenderGroupAdmin(groupMetadata, senderJid);
 
   if (!isOwner && !senderIsGroupAdmin) {
@@ -2762,34 +2762,24 @@ if (cmd === 'promote') {
     await sock.groupParticipantsUpdate(from, [targetParticipant.id], 'demote');
     groupMetaCache.delete(from);
 
-    // Falls ihr intern einen ADMIN-Rang verwaltet (z.B. in einer DB/JSON),
-    // hier den Rang zusätzlich entfernen:
-    // await removeInternalAdminRank(from, targetParticipant.id);
+    // Internen ADMIN-Rang ebenfalls entfernen, falls gesetzt
+    const normJid = normalizeJid(targetParticipant.id);
+    if (ranks[normJid] === 'ADMIN') {
+      ranks[normJid] = 'USER';
+      save(FILES.ranks, ranks);
+    }
+    if (users[normJid] && users[normJid].rank === 'ADMIN') {
+      users[normJid].rank = 'USER';
+      save(FILES.users, users);
+    }
+    ROLES.ADMIN = (ROLES.ADMIN || []).filter(id => !isSameJid(id, normJid));
 
     return send(`✅ @${targetParticipant.id.split('@')[0]} wurde als Gruppenadmin entfernt.`, { mentions: [targetParticipant.id] });
   } catch (e) {
     console.error('[demote] Fehler:', e?.message || e);
-    return send('❌ Entfernung fehlgeschlagen (bin ich Gruppenadmin?).');
+    return send('❌ Herabstufung fehlgeschlagen (bin ich Gruppenadmin?).');
   }
 }
-          // Internen ADMIN-Rang ebenfalls entfernen, falls gesetzt
-          const normJid = normalizeJid(targetParticipant.id);
-          if (ranks[normJid] === 'ADMIN') {
-            ranks[normJid] = 'USER';
-            save(FILES.ranks, ranks);
-          }
-          if (users[normJid] && users[normJid].rank === 'ADMIN') {
-            users[normJid].rank = 'USER';
-            save(FILES.users, users);
-          }
-          ROLES.ADMIN = (ROLES.ADMIN || []).filter(id => !isSameJid(id, normJid));
-
-          return send(`✅ @${targetParticipant.id.split('@')[0]} wurde als Gruppenadmin entfernt.`, { mentions: [targetParticipant.id] });
-        } catch (e) {
-          console.error('[demote] Fehler:', e?.message || e);
-          return send('❌ Herabstufung fehlgeschlagen (bin ich Gruppenadmin?).');
-        }
-      }
 
       if (cmd === 'setrank') {
         if (!isOwner) return send('❌ Nur der Inhaber.');
