@@ -491,6 +491,7 @@ let joinreqs = normalizeDataKeys(load(FILES.joinreq.file));
 let pets = normalizeDataKeys(load(FILES.pets.file));
 let tickets = normalizeDataKeys(load(FILES.tickets.file));
 let ranks = normalizeDataKeys(load(FILES.ranks.file));
+let marriages = normalizeDataKeys(load(FILES.marriages.file));
 let commandBans = load(FILES.commandBans.file) || {};
 let credits = load(FILES.credits.file) || { list: [] };
 let officialGroup = load(FILES.officialGroup.file) || { link: 'https://chat.whatsapp.com/DBiDcF2s16FEWiGKyZA7Nl' };
@@ -511,7 +512,6 @@ if (Object.keys(ranks).length === 0) {
 let groupSettings = normalizeDataKeys(load(FILES.groupSettings.file));
 let ticketCounter = Object.keys(tickets).length;
 let teamTodos = load(FILES.teamTodos.file) || {};
-let marriages = normalizeDataKeys(load(FILES.marriages.file));
 let todoCounter = Object.keys(teamTodos).length;
 let userTodos = load(FILES.userTodos.file) || {};
 let userTodoCounter = Object.keys(userTodos).length;
@@ -653,6 +653,7 @@ function persistAll() {
   save(FILES.broadcastSettings, broadcastSettings);
   save(FILES.deleted, deletedUsers);
   save(FILES.credits, credits);
+save(FILES.marriages, marriages); 
   save(FILES.officialGroup, officialGroup);
   try {
     save(FILES.owner, { ownerLid: OWNER_LID, ownerPriv: OWNER_PRIV, coownerLid: COOWNER_LID });
