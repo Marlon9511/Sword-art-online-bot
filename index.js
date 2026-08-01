@@ -1653,7 +1653,25 @@ if ((cmd === 'games-an' || cmd === 'games-aus') && isGroup) {
         return send(`✅ Präfix gesetzt auf: ${PREFIX}`);
       }
 
+// RESET COINS
+      if (cmd === 'resetcoins') {
+        if (!isAuthorized(sender, ['OWNER'])) return send('❌ Nur der Inhaber darf diesen Befehl nutzen.');
 
+        const ctx = m.message?.extendedTextMessage?.contextInfo;
+        let target = args[0];
+        if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+        if (!target && ctx?.participant) target = ctx.participant;
+
+        if (!target) return send(`❌ Nutzung: ${PREFIX}resetcoins <@user|nummer>`);
+
+        const targetJid = normalizeJid(target);
+        ensureUser(targetJid);
+        const oldCoins = users[targetJid].coins || 0;
+        users[targetJid].coins = 0;
+        save(FILES.users, users);
+
+        return send(`✅ Coins von @${targetJid.split('@')[0]} wurden zurückgesetzt (vorher: ${oldCoins} → jetzt: 0).`, { mentions: [targetJid] });
+      }
       // LISTROLES
       if (cmd === 'listroles') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
