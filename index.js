@@ -388,7 +388,13 @@ function isSameJid(a, b) {
   if (!a || !b) return false;
   return normalizeJid(a) === normalizeJid(b);
 }
-
+function isSenderGroupAdmin(groupMetadata, senderJid) {
+  const rawSender = senderJid.split('@')[0];
+  const p = groupMetadata?.participants?.find(p =>
+    isSameJid(p.id, senderJid) || (p.id || '').split('@')[0] === rawSender
+  );
+  return p?.admin === 'admin' || p?.admin === 'superadmin';
+}
 // ---- FIX: robuster Admin-Check über die reine Rufnummer ----
 // Baileys liefert Gruppenteilnehmer je nach Situation als @lid oder
 // @s.whatsapp.net (teils mit :device-Suffix). isSameJid() vergleicht nur
