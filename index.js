@@ -1343,7 +1343,7 @@ helpText += `▸ ${PREFIX}punch @user — Schlagen\n\n`;
         helpText += `▸ ${PREFIX}addxp <@user> <menge> — XP schenken\n`;
         helpText += `▸ ${PREFIX}addcash <@user> <menge> — Coins schenken\n`;
         helpText += `▸ ${PREFIX}addvip <@user> <zeit> — VIP geben\n`;
-        helpText += `▸ ${PREFIX}purge [anzahl] — Nachrichten löschen (alle oder letzte N)\n`;
+        helpText += `▸ ${PREFIX}purge [anzahl] — Nachrichten löschen (alle oder letzte Nachrichten)\n`;
 
         if (hasAdminPerms(sender)) {
           helpText += `\n👑 *OWNER*\n${divider}\n`;
