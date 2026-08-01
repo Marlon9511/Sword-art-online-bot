@@ -1810,8 +1810,13 @@ if ((cmd === 'games-an' || cmd === 'games-aus') && isGroup) {
         const xp = user.xp || 0;
         const neededXp = 100 + (level * 50);
         const remainingXp = Math.max(0, neededXp - xp);
-        const caption = `User: ${username}\nCoins: ${coins}\nRank: ${r}\nLevel: ${level}\nXP: ${xp} / ${neededXp}\nNoch ${remainingXp} XP bis Level ${level + 1}`;
+       const marriage = marriages[normalizedSender];
+const marriageLine = marriage
+  ? `💍 Verheiratet mit: @${marriage.partner.split('@')[0]} (seit ${new Date(marriage.since).toLocaleDateString('de-DE')})`
+  : '💍 Status: Single';
+const marriageMentions = marriage ? [marriage.partner] : [];
 
+const caption = `User: ${username}\nCoins: ${coins}\nRank: ${r}\nLevel: ${level}\nXP: ${xp} / ${neededXp}\nNoch ${remainingXp} XP bis Level ${level + 1}\n${marriageLine}`;
         // Fallback-Bild, falls kein echtes Profilbild gefunden wird
 const FALLBACK_PP_URL = 'https://raw.githubusercontent.com/Marlon9511/Sword-art-online-bot/main/5d553cd8911378163e989839dff229f3.webp.jpg';
 
@@ -2054,7 +2059,89 @@ console.log('[whoami] Socket-Status:', sock.ws?.readyState, '| User:', !!sock.us
 
         return send(`✅ Session "${target}" wurde gestoppt und vollständig gelöscht (inkl. Login-Daten). Beim nächsten "${PREFIX}newsession ${target}" muss neu per QR-Code gescannt werden.`);
       }
+// MARRY
+if (cmd === 'marry') {
+  const sub = (args[0] || '').toLowerCase();
 
+  if (sub === 'accept') {
+    const proposal = pendingMarriageProposals.get(sender);
+    if (!proposal) return send('❌ Du hast keinen offenen Heiratsantrag.');
+    if (marriages[sender] || marriages[proposal.from]) {
+      pendingMarriageProposals.delete(sender);
+      return send('❌ Einer von euch ist inzwischen bereits verheiratet.');
+    }
+    marriages[sender] = { partner: proposal.from, since: Date.now() };
+    marriages[proposal.from] = { partner: sender, since: Date.now() };
+    save(FILES.marriages, marriages);
+    pendingMarriageProposals.delete(sender);
+    return send(
+      `💍 Herzlichen Glückwunsch! @${proposal.from.split('@')[0]} und @${sender.split('@')[0]} sind jetzt verheiratet! 🎉`,
+      { mentions: [sender, proposal.from] }
+    );
+  }
+
+  if (sub === 'deny' || sub === 'decline') {
+    const proposal = pendingMarriageProposals.get(sender);
+    if (!proposal) return send('❌ Du hast keinen offenen Heiratsantrag.');
+    pendingMarriageProposals.delete(sender);
+    return send(`💔 @${sender.split('@')[0]} hat den Heiratsantrag abgelehnt.`, { mentions: [sender] });
+  }
+
+  if (sub === 'cancel') {
+    let found = null;
+    for (const [targetJid, v] of pendingMarriageProposals.entries()) {
+      if (v.from === sender) { found = targetJid; break; }
+    }
+    if (!found) return send('❌ Du hast keinen offenen Antrag zum Zurückziehen.');
+    pendingMarriageProposals.delete(found);
+    return send('✅ Dein Heiratsantrag wurde zurückgezogen.');
+  }
+
+  const ctx = m.message?.extendedTextMessage?.contextInfo;
+  let target = args[0];
+  if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+  if (!target && ctx?.participant) target = ctx.participant;
+  if (!target) return send(`❌ Nutzung: ${activePrefix}marry @user\n${activePrefix}marry accept / deny / cancel`);
+
+  const targetJid = normalizeJid(target);
+  ensureUser(sender);
+  ensureUser(targetJid);
+
+  if (isSameJid(sender, targetJid)) return send('❌ Du kannst dich nicht selbst heiraten! 😅');
+  if (marriages[sender]) return send(`❌ Du bist bereits mit @${marriages[sender].partner.split('@')[0]} verheiratet. Nutze zuerst ${activePrefix}divorce.`, { mentions: [marriages[sender].partner] });
+  if (marriages[targetJid]) return send(`❌ @${targetJid.split('@')[0]} ist bereits verheiratet.`, { mentions: [targetJid] });
+
+  const existing = pendingMarriageProposals.get(targetJid);
+  if (existing && existing.from === sender) return send('❌ Du hast bereits einen offenen Antrag an diese Person.');
+
+  pendingMarriageProposals.set(targetJid, { from: sender, at: Date.now() });
+
+  return send(
+    `💍 @${sender.split('@')[0]} möchte @${targetJid.split('@')[0]} heiraten!\n\n@${targetJid.split('@')[0]}, antworte mit:\n${activePrefix}marry accept — annehmen\n${activePrefix}marry deny — ablehnen`,
+    { mentions: [sender, targetJid] }
+  );
+}
+
+// DIVORCE
+if (cmd === 'divorce') {
+  ensureUser(sender);
+  const marriage = marriages[sender];
+  if (!marriage) return send('❌ Du bist nicht verheiratet.');
+
+  const partnerJid = marriage.partner;
+  delete marriages[sender];
+  delete marriages[partnerJid];
+  save(FILES.marriages, marriages);
+
+  try {
+    await sock.sendMessage(partnerJid, {
+      text: `💔 @${sender.split('@')[0]} hat sich von dir scheiden lassen.`,
+      mentions: [sender]
+    });
+  } catch (e) {}
+
+  return send(`💔 Du hast dich von @${partnerJid.split('@')[0]} scheiden lassen.`, { mentions: [partnerJid] });
+}
       // HIDETAG
       if (cmd === 'hidetag') {
         if (!isGroup) return send('❌ Nur in Gruppen.');
