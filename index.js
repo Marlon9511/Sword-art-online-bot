@@ -710,13 +710,13 @@ async function startBot(sessionName = 'default', hooks = {}) {
   const lastProcessed = new Map();
   const pendingActions = new Map();
 
-  async function getGroupMetaSafe(jid) {
+  async function getGroupMetaSafe(jid, forceRefresh = false) {
     if (!jid) {
       console.error('[groupMeta] Called with null/undefined jid');
       return null;
     }
 
-    if (groupMetaCache.has(jid)) {
+    if (!forceRefresh && groupMetaCache.has(jid)) {
       return groupMetaCache.get(jid);
     }
 
@@ -814,6 +814,10 @@ async function startBot(sessionName = 'default', hooks = {}) {
   sock.ev.on('group-participants.update', async (update) => {
     try {
       const { id: groupId, participants, action } = update;
+
+      // Cache invalidieren: Admin-Status/Mitgliederliste hat sich geändert
+      // (u.a. wichtig für promote/demote und den Antilink-Admin-Check)
+      groupMetaCache.delete(groupId);
 
       if (!groupSettings[groupId]) {
         groupSettings[groupId] = {
@@ -916,7 +920,9 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
         try {
           const antilinkSettings = groupSettings[from]?.antilink;
           if (antilinkSettings?.enabled) {
-            const meta = await getGroupMetaSafe(from);
+            // Frische (nicht gecachte) Metadaten holen, damit ein kürzlich
+            // beförderter/degradierter Admin-Status korrekt erkannt wird.
+            const meta = await getGroupMetaSafe(from, true);
 
             const senderIsGroupAdmin = isGroupAdminJid(meta, sender);
             const senderIsTeam = isAuthorized(sender, ['OWNER', 'COOWNER', 'GROUPADMIN', 'MOD']);
@@ -960,6 +966,8 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
               }
 
               return;
+            } else {
+              console.log(`[antilink] ${sender} ist Admin/Team — wird nicht entfernt.`);
             }
           }
         } catch (e) { console.error('[antilink] Fehler:', e); }
@@ -1316,16 +1324,14 @@ helpText += `▸ ${PREFIX}punch @user — Schlagen\n\n`;
           helpText += `▸ ${PREFIX}cleartickets — Alle Tickets löschen\n`;
         }
 
-        if (isAdmin) {
-          helpText += `\n⚔️ *ADMIN*\n${divider}\n`;
-          helpText += `▸ ${PREFIX}warn @user — Verwarnen\n`;
-          helpText += `▸ ${PREFIX}kick @user — Entfernen\n`;
-          helpText += `▸ ${PREFIX}promote / ${PREFIX}demote @user — Admin-Rechte\n`;
-          helpText += `▸ ${PREFIX}addxp <@user> <menge> — XP schenken\n`;
-          helpText += `▸ ${PREFIX}addcash <@user> <menge> — Coins schenken\n`;
-          helpText += `▸ ${PREFIX}addvip <@user> <zeit> — VIP geben\n`;
-          helpText += `▸ ${PREFIX}purge [anzahl] — Nachrichten löschen (alle oder letzte N)\n`;
-        }
+        helpText += `\n⚔️ *ADMIN*\n${divider}\n`;
+        helpText += `▸ ${PREFIX}warn @user — Verwarnen\n`;
+        helpText += `▸ ${PREFIX}kick @user — Entfernen\n`;
+        helpText += `▸ ${PREFIX}promote / ${PREFIX}demote @user — Gruppenadmin-Rechte\n`;
+        helpText += `▸ ${PREFIX}addxp <@user> <menge> — XP schenken\n`;
+        helpText += `▸ ${PREFIX}addcash <@user> <menge> — Coins schenken\n`;
+        helpText += `▸ ${PREFIX}addvip <@user> <zeit> — VIP geben\n`;
+        helpText += `▸ ${PREFIX}purge [anzahl] — Nachrichten löschen (alle oder letzte N)\n`;
 
         if (hasAdminPerms(sender)) {
           helpText += `\n👑 *OWNER*\n${divider}\n`;
@@ -2546,7 +2552,7 @@ if (cmd === 'purge' || cmd === 'clearchat') {
       if (cmd === 'usertodo' || cmd === 'usertodos') {
         const sub = (args[0] || '').toLowerCase();
 
-        // ?usertodo add <text> — jeder registrierte User darf vorschlagen
+        // usertodo add <text> — jeder registrierte User darf vorschlagen
         if (sub === 'add') {
           const text = args.slice(1).join(' ').trim();
           if (!text) return send(`❌ Nutzung: ${PREFIX}usertodo add <befehlsvorschlag>`);
@@ -2695,90 +2701,76 @@ if (cmd === 'purge' || cmd === 'clearchat') {
         return send(`✅ Warns entfernt für ${jid}`);
       }
 
+      // PROMOTE (Duplikat, wird wegen des früheren return oben nie erreicht,
+      // aber mit derselben korrigierten Logik versehen)
       if (cmd === 'promote') {
+        if (!isGroup) return send('❌ Nur in Gruppen.');
         if (!isOwner) return send('Nur Owner/Co-Owner darf promoten.');
-        const t = args[0]; if (!t) return send('Usage: $promote <num|jid>');
-        const jid = normalizeJid(t);
-        ranks[jid] = 'ADMIN'; save(FILES.ranks, ranks);
-        return send(`✅ ${jid} zum ADMIN befördert.`);
-      }
 
-      if (cmd === 'kick') {
         const ctx = m.message?.extendedTextMessage?.contextInfo;
         let target = args[0];
         if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
-        if (!target) return send('Usage: $kick <num|jid|@user>');
-        if (isPrimaryOwner(target)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gekickt werden.');
+        if (!target && ctx?.participant) target = ctx.participant;
+        if (!target) return send('Usage: $promote <num|jid|@user>');
 
-        let permitted = isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD']);
-        let groupMetadata;
-        if (!permitted && isGroup) {
-          groupMetadata = await getGroupMetaSafe(from);
-          const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
-          permitted = !!isGroupAdmin;
-        }
-        if (!permitted) return send('Kein Zugriff.');
-
-        if (!isGroup) return send('❌ Nur in Gruppen.');
-
-        groupMetadata = groupMetadata || await getGroupMetaSafe(from);
-        const normalizedTarget = normalizeJid(target);
-        const rawId = target.replace(/^@/, '').split('@')[0];
-
-        const targetParticipant = groupMetadata?.participants?.find(p => 
-          isSameJid(p.id, normalizedTarget) || 
-          (p.id || '').split('@')[0] === rawId
+        const jid = normalizeJid(target);
+        const groupMetadata = await getGroupMetaSafe(from, true);
+        const rawId = jid.split('@')[0];
+        const targetParticipant = groupMetadata?.participants?.find(p =>
+          isSameJid(p.id, jid) || (p.id || '').split('@')[0] === rawId
         );
-
-        if (!targetParticipant) return send('❌ Benutzer nicht gefunden.');
-
-        console.log('[kick-debug] Ziel:', { id: targetParticipant.id, jid: normalizedTarget, raw: rawId });
+        if (!targetParticipant) return send('❌ Benutzer nicht in dieser Gruppe gefunden.');
 
         try {
-          await sock.groupParticipantsUpdate(from, [targetParticipant.id], 'remove');
-          return send(`✅ @${targetParticipant.id.split('@')[0]} entfernt.`, { mentions: [targetParticipant.id] });
+          await sock.groupParticipantsUpdate(from, [targetParticipant.id], 'promote');
+          groupMetaCache.delete(from);
+          return send(`✅ @${targetParticipant.id.split('@')[0]} wurde zum Gruppenadmin befördert.`, { mentions: [targetParticipant.id] });
         } catch (e) {
-          console.error('[kick] Fehler:', e?.message, e?.response?.status);
-          if (e?.message?.includes('not admin') || e?.message?.includes('admin')) {
-            return send('❌ Ich bin kein Gruppenadmin und kann niemanden kicken.');
-          }
-          return send('❌ Kicken fehlgeschlagen: ' + (e?.message || 'Unbekannter Fehler'));
+          console.error('[promote] Fehler:', e?.message || e);
+          return send('❌ Beförderung fehlgeschlagen (bin ich Gruppenadmin?).');
         }
       }
-
-      if (cmd === 'warn') {
-        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
-        const t = args[0]; const reason = args.slice(1).join(' ') || 'Kein Grund';
-        if (!t) return send('Usage: $warn <num|jid> <grund>');
-        const jid = normalizeJid(t);
-        ensureUser(jid);
-        users[jid].warns = users[jid].warns || [];
-        users[jid].warns.push({ by: sender, reason, at: new Date().toISOString() });
-        save(FILES.users, users);
-        return send(`⚠ ${jid} verwarnt.`);
-      }
-      if (cmd === 'clearwarns') {
-        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
-        const t = args[0]; if (!t) return send('Usage: $clearwarns <num|jid>');
-        const jid = normalizeJid(t);
-        if (users[jid]) users[jid].warns = [];
-        save(FILES.users, users);
-        return send(`✅ Warns entfernt für ${jid}`);
-      }
-
-      if (cmd === 'promote') {
-        if (!isOwner) return send('Nur Owner/Co-Owner darf promoten.');
-        const t = args[0]; if (!t) return send('Usage: $promote <num|jid>');
-        const jid = normalizeJid(t);
-        ranks[jid] = 'ADMIN'; save(FILES.ranks, ranks);
-        return send(`✅ ${jid} zum ADMIN befördert.`);
-      }
-         if (cmd === 'demote') {
+      // DEMOTE — entfernt den Ziel-User als echten WhatsApp-Gruppenadmin
+      // und entfernt zusätzlich einen intern gesetzten ADMIN-Rang
+      if (cmd === 'demote') {
+        if (!isGroup) return send('❌ Nur in Gruppen.');
         if (!isOwner) return send('Nur Owner/Co-Owner darf demoten.');
-        const t = args[0]; if (!t) return send('Usage: $demote <num|jid>');
-        const jid = normalizeJid(t);
-        ranks[jid] = 'USER'; save(FILES.ranks, ranks);
-        return send(`✅ ${jid} demoted.`);
+
+        const ctx = m.message?.extendedTextMessage?.contextInfo;
+        let target = args[0];
+        if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+        if (!target && ctx?.participant) target = ctx.participant;
+        if (!target) return send('Usage: $demote <num|jid|@user>');
+
+        const jid = normalizeJid(target);
+        const groupMetadata = await getGroupMetaSafe(from, true);
+        const rawId = jid.split('@')[0];
+        const targetParticipant = groupMetadata?.participants?.find(p =>
+          isSameJid(p.id, jid) || (p.id || '').split('@')[0] === rawId
+        );
+        if (!targetParticipant) return send('❌ Benutzer nicht in dieser Gruppe gefunden.');
+
+        try {
+          await sock.groupParticipantsUpdate(from, [targetParticipant.id], 'demote');
+          groupMetaCache.delete(from);
+
+          // Internen ADMIN-Rang ebenfalls entfernen, falls gesetzt
+          const normJid = normalizeJid(targetParticipant.id);
+          if (ranks[normJid] === 'ADMIN') {
+            ranks[normJid] = 'USER';
+            save(FILES.ranks, ranks);
+          }
+          if (users[normJid] && users[normJid].rank === 'ADMIN') {
+            users[normJid].rank = 'USER';
+            save(FILES.users, users);
+          }
+          ROLES.ADMIN = (ROLES.ADMIN || []).filter(id => !isSameJid(id, normJid));
+
+          return send(`✅ @${targetParticipant.id.split('@')[0]} wurde als Gruppenadmin entfernt.`, { mentions: [targetParticipant.id] });
+        } catch (e) {
+          console.error('[demote] Fehler:', e?.message || e);
+          return send('❌ Herabstufung fehlgeschlagen (bin ich Gruppenadmin?).');
+        }
       }
 
       if (cmd === 'setrank') {
@@ -2826,8 +2818,7 @@ if (cmd === 'purge' || cmd === 'clearchat') {
 
         return send(`✅ Rang von ${await getNumberMention(jid, sock)} auf ${r} gesetzt.`, { mentions: [jid] });
       }
-
-      if (cmd === 'datadelete') {
+if (cmd === 'datadelete') {
         if (!isOwner) return send('❌ Nur der Inhaber.');
         const t = args[0]; if (!t) return send('Usage: $datadelete <num|jid>');
         const jid = normalizeJid(t);
