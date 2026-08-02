@@ -1375,6 +1375,7 @@ helpText += `▸ ${PREFIX}marry @user — Verlobungsring überreichen\n`;
 helpText += `▸ ${PREFIX}divorce — Ring zurückgeben\n`;
 helpText += `▸ ${PREFIX}sticker — Bild/GIF antworten → Sticker craften\n`;
 helpText += `▸ ${PREFIX}bewerbung — Gildenbeitritt beantragen\n`;
+helpText += `▸ ${PREFIX}setinfo <feld> <wert> — Profilinfos setzen (name/alter/hobbys/sexualitaet)\n`;
 
         helpText += `⚔️ *ARENA & WIRTSCHAFT* (Cor & Kämpfe)\n${divider}\n`;
         helpText += `▸ ${PREFIX}daily — Tägliche Quest-Belohnung\n`;
@@ -1670,19 +1671,21 @@ if ((cmd === 'games-an' || cmd === 'games-aus') && isGroup) {
           ranks[jid] = roleUpper;
 
           // users.json aktualisieren (User anlegen falls nötig)
-          if (!users[jid]) {
-            users[jid] = {
-              xp: 0,
-              level: 1,
-              coins: 100,
-              rank: roleUpper,
-              msgCount: 0,
-              lastDaily: 0,
-              items: {},
-              registered: false,
-              registrationDate: null,
-              name: null
-            };
+          if (!users[jid]) users[jid] = {
+    xp: 0,
+    level: 1,
+    coins: 100,
+    rank: 'USER',
+    msgCount: 0,
+    lastDaily: 0,
+    items: {},
+    registered: false,
+    registrationDate: null,
+    name: null,
+    alter: null,
+    hobbys: null,
+    sexualitaet: null
+};
           } else {
             users[jid].rank = roleUpper;
           }
@@ -1936,7 +1939,13 @@ if (cmd === 'listroles') {
           marriageMentions.push(marriage.partner);
         }
 
-        const caption = `User: ${username}\nCoins: ${coins}\nRank: ${r}\nLevel: ${level}\nXP: ${xp} / ${neededXp}\nNoch ${remainingXp} XP bis Level ${level + 1}\n${marriageLine}`;
+        const caption = `User: $const infoLines = [];
+if (user.alter) infoLines.push(`🎂 Alter: ${user.alter}`);
+if (user.hobbys) infoLines.push(`🎯 Hobbys: ${user.hobbys}`);
+if (user.sexualitaet) infoLines.push(`🏳️‍🌈 Sexualität: ${user.sexualitaet}`);
+const infoBlock = infoLines.length ? `\n${infoLines.join('\n')}` : '';
+
+const caption = `User: ${username}\nCoins: ${coins}\nRank: ${r}\nLevel: ${level}\nXP: ${xp} / ${neededXp}\nNoch ${remainingXp} XP bis Level ${level + 1}\n${marriageLine}${infoBlock}`;
         // Fallback-Bild, falls kein echtes Profilbild gefunden wird
 const FALLBACK_PP_URL = 'https://raw.githubusercontent.com/Marlon9511/Sword-art-online-bot/main/5d553cd8911378163e989839dff229f3.webp.jpg';
 
