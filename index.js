@@ -3339,9 +3339,8 @@ if (REACTION_COMMANDS[cmd]) {
 
   try {
     const result = await sock.groupParticipantsUpdate(from, [jid], 'add');
-    return send(`Ergebnis: ${JSON.stringify(result)}`);
-  } catch (e) {
-    console.error('[addnumber] Fehler:', e);
+   
+  
     return send('❌ Hinzufügen fehlgeschlagen (bin ich Gruppenadmin? Ist die Nummer erreichbar?).');
   }
 }
