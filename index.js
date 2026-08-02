@@ -883,6 +883,60 @@ function isSenderGroupAdmin(groupMetadata, senderJid) {
      if (body) {
         log(`[MSG] ${sender} in ${isGroup ? from : 'PM'}: ${body}`);
       }
+if (!m.key.fromMe && pendingApplications.has(sender)) {
+  const appState = pendingApplications.get(sender);
+  const answerText = (body || '').trim();
+
+  if (/^(abbrechen|cancel)$/i.test(answerText)) {
+    pendingApplications.delete(sender);
+    await sock.sendMessage(from, { text: '❌ Deine Bewerbung wurde abgebrochen, Schwertkämpfer.' });
+    return;
+  }
+
+  if (!answerText) {
+    await sock.sendMessage(from, { text: '⚔️ Bitte gib eine Antwort ein, oder schreibe "abbrechen".' });
+    return;
+  }
+
+  const currentField = APPLICATION_STEPS[appState.step];
+  appState.answers[currentField.key] = answerText;
+  appState.step++;
+
+  if (appState.step < APPLICATION_STEPS.length) {
+    const nextField = APPLICATION_STEPS[appState.step];
+    await sock.sendMessage(from, { text: nextField.question });
+    return;
+  }
+
+  // Alle Fragen beantwortet -> an Owner senden
+  pendingApplications.delete(sender);
+  const a = appState.answers;
+
+  const summary =
+    `⚔️ *— NEUE GILDEN-BEWERBUNG —* ⚔️\n` +
+    `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+    `👤 *Name:* ${a.name}\n` +
+    `🎂 *Alter:* ${a.alter}\n\n` +
+    `📜 *Warum willst du dich bewerben?*\n${a.warum_bewerben}\n\n` +
+    `💠 *Warum sollten wir dich nehmen?*\n${a.warum_nehmen}\n\n` +
+    `🏅 *Gewünschter Rang:* ${a.rang}\n\n` +
+    `🛡️ *Erfahrung als Teammitglied:*\n${a.erfahrung}\n` +
+    `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+    `📇 Bewerber: @${sender.split('@')[0]}\n` +
+    `🕓 Eingereicht: ${new Date().toLocaleString('de-DE')}`;
+
+  try {
+    await sock.sendMessage(normalizeJid(OWNER_PRIV), {
+      text: summary,
+      mentions: [sender]
+    });
+    await sock.sendMessage(from, { text: '✅ Deine Bewerbung wurde erfolgreich an den Anführer der Gilde übermittelt! Er wird sich bei dir melden, Schwertkämpfer. ⚔️' });
+  } catch (e) {
+    console.error('[bewerbung] Fehler beim Senden an Owner:', e);
+    await sock.sendMessage(from, { text: '❌ Deine Bewerbung konnte nicht gesendet werden. Bitte kontaktiere den Owner direkt.' });
+  }
+  return;
+}
 
 const rawBody = (body || '').trim();
 const noPrefixMatch = rawBody.match(/^[^\w]*(\w+)/);
