@@ -2985,15 +2985,13 @@ if (cmd === 'datadelete') {
         try { await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: `📩 Joinrequest von ${sender}: ${link}` }); } catch {}
         return send('✅ Anfrage gesendet.');
       }
-      if (cmd === 'join') {
-        if (!(isOwner || isCoOwner)) return send('Kein Zugriff.');
-        const link = args[0] || Object.values(joinreqs)[0]?.link;
-        if (!link) return send('Kein Link gefunden.');
-        const code = (link.match(/chat\.whatsapp\.com\/([A-Za-z0-9_-]+)/)?.[1]) || link;
-        try { await sock.groupAcceptInvite(code); return send('✅ Erfolgreich beigetreten'); } catch (e) { return send('❌ Beitritt fehlgeschlagen'); }
-      }
-      const isGroupChat = from?.endsWith('@g.us');
-
+     if (cmd === 'join') {
+  if (!(isOwner || isCoOwner)) return send('Kein Zugriff.');
+  const link = args[0] || Object.values(joinreqs)[0]?.link;
+  if (!link) return send('Kein Link gefunden.');
+  const code = (link.match(/chat\.whatsapp\.com\/([A-Za-z0-9_-]+)/)?.[1]) || link;
+  try { await sock.groupAcceptInvite(code); return send('✅ Erfolgreich beigetreten'); } catch (e) { return send('❌ Beitritt fehlgeschlagen'); }
+}
  
 // leave
 if (cmd === 'leave') {
