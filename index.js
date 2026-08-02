@@ -1701,31 +1701,35 @@ if ((cmd === 'games-an' || cmd === 'games-aus') && isGroup) {
 if (cmd === 'listroles') {
   if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
 
-  // Feste Reihenfolge für eine übersichtliche Anzeige
   const roleOrder = ['OWNER', 'COOWNER', 'ADMIN', 'MOD', 'VIP', 'SUPPORTER', 'TEST_SUPPORTER'];
 
-  // Zusammenführen: ranks.json ist die "lebendige" Quelle (wird von setrole/setrank
-  // sofort aktualisiert), ROLES-Arrays werden ergänzend dazugenommen, damit auch
-  // ältere/alternative Zuweisungswege nichts verlieren. Sets verhindern Duplikate,
-  // selbst wenn eine Person mehrfach (z.B. @lid und @s.whatsapp.net) auftaucht.
+  // grouped[role] = Map<rawNumber, jid>
+  // rawNumber = reine Ziffernfolge (via extractRawNumber). Das verhindert Duplikate,
+  // wenn dieselbe Person einmal als @lid und einmal als @s.whatsapp.net gespeichert ist —
+  // beide Formen zeigen auf dieselbe rohe Nummer und werden hier zusammengeführt.
   const grouped = {};
-  for (const r of roleOrder) grouped[r] = new Set();
+  for (const r of roleOrder) grouped[r] = new Map();
 
-  for (const [jid, role] of Object.entries(ranks)) {
-    if (role === 'USER') continue;
-    const n = normalizeJid(jid);
-    if (!n) continue;
-    if (!grouped[role]) grouped[role] = new Set();
-    grouped[role].add(n);
-  }
-
-  for (const [role, jids] of Object.entries(ROLES)) {
-    if (role === 'USER' || !Array.isArray(jids)) continue;
-    if (!grouped[role]) grouped[role] = new Set();
-    for (const id of jids) {
-      const n = normalizeJid(id);
-      if (n) grouped[role].add(n);
+  const addEntry = (role, rawJid) => {
+    if (role === 'USER') return;
+    const n = normalizeJid(rawJid);
+    if (!n) return;
+    const raw = extractRawNumber(n);
+    if (!raw) return;
+    if (!grouped[role]) grouped[role] = new Map();
+    const existing = grouped[role].get(raw);
+    if (!existing) {
+      grouped[role].set(raw, n);
+    } else if (existing.endsWith('@lid') && n.endsWith('@s.whatsapp.net')) {
+      // @s.whatsapp.net zeigt die echte Nummer -> bevorzugt anzeigen
+      grouped[role].set(raw, n);
     }
+  };
+
+  for (const [jid, role] of Object.entries(ranks)) addEntry(role, jid);
+  for (const [role, jids] of Object.entries(ROLES)) {
+    if (!Array.isArray(jids)) continue;
+    for (const id of jids) addEntry(role, id);
   }
 
   const allRoleKeys = [...new Set([...roleOrder, ...Object.keys(grouped)])];
@@ -1734,17 +1738,16 @@ if (cmd === 'listroles') {
   const allMentions = [];
 
   for (const role of allRoleKeys) {
-    const jidSet = grouped[role];
-    if (!jidSet || jidSet.size === 0) {
+    const map = grouped[role];
+    if (!map || map.size === 0) {
       message += `*${prettyRank(role)}* (0):\n(keine)\n\n`;
       continue;
     }
 
-    message += `*${prettyRank(role)}* (${jidSet.size}):\n`;
-    for (const n of jidSet) {
-      const lid = n.endsWith('@s.whatsapp.net') ? n.replace('@s.whatsapp.net', '@lid') : n;
+    message += `*${prettyRank(role)}* (${map.size}):\n`;
+    for (const [raw, n] of map) {
       const name = (users[n] && (users[n].name || users[n].registrationName)) || '(kein name)';
-      message += `• @${n.split('@')[0]} — ${name}\n`;
+      message += `• @${raw} — ${name}\n`;
       allMentions.push(n);
     }
     message += '\n';
