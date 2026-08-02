@@ -933,11 +933,13 @@ if (!m.key.fromMe && pendingApplications.has(sender)) {
     `📇 Bewerber: @${sender.split('@')[0]}\n` +
     `🕓 Eingereicht: ${new Date().toLocaleString('de-DE')}`;
 
-  try {
-    await sock.sendMessage(normalizeJid(OWNER_PRIV), {
+ try {
+    console.log('[bewerbung] Sende an:', normalizeJid(OWNER_PRIV));
+    const result = await sock.sendMessage(normalizeJid(OWNER_PRIV), {
       text: summary,
       mentions: [sender]
     });
+    console.log('[bewerbung] Ergebnis:', JSON.stringify(result));
     await sock.sendMessage(from, { text: '✅ Deine Bewerbung wurde erfolgreich an den Anführer der Gilde übermittelt! Er wird sich bei dir melden, Schwertkämpfer. ⚔️' });
   } catch (e) {
     console.error('[bewerbung] Fehler beim Senden an Owner:', e);
