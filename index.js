@@ -3683,6 +3683,47 @@ if (cmd === 'sticker' || cmd === 's' || cmd === 'stiker') {
   }
   return;
 }
+// SETINFO
+if (cmd === 'setinfo') {
+  const feld = (args[0] || '').toLowerCase();
+  const wert = args.slice(1).join(' ').trim();
+
+  const erlaubteFelder = {
+    name: 'name',
+    alter: 'alter',
+    hobbys: 'hobbys',
+    hobby: 'hobbys',
+    sexualitaet: 'sexualitaet',
+    sexualität: 'sexualitaet'
+  };
+
+  if (!feld || !erlaubteFelder[feld] || !wert) {
+    return send(
+      `❌ Nutzung: ${activePrefix}setinfo <feld> <wert>\n\n` +
+      `Verfügbare Felder: name, alter, hobbys, sexualitaet\n\n` +
+      `Beispiele:\n` +
+      `${activePrefix}setinfo name Kirito\n` +
+      `${activePrefix}setinfo alter 22\n` +
+      `${activePrefix}setinfo hobbys Lesen, Gaming\n` +
+      `${activePrefix}setinfo sexualitaet Hetero`
+    );
+  }
+
+  const key = erlaubteFelder[feld];
+
+  if (key === 'alter') {
+    const num = parseInt(wert);
+    if (isNaN(num) || num < 1 || num > 120) {
+      return send('❌ Bitte gib ein gültiges Alter zwischen 1 und 120 an.');
+    }
+    users[sender].alter = num;
+  } else {
+    users[sender][key] = wert;
+  }
+
+  save(FILES.users, users);
+  return send(`✅ ${feld.charAt(0).toUpperCase() + feld.slice(1)} wurde gespeichert. Nutze ${activePrefix}me, um dein Profil anzuzeigen.`);
+}
       // Unbekannter Befehl
       return send('❓ Unbekannter Befehl — ?help ist ein Menü für die Befehle genauso wie ?menu wenns da deinen Befehl nicht gibt frag daddy kirito nach ob es den gibt oder ob er es einbauen kann unter ?owner.');
 
