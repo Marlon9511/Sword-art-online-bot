@@ -3330,6 +3330,9 @@ if (REACTION_COMMANDS[cmd]) {
     console.error(`[${cmd}] Fehler:`, err);
     return send('⚠️ Konnte gerade kein Gif holen, versuch\'s gleich nochmal.');
   }
+  return;
+}
+
 if (cmd === 'addmeta') {
   if (!isGroup) return send('❌ Nur in Gruppen.');
   if (!hasAdminPerms(sender)) return send('❌ Kein Zugriff.');
