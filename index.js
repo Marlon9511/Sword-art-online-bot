@@ -1382,7 +1382,6 @@ helpText += `▸ ${PREFIX}bewerbung — Bewerbung für die Gilde starten\n`;
         helpText += `▸ ${PREFIX}adopt <name> — Haustier adoptieren\n`;
         helpText += `▸ ${PREFIX}feed — Haustier füttern\n\n`;
 helpText += `\n🤾 *INTERAKTION*\n${divider}\n`;
-helpText += `▸ ${PREFIX}throw @user — Jemanden werfen\n`;
 helpText += `▸ ${PREFIX}slap @user — Ohrfeige verpassen\n`;
 helpText += `▸ ${PREFIX}hug @user — Umarmen\n`;
 helpText += `▸ ${PREFIX}kiss @user — Küssen\n`;
@@ -1390,7 +1389,10 @@ helpText += `▸ ${PREFIX}pat @user — Tätscheln\n`;
 helpText += `▸ ${PREFIX}poke @user — Anpiksen\n`;
 helpText += `▸ ${PREFIX}cuddle @user — Kuscheln\n`;
 helpText += `▸ ${PREFIX}bite @user — Beißen\n`;
-helpText += `▸ ${PREFIX}punch @user — Schlagen\n\n`;
+helpText += `▸ ${PREFIX}punch @user — Schlagen\n`;
+helpText += `▸ ${PREFIX}love @user — Lieben\n`;
+helpText += `▸ ${PREFIX}blush @user — Erröten wegen jemandem\n`;
+helpText += `▸ ${PREFIX}handhold @user — Hand halten\n\n`;
 
         helpText += `💬 *CHAT & GRUPPEN*\n${divider}\n`;
         helpText += `▸ ${PREFIX}gi — Gruppeneinstellungen anzeigen\n`;
@@ -1439,7 +1441,6 @@ helpText += `▸ ${PREFIX}punch @user — Schlagen\n\n`;
         }
 
         helpText += `\n${divider}\n_💡 Tipp: Nutze Befehle ohne Parameter für mehr Info_`;
-
         
         try {
           const videoPath = await downloadShortIfNeeded();
