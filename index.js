@@ -3408,6 +3408,33 @@ if (REACTION_COMMANDS[cmd]) {
   }
   return;
 }
+const STICKER_CACHE_DIR = path.join(__dirname, 'cache', 'stickers');
+
+function bufferToSticker(inputBuffer, ext, isAnimated) {
+  return new Promise((resolve, reject) => {
+    fs.mkdirSync(STICKER_CACHE_DIR, { recursive: true });
+    const stamp = Date.now();
+    const inPath = path.join(STICKER_CACHE_DIR, `${stamp}_in.${ext}`);
+    const outPath = path.join(STICKER_CACHE_DIR, `${stamp}_out.webp`);
+    fs.writeFileSync(inPath, inputBuffer);
+
+    const filter = "scale='min(512,iw)':'min(512,ih)':force_original_aspect_ratio=decrease,fps=15,pad=512:512:(512-iw)/2:(512-ih)/2:color=0x00000000";
+
+    const cmd = isAnimated
+      ? `ffmpeg -y -i "${inPath}" -vf "${filter}" -t 6 -loop 0 -an -vsync 0 -c:v libwebp -lossless 0 -qscale 60 -preset default "${outPath}"`
+      : `ffmpeg -y -i "${inPath}" -vf "${filter}" -vframes 1 -c:v libwebp -lossless 1 -qscale 75 "${outPath}"`;
+
+    exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
+      try { fs.unlinkSync(inPath); } catch (e) {}
+      if (err) return reject(err);
+      try {
+        const buf = fs.readFileSync(outPath);
+        fs.unlinkSync(outPath);
+        resolve(buf);
+      } catch (e) { reject(e); }
+    });
+  });
+}
 
 if (cmd === 'add') {
   if (!isGroup) return send('❌ Nur in Gruppen.');
@@ -3489,6 +3516,56 @@ if (cmd === 'add') {
       : (e?.message || 'Unbekannter Fehler');
     return send(`❌ Hinzufügen fehlgeschlagen: ${msg}`);
   }
+}
+// STICKER
+if (cmd === 'sticker' || cmd === 's' || cmd === 'stiker') {
+  const ctx = m.message?.extendedTextMessage?.contextInfo;
+
+  let targetMsg = null;
+  let mediaType = null;
+
+  // Fall 1: Antwort auf Bild/GIF/Video/Sticker
+  if (ctx?.quotedMessage) {
+    const q = ctx.quotedMessage;
+    const quotedKey = {
+      remoteJid: from,
+      id: ctx.stanzaId,
+      fromMe: false,
+      participant: ctx.participant
+    };
+    if (q.imageMessage) { targetMsg = { key: quotedKey, message: q }; mediaType = 'image'; }
+    else if (q.videoMessage) { targetMsg = { key: quotedKey, message: q }; mediaType = 'video'; }
+    else if (q.stickerMessage) { targetMsg = { key: quotedKey, message: q }; mediaType = 'sticker'; }
+  }
+
+  // Fall 2: Bild/Video direkt mit Befehl als Bildunterschrift
+  if (!targetMsg && m.message.imageMessage) { targetMsg = m; mediaType = 'image'; }
+  if (!targetMsg && m.message.videoMessage) { targetMsg = m; mediaType = 'video'; }
+
+  if (!targetMsg) {
+    return send(`❓ Schick ein Bild/GIF direkt mit "${activePrefix}${cmd}" als Bildunterschrift, oder antworte mit "${activePrefix}${cmd}" auf ein Bild/Video/GIF.`);
+  }
+
+  await send('⏳ Erstelle Sticker...');
+
+  try {
+    const buffer = await downloadMediaMessage(
+      targetMsg,
+      'buffer',
+      {},
+      { logger: P({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
+    );
+
+    const isAnimated = mediaType === 'video';
+    const ext = mediaType === 'video' ? 'mp4' : (mediaType === 'sticker' ? 'webp' : 'jpg');
+
+    const webpBuffer = await bufferToSticker(buffer, ext, isAnimated);
+    await sock.sendMessage(from, { sticker: webpBuffer }, { quoted: m });
+  } catch (e) {
+    console.error('[sticker] Fehler:', e);
+    return send('❌ Sticker-Erstellung fehlgeschlagen. (ffmpeg installiert?)');
+  }
+  return;
 }
       // Unbekannter Befehl
       return send('❓ Unbekannter Befehl — ?help ist ein Menü für die Befehle genauso wie ?menu wenns da deinen Befehl nicht gibt frag daddy kirito nach ob es den gibt oder ob er es einbauen kann unter ?owner.');
