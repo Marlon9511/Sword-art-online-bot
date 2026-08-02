@@ -2985,12 +2985,52 @@ if (cmd === 'datadelete') {
         try { await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: `📩 Joinrequest von ${sender}: ${link}` }); } catch {}
         return send('✅ Anfrage gesendet.');
       }
-     if (cmd === 'join') {
-  if (!(isOwner || isCoOwner)) return send('Kein Zugriff.');
+if (cmd === 'join') {
+  console.log('[join] Befehl wurde erkannt. Sender:', sender, '| isOwner:', isOwner, '| isCoOwner:', isCoOwner, '| args:', args);
+
+  if (!(isOwner || isCoOwner)) {
+    console.log('[join] Abgebrochen: kein Owner/CoOwner.');
+    return send('Kein Zugriff.');
+  }
   const link = args[0] || Object.values(joinreqs)[0]?.link;
-  if (!link) return send('Kein Link gefunden.');
-  const code = (link.match(/chat\.whatsapp\.com\/([A-Za-z0-9_-]+)/)?.[1]) || link;
-  try { await sock.groupAcceptInvite(code); return send('✅ Erfolgreich beigetreten'); } catch (e) { return send('❌ Beitritt fehlgeschlagen'); }
+  console.log('[join] Ermittelter Link:', link);
+  if (!link) return send('❌ Kein Link gefunden. Nutzung: ' + activePrefix + 'join <whatsapp-gruppenlink oder code>');
+
+  const match = link.match(/chat\.whatsapp\.com\/(?:invite\/)?([A-Za-z0-9_-]+)/i);
+  const code = match ? match[1] : link.trim();
+  console.log('[join] Extrahierter Code:', code);
+
+  if (!code) return send('❌ Konnte keinen gültigen Einladungscode aus dem Link extrahieren.');
+
+  try {
+    try {
+      const info = await sock.groupGetInviteInfo(code);
+      console.log('[join] Invite-Info:', info?.subject, info?.id);
+    } catch (infoErr) {
+      console.error('[join] groupGetInviteInfo Fehler:', infoErr);
+      const msg = infoErr?.message || String(infoErr);
+      if (msg.includes('410') || msg.toLowerCase().includes('gone')) {
+        return send('❌ Dieser Einladungslink ist ungültig oder abgelaufen.');
+      }
+      if (msg.includes('401') || msg.toLowerCase().includes('unauthorized')) {
+        return send('❌ Kein Zugriff auf diesen Link (evtl. wurde der Bot bereits entfernt/blockiert).');
+      }
+    }
+
+    const result = await sock.groupAcceptInvite(code);
+    console.log('[join] Beigetreten, Gruppen-JID:', result);
+    return send(`✅ Erfolgreich beigetreten${result ? `: ${result}` : ''}`);
+  } catch (e) {
+    console.error('[join] Fehler beim Beitritt:', e);
+    const msg = e?.message || String(e);
+    let explanation = msg;
+    if (msg.includes('conflict') || msg.includes('409')) explanation = 'Bot ist bereits Mitglied dieser Gruppe.';
+    else if (msg.includes('410') || msg.toLowerCase().includes('gone')) explanation = 'Der Link ist ungültig oder abgelaufen.';
+    else if (msg.includes('401')) explanation = 'Kein Zugriff — evtl. wurde der Bot aus der Gruppe entfernt oder blockiert.';
+    else if (msg.includes('429')) explanation = 'Zu viele Beitrittsversuche — bitte kurz warten und erneut versuchen.';
+
+    return send(`❌ Beitritt fehlgeschlagen: ${explanation}`);
+  }
 }
  
 // leave
