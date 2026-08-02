@@ -2058,7 +2058,15 @@ console.log('[whoami] Socket-Status:', sock.ws?.readyState, '| User:', !!sock.us
           return send('❌ Fehler beim Lesen der Datei.');
         }
       }
-
+// BEWERBUNG
+if (cmd === 'bewerbung' || cmd === 'bewerben' || cmd === 'apply') {
+  if (pendingApplications.has(sender)) {
+    return send('⚔️ Du hast bereits eine offene Bewerbung. Beantworte die letzte Frage oder schreibe "abbrechen".');
+  }
+  pendingApplications.set(sender, { step: 0, answers: {} });
+  await sock.sendMessage(from, { text: APPLICATION_STEPS[0].question });
+  return;
+}
       // BOTOFFLINE
       if (cmd === 'botoffline') {
         if (!isOwner) return send('❌ Nur der Inhaber.');
