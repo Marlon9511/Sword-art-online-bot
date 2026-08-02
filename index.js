@@ -1303,6 +1303,8 @@ function downloadShortIfNeeded() {
         helpText += `▸ ${PREFIX}credits — Alle Helfer des Bots\n\n`;
 helpText += `▸ ${PREFIX}marry @user — Heiratsantrag stellen\n`;
 helpText += `▸ ${PREFIX}divorce — Scheidung einreichen\n`;
+helpText += `▸ ${PREFIX}sticker — Bild/GIF antworten → Sticker\n`;
+
 
         helpText += `🎮 *SPIELE & WIRTSCHAFT*\n${divider}\n`;
         helpText += `▸ ${PREFIX}daily — Tägliche Belohnung\n`;
