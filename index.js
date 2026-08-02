@@ -1389,6 +1389,13 @@ helpText += `▸ ${PREFIX}punch @user — Schlagen\n\n`;
   'daily', 'work', 'blackjack', 'bj', 'bjstart', 'hit', 'stand',
   'slot', 'rps', 'fish', 'adopt', 'pet', 'petinfo', 'feed', 'play'
 ];
+// GAMES an/aus Check 
+if (isGroup && GAME_COMMANDS.includes(cmd)) {
+  const gamesEnabled = groupSettings[from]?.games?.enabled !== false; // Default: an
+  if (!gamesEnabled) {
+    return send(`🎮 Spiele sind in dieser Gruppe deaktiviert. Ein Admin kann sie mit ${activePrefix}games-an wieder aktivieren.`);
+  }
+}
       // Cooldown
       if (!isOwner && cmd !== 'help' && cmd !== 'menu') {
         const cooldownCommands = [
@@ -1401,13 +1408,7 @@ helpText += `▸ ${PREFIX}punch @user — Schlagen\n\n`;
           if (cooldownMessage) return send(cooldownMessage);
         }
       }
-// GAMES an/aus Check
-if (isGroup && GAME_COMMANDS.includes(cmd)) {
-  const gamesEnabled = groupSettings[from]?.games?.enabled !== false; // Default: an
-  if (!gamesEnabled) {
-    return send(`🎮 Spiele sind in dieser Gruppe deaktiviert. Ein Admin kann sie mit ${activePrefix}games-an wieder aktivieren.`);
-  }
-}
+
       // Group Settings (gi)
       if (cmd === 'gi' && isGroup) {
         const groupMetadata = await getGroupMetaSafe(from);
