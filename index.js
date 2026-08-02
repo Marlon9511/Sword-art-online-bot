@@ -1703,33 +1703,55 @@ if (cmd === 'listroles') {
 
   const roleOrder = ['OWNER', 'COOWNER', 'ADMIN', 'MOD', 'VIP', 'SUPPORTER', 'TEST_SUPPORTER'];
 
-  // grouped[role] = Map<rawNumber, jid>
-  // rawNumber = reine Ziffernfolge (via extractRawNumber). Das verhindert Duplikate,
-  // wenn dieselbe Person einmal als @lid und einmal als @s.whatsapp.net gespeichert ist —
-  // beide Formen zeigen auf dieselbe rohe Nummer und werden hier zusammengeführt.
-  const grouped = {};
-  for (const r of roleOrder) grouped[r] = new Map();
+  // Schritt 1: alle rohen JIDs pro Rolle sammeln (noch ohne Dedupe)
+  const rawEntries = {};
+  for (const r of roleOrder) rawEntries[r] = new Set();
 
-  const addEntry = (role, rawJid) => {
+  const collect = (role, jid) => {
     if (role === 'USER') return;
-    const n = normalizeJid(rawJid);
+    const n = normalizeJid(jid);
     if (!n) return;
-    const raw = extractRawNumber(n);
-    if (!raw) return;
-    if (!grouped[role]) grouped[role] = new Map();
-    const existing = grouped[role].get(raw);
-    if (!existing) {
-      grouped[role].set(raw, n);
-    } else if (existing.endsWith('@lid') && n.endsWith('@s.whatsapp.net')) {
-      // @s.whatsapp.net zeigt die echte Nummer -> bevorzugt anzeigen
-      grouped[role].set(raw, n);
-    }
+    if (!rawEntries[role]) rawEntries[role] = new Set();
+    rawEntries[role].add(n);
   };
 
-  for (const [jid, role] of Object.entries(ranks)) addEntry(role, jid);
+  for (const [jid, role] of Object.entries(ranks)) collect(role, jid);
   for (const [role, jids] of Object.entries(ROLES)) {
     if (!Array.isArray(jids)) continue;
-    for (const id of jids) addEntry(role, id);
+    for (const id of jids) collect(role, id);
+  }
+
+  // Schritt 2: @lid-Einträge über die ECHTE LID->Telefonnummer-Zuordnung auflösen
+  // (nicht per Suffix-Tausch, sondern über die offizielle Mapping-Funktion),
+  // damit dieselbe Person aus @lid- und @s.whatsapp.net-Quellen zusammengeführt wird.
+  const grouped = {};
+  for (const role of Object.keys(rawEntries)) {
+    grouped[role] = new Map(); // canonicalRaw -> { displayJid, sourceJids: Set }
+    for (const n of rawEntries[role]) {
+      let canonicalRaw = extractRawNumber(n);
+      let displayJid = n;
+
+      if (n.endsWith('@lid')) {
+        const resolved = await resolvePhoneJid(n, sock);
+        if (resolved) {
+          canonicalRaw = extractRawNumber(resolved);
+          displayJid = resolved;
+        }
+        // Falls keine Auflösung möglich ist (z.B. noch kein Signal-Session mit
+        // dieser Person aufgebaut), bleibt es bei der rohen LID — das ist dann
+        // technisch bedingt und kein Bug.
+      }
+
+      const existing = grouped[role].get(canonicalRaw);
+      if (!existing) {
+        grouped[role].set(canonicalRaw, { displayJid, sourceJids: new Set([n]) });
+      } else {
+        existing.sourceJids.add(n);
+        if (existing.displayJid.endsWith('@lid') && displayJid.endsWith('@s.whatsapp.net')) {
+          existing.displayJid = displayJid;
+        }
+      }
+    }
   }
 
   const allRoleKeys = [...new Set([...roleOrder, ...Object.keys(grouped)])];
@@ -1745,44 +1767,22 @@ if (cmd === 'listroles') {
     }
 
     message += `*${prettyRank(role)}* (${map.size}):\n`;
-    for (const [raw, n] of map) {
-      const name = (users[n] && (users[n].name || users[n].registrationName)) || '(kein name)';
+    for (const [raw, entry] of map) {
+      // Name über jede bekannte Quell-JID suchen (falls users.json unter der
+      // anderen JID-Form gespeichert ist)
+      let name = '(kein name)';
+      for (const src of entry.sourceJids) {
+        const u = users[src];
+        if (u && (u.name || u.registrationName)) { name = u.name || u.registrationName; break; }
+      }
       message += `• @${raw} — ${name}\n`;
-      allMentions.push(n);
+      allMentions.push(entry.displayJid);
     }
     message += '\n';
   }
 
   return send(message.trim(), { mentions: allMentions });
 }
-
-      // CMBAN / CMDBAN
-      if (cmd === 'cmdban' || cmd === 'bancmd') {
-        if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Nur Owner/CoOwner.');
-        const target = args[0];
-        const action = (args[1] || '').toLowerCase();
-        if (!target) {
-          const banned = Object.keys(commandBans || {}).filter(k => commandBans[k]);
-          return send(`🔒 Gesperrte Befehle:\n${banned.length ? banned.join('\n') : '(keine)'}\n\nNutzung: ${PREFIX}cmdban <befehl> [ban|unban]`);
-        }
-        const tcmd = String(target).toLowerCase().replace(new RegExp(`^\\${PREFIX}`), '').trim();
-        if (!tcmd) return send('❌ Ungültiger Befehl.');
-
-        if (action === 'unban' || action === 'allow' || action === 'remove') {
-          if (commandBans[tcmd]) delete commandBans[tcmd];
-          try { save(FILES.commandBans, commandBans); } catch (e) {}
-          return send(`✅ Befehl ${tcmd} wurde entsperrt.`);
-        }
-
-        if (action === 'ban' || action === 'add' || !action) {
-          commandBans[tcmd] = true;
-          try { save(FILES.commandBans, commandBans); } catch (e) {}
-          return send(`⛔ Befehl ${tcmd} wurde gesperrt (nur Owner/CoOwner).`);
-        }
-
-        return send('❌ Ungültige Aktion. Verwende ban oder unban.');
-      }
-
       // APPLYROLES
       if (cmd === 'applyroles') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
