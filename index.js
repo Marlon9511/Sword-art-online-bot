@@ -3419,7 +3419,7 @@ function bufferToSticker(inputBuffer, ext, isAnimated) {
     const outPath = path.join(STICKER_CACHE_DIR, `${stamp}_out.webp`);
     fs.writeFileSync(inPath, inputBuffer);
 
-    const filter = "scale='min(512,iw)':'min(512,ih)':force_original_aspect_ratio=decrease,fps=15,pad=512:512:(512-iw)/2:(512-ih)/2:color=0x00000000";
+    const filter = "scale=512:512:force_original_aspect_ratio=increase,crop=512:512,fps=15";
 
     const cmd = isAnimated
       ? `ffmpeg -y -i "${inPath}" -vf "${filter}" -t 6 -loop 0 -an -vsync 0 -c:v libwebp -lossless 0 -qscale 60 -preset default "${outPath}"`
