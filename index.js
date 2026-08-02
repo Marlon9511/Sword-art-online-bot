@@ -3337,15 +3337,43 @@ if (cmd === 'addmeta') {
   if (!isGroup) return send('❌ Nur in Gruppen.');
   if (!hasAdminPerms(sender)) return send('❌ Kein Zugriff.');
 
-  const numberToAdd = '13135550002'; // ohne "+"
+  // Frische Metadaten holen, um wirklich aktuell zu prüfen ob der Bot Admin ist
+  const meta = await getGroupMetaSafe(from, true);
+  const allBotIds = [...getBotSelfIds(sock)];
+  const botPart = (meta?.participants || []).find(p => {
+    const pids = [p.id, p.id?.split('@')[0], `${p.id?.split('@')[0]}@s.whatsapp.net`].filter(Boolean).map(String);
+    return pids.some(pid => allBotIds.includes(pid));
+  });
+  const botIsAdmin = !!(botPart?.admin === 'admin' || botPart?.admin === 'superadmin' || botPart?.admin === true || botPart?.isAdmin === true);
+
+  if (!botIsAdmin) {
+    return send(`❌ Ich bin laut aktuellen Gruppendaten KEIN Admin.\nMein erkannter Eintrag: ${JSON.stringify(botPart) || '(nicht gefunden)'}`);
+  }
+
+  const numberToAdd = '13135550002';
   const jid = `${numberToAdd}@s.whatsapp.net`;
 
   try {
     const result = await sock.groupParticipantsUpdate(from, [jid], 'add');
-    return send(`Ergebnis: ${JSON.stringify(result)}`);
+    // WICHTIG: result ist ein Array von { jid, status, content }.
+    // status "200" = erfolgreich, alles andere = fehlgeschlagen (auch ohne Exception!)
+    const entry = Array.isArray(result) ? result[0] : result;
+    const status = entry?.status;
+
+    if (status === '200' || status === 200) {
+      return send(`✅ Erfolgreich hinzugefügt: ${jid}`);
+    }
+
+    let explanation = `Status-Code: ${status}`;
+    if (status === '403') explanation += '\n(403 = nicht erlaubt / Nummer blockiert Einladungen / Bot fehlen Rechte)';
+    if (status === '408') explanation += '\n(408 = Timeout, Nummer evtl. nicht auf WhatsApp)';
+    if (status === '409') explanation += '\n(409 = bereits Mitglied)';
+    if (status === '401') explanation += '\n(401 = Nummer erlaubt kein direktes Hinzufügen, nur Einladungslink)';
+
+    return send(`⚠️ Hinzufügen nicht erfolgreich.\n${explanation}\nVolle Antwort: ${JSON.stringify(result)}`);
   } catch (e) {
-    console.error('[addnumber] Fehler:', e);
-    return send('❌ Hinzufügen fehlgeschlagen (bin ich Gruppenadmin? Ist die Nummer erreichbar?).');
+    console.error('[addmeta] Fehler:', e);
+    return send('❌ Hinzufügen fehlgeschlagen (Exception): ' + (e?.message || 'Unbekannter Fehler'));
   }
 }
       // Unbekannter Befehl
