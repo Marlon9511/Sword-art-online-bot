@@ -1387,6 +1387,14 @@ helpText += `▸ ${PREFIX}punch @user — Schlagen\n\n`;
         }
         return;
       }
+const APPLICATION_STEPS = [
+  { key: 'name', question: '⚔️ *— BEWERBUNG FÜR DIE GILDE —* ⚔️\n\nWillkommen, Schwertkämpfer! Beantworte der Reihe nach die folgenden Fragen, um dich zu bewerben.\n(Schreibe jederzeit "abbrechen", um die Bewerbung abzubrechen.)\n\n1️⃣ Wie lautet dein *Name*?' },
+  { key: 'alter', question: '2️⃣ Wie *alt* bist du?' },
+  { key: 'warum_bewerben', question: '3️⃣ *Warum* willst du dich bewerben?' },
+  { key: 'warum_nehmen', question: '4️⃣ *Warum sollten wir dich nehmen?*' },
+  { key: 'rang', question: '5️⃣ Welchen *Rang* strebst du an? (z.B. Supporter, Moderator, Admin...)' },
+  { key: 'erfahrung', question: '6️⃣ Hast du bereits *Erfahrung als Teammitglied*? Wenn ja, wo?\n(z.B. "Ja, bei XY-Server" oder "Nein")' }
+];
    const GAME_COMMANDS = [
   'daily', 'work', 'blackjack', 'bj', 'bjstart', 'hit', 'stand',
   'slot', 'rps', 'fish', 'adopt', 'pet', 'petinfo', 'feed', 'play'
