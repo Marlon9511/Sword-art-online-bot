@@ -1940,13 +1940,13 @@ if (cmd === 'listroles') {
           marriageMentions.push(marriage.partner);
         }
 
-        const caption = `User: $const infoLines = [];
-if (user.alter) infoLines.push(`🎂 Alter: ${user.alter}`);
-if (user.hobbys) infoLines.push(`🎯 Hobbys: ${user.hobbys}`);
-if (user.sexualitaet) infoLines.push(`🏳️‍🌈 Sexualität: ${user.sexualitaet}`);
-const infoBlock = infoLines.length ? `\n${infoLines.join('\n')}` : '';
+        const caption = `User: const infoLines = [];
+  if (user.alter) infoLines.push(`Alter: ${user.alter}`);
+  if (user.hobbys) infoLines.push(`Hobbys: ${user.hobbys}`);
+  if (user.sexualitaet) infoLines.push(`Sexualitaet: ${user.sexualitaet}`);
+  const infoBlock = infoLines.length ? `\n${infoLines.join('\n')}` : '';
 
-const caption = `User: ${username}\nCoins: ${coins}\nRank: ${r}\nLevel: ${level}\nXP: ${xp} / ${neededXp}\nNoch ${remainingXp} XP bis Level ${level + 1}\n${marriageLine}${infoBlock}`;
+  const caption = `User: ${username}\nCoins: ${coins}\nRank: ${r}\nLevel: ${level}\nXP: ${xp} / ${neededXp}\nNoch ${remainingXp} XP bis Level ${level + 1}\n${marriageLine}${infoBlock}`;
         // Fallback-Bild, falls kein echtes Profilbild gefunden wird
 const FALLBACK_PP_URL = 'https://raw.githubusercontent.com/Marlon9511/Sword-art-online-bot/main/5d553cd8911378163e989839dff229f3.webp.jpg';
 
