@@ -1356,32 +1356,32 @@ function downloadShortIfNeeded() {
 }
 // HELP / MENU
       if (cmd === 'help' || cmd === 'menu') {
-        const divider = '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈';
-        let helpText = `╭───────────────╮\n│   🤖 *BOT MENÜ*   │\n╰───────────────╯\n\n`;
+        const divider = '⚔️┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈⚔️';
+        let helpText = `┏━━━━━━━━━━━━━━━┓\n┃  ▄▄▄▄▄▄▄▄▄▄▄▄▄  ┃\n┃  █ AINCRAD █  ┃\n┃  ▀▀▀▀▀▀▀▀▀▀▀▀▀  ┃\n┗━━━━━━━━━━━━━━━┛\n     🗡️ System Command Window 🗡️\n     ⌈ Floor: Main Menu ⌋\n\n`;
 
-        helpText += `📱 *BASIS*\n${divider}\n`;
-        helpText += `▸ ${PREFIX}help — Diese Hilfe\n`;
-        helpText += `▸ ${PREFIX}ping — Bot-Status prüfen\n`;
-        helpText += `▸ ${PREFIX}owner — Owner kontaktieren\n`;
-        helpText += `▸ ${PREFIX}com — Link zur offiziellen Gruppe\n`;
-        helpText += `▸ ${PREFIX}whoami / ${PREFIX}me — Deine Nutzerinfo\n`;
-        helpText += `▸ ${PREFIX}afk [grund] — AFK-Status setzen\n`;
-        helpText += `▸ ${PREFIX}usertodo add <text> — Befehl vorschlagen\n`;
-        helpText += `▸ ${PREFIX}credits — Alle Helfer des Bots\n\n`;
-helpText += `▸ ${PREFIX}marry @user — Heiratsantrag stellen\n`;
-helpText += `▸ ${PREFIX}divorce — Scheidung einreichen\n`;
-helpText += `▸ ${PREFIX}sticker — Bild/GIF antworten → Sticker\n`;
-helpText += `▸ ${PREFIX}bewerbung — Bewerbung für die Gilde starten\n`;
+        helpText += `🔷 *SYSTEM MENU*\n${divider}\n`;
+        helpText += `▸ ${PREFIX}help — Dieses Command-Window öffnen\n`;
+        helpText += `▸ ${PREFIX}ping — Verbindung zum Server prüfen\n`;
+        helpText += `▸ ${PREFIX}owner — Game Master kontaktieren\n`;
+        helpText += `▸ ${PREFIX}com — Link zur Gilden-Halle\n`;
+        helpText += `▸ ${PREFIX}whoami / ${PREFIX}me — Charakterbogen anzeigen\n`;
+        helpText += `▸ ${PREFIX}afk [grund] — Logout-Status setzen\n`;
+        helpText += `▸ ${PREFIX}usertodo add <text> — Skill vorschlagen\n`;
+        helpText += `▸ ${PREFIX}credits — Alle Beta-Tester des Systems\n\n`;
+helpText += `▸ ${PREFIX}marry @user — Verlobungsring überreichen\n`;
+helpText += `▸ ${PREFIX}divorce — Ring zurückgeben\n`;
+helpText += `▸ ${PREFIX}sticker — Bild/GIF antworten → Sticker craften\n`;
+helpText += `▸ ${PREFIX}bewerbung — Gildenbeitritt beantragen\n`;
 
-        helpText += `🎮 *SPIELE & WIRTSCHAFT*\n${divider}\n`;
-        helpText += `▸ ${PREFIX}daily — Tägliche Belohnung\n`;
-        helpText += `▸ ${PREFIX}blackjack — Blackjack spielen\n`;
-        helpText += `▸ ${PREFIX}slot — Spielautomat\n`;
-        helpText += `▸ ${PREFIX}fish — Angeln gehen\n`;
-        helpText += `▸ ${PREFIX}pet — Haustier-Status\n`;
-        helpText += `▸ ${PREFIX}adopt <name> — Haustier adoptieren\n`;
-        helpText += `▸ ${PREFIX}feed — Haustier füttern\n\n`;
-helpText += `\n🤾 *INTERAKTION*\n${divider}\n`;
+        helpText += `⚔️ *ARENA & WIRTSCHAFT* (Cor & Kämpfe)\n${divider}\n`;
+        helpText += `▸ ${PREFIX}daily — Tägliche Quest-Belohnung\n`;
+        helpText += `▸ ${PREFIX}blackjack — Glücksspiel im Coliseum\n`;
+        helpText += `▸ ${PREFIX}slot — Spielautomat in der Taverne\n`;
+        helpText += `▸ ${PREFIX}fish — Angeln am Floor-See\n`;
+        helpText += `▸ ${PREFIX}pet — Begleiter-Status prüfen\n`;
+        helpText += `▸ ${PREFIX}adopt <name> — Begleiter zähmen\n`;
+        helpText += `▸ ${PREFIX}feed — Begleiter füttern\n\n`;
+helpText += `\n💞 *SOCIAL SKILLS* (Interaktion)\n${divider}\n`;
 helpText += `▸ ${PREFIX}slap @user — Ohrfeige verpassen\n`;
 helpText += `▸ ${PREFIX}hug @user — Umarmen\n`;
 helpText += `▸ ${PREFIX}kiss @user — Küssen\n`;
@@ -1392,58 +1392,57 @@ helpText += `▸ ${PREFIX}bite @user — Beißen\n`;
 helpText += `▸ ${PREFIX}punch @user — Schlagen\n`;
 helpText += `▸ ${PREFIX}love @user — Lieben\n`;
 helpText += `▸ ${PREFIX}blush @user — Erröten wegen jemandem\n`;
-helpText += `▸ ${PREFIX}handhold @user — Hand halten\n\n`;
+helpText += `▸ ${PREFIX}handhold @user — Hand halten\n`;
 helpText += `▸ ${PREFIX}lick @user — Ablecken\n`;
 helpText += `▸ ${PREFIX}nervous @user — Nervös wegen jemandem sein\n\n`;
 
-        helpText += `💬 *CHAT & GRUPPEN*\n${divider}\n`;
-        helpText += `▸ ${PREFIX}gi — Gruppeneinstellungen anzeigen\n`;
-        helpText += `▸ ${PREFIX}welcome-an / -aus — Welcome an/aus\n`;
-        helpText += `▸ ${PREFIX}welcome-set <text> — Welcome-Text setzen\n`;
-        helpText += `▸ ${PREFIX}antilink-an / -aus — Anti-WhatsApp-Link-Kick an/aus\n`;
+        helpText += `💬 *GILDEN-CHAT* (Chat & Gruppen)\n${divider}\n`;
+        helpText += `▸ ${PREFIX}gi — Gildeneinstellungen anzeigen\n`;
+        helpText += `▸ ${PREFIX}welcome-an / -aus — Willkommens-Portal an/aus\n`;
+        helpText += `▸ ${PREFIX}welcome-set <text> — Willkommenstext setzen\n`;
+        helpText += `▸ ${PREFIX}antilink-an / -aus — Anti-Fremdportal-Bann an/aus\n`;
         helpText += `▸ ${PREFIX}hidetag <text> — Nachricht mit verstecktem Tag\n`;
         helpText += `▸ ${PREFIX}delete — Als Reply: Nachricht löschen\n`;
         helpText += `▸ ${PREFIX}ytmp3 <link> — YouTube als MP3\n\n`;
 
-        helpText += `⚙️ *Aktuelles Präfix:* ${PREFIX}\n`;
+        helpText += `⚙️ *Aktueller System-Befehl:* ${PREFIX}\n`;
 
         if (isAuthorized(sender, ['OWNER', 'COOWNER', 'MOD', 'SUPPORTER', 'TEST_SUPPORTER'])) {
-          helpText += `\n🎫 *SUPPORT-SYSTEM*\n${divider}\n`;
-          helpText += `▸ ${PREFIX}support <nachricht> — Ticket erstellen\n`;
+          helpText += `\n🎫 *KNIGHTS OF THE BLOOD SUPPORT* (Ticket-System)\n${divider}\n`;
+          helpText += `▸ ${PREFIX}support <nachricht> — Notfall-Ticket erstellen\n`;
           helpText += `▸ ${PREFIX}answer <id> <text> — Ticket beantworten\n`;
           helpText += `▸ ${PREFIX}tickets [id|status] — Tickets anzeigen\n`;
           helpText += `▸ ${PREFIX}cleartickets — Alle Tickets löschen\n`;
         }
 
-        helpText += `\n⚔️ *ADMIN*\n${divider}\n`;
+        helpText += `\n🛡️ *GILDENMEISTER* (Admin)\n${divider}\n`;
         helpText += `▸ ${PREFIX}warn @user — Verwarnen\n`;
-        helpText += `▸ ${PREFIX}kick @user — Entfernen\n`;
-        helpText += `▸ ${PREFIX}promote / ${PREFIX}demote @user — Gruppenadmin-Rechte\n`;
-        helpText += `▸ ${PREFIX}addxp <@user> <menge> — XP schenken\n`;
-        helpText += `▸ ${PREFIX}addcash <@user> <menge> — Coins schenken\n`;
-        helpText += `▸ ${PREFIX}addvip <@user> <zeit> — VIP geben\n`;
+        helpText += `▸ ${PREFIX}kick @user — Aus der Gilde werfen\n`;
+        helpText += `▸ ${PREFIX}promote / ${PREFIX}demote @user — Gildenadmin-Rechte\n`;
+        helpText += `▸ ${PREFIX}addxp <@user> <menge> — EXP schenken\n`;
+        helpText += `▸ ${PREFIX}addcash <@user> <menge> — Cor schenken\n`;
+        helpText += `▸ ${PREFIX}addvip <@user> <zeit> — VIP-Rang geben\n`;
         helpText += `▸ ${PREFIX}purge [anzahl] — Nachrichten löschen (alle oder letzte Nachrichten)\n`;
 
         if (hasAdminPerms(sender)) {
-          helpText += `\n👑 *OWNER*\n${divider}\n`;
-          helpText += `▸ ${PREFIX}broadcast <text> — An alle Gruppen senden\n`;
-          helpText += `▸ ${PREFIX}restart — Bot neu starten\n`;
-          helpText += `▸ ${PREFIX}updateprofile — Profil aktualisieren\n`;
-          helpText += `▸ ${PREFIX}bancmd <befehl> [ban|unban] — Befehl sperren\n`;
-          helpText += `▸ ${PREFIX}setrole @user <rolle> — Rolle setzen\n`;
-          helpText += `▸ ${PREFIX}listroles — Alle Rollen anzeigen\n`;
-          helpText += `▸ ${PREFIX}newsession <name> — Neue Session starten\n`;
-          helpText += `▸ ${PREFIX}sessions — Aktive Sessions anzeigen\n`;
-          helpText += `▸ ${PREFIX}stopsession <name> — Session stoppen\n`;
-          helpText += `▸ ${PREFIX}deletesession <name> — Session löschen\n`;
-          helpText += `▸ ${PREFIX}addcredit Name | Rolle — Helfer hinzufügen\n`;
-          helpText += `▸ ${PREFIX}delcredit <nummer> — Helfer entfernen\n`;
-          helpText += `▸ ${PREFIX}com <link> — Offiziellen Gruppenlink ändern\n`;
-          helpText += `▸ ${PREFIX}usertodo — Von Usern vorgeschlagene Befehle ansehen\n`;
+          helpText += `\n👑 *SYSTEM ADMINISTRATOR* (Kayaba-Rechte)\n${divider}\n`;
+          helpText += `▸ ${PREFIX}broadcast <text> — Serverweite Ansage an alle Gilden\n`;
+          helpText += `▸ ${PREFIX}restart — System neu starten\n`;
+          helpText += `▸ ${PREFIX}updateprofile — Avatar aktualisieren\n`;
+          helpText += `▸ ${PREFIX}bancmd <befehl> [ban|unban] — Skill sperren\n`;
+          helpText += `▸ ${PREFIX}setrole @user <rolle> — Rang setzen\n`;
+          helpText += `▸ ${PREFIX}listroles — Alle Ränge anzeigen\n`;
+          helpText += `▸ ${PREFIX}newsession <name> — Neuen Server starten\n`;
+          helpText += `▸ ${PREFIX}sessions — Aktive Server anzeigen\n`;
+          helpText += `▸ ${PREFIX}stopsession <name> — Server stoppen\n`;
+          helpText += `▸ ${PREFIX}deletesession <name> — Server löschen\n`;
+          helpText += `▸ ${PREFIX}addcredit Name | Rolle — Beta-Tester hinzufügen\n`;
+          helpText += `▸ ${PREFIX}delcredit <nummer> — Beta-Tester entfernen\n`;
+          helpText += `▸ ${PREFIX}com <link> — Gilden-Link ändern\n`;
+          helpText += `▸ ${PREFIX}usertodo — Von Spielern vorgeschlagene Skills ansehen\n`;
         }
 
-        helpText += `\n${divider}\n_💡 Tipp: Nutze Befehle ohne Parameter für mehr Info_`;
-        
+        helpText += `\n${divider}\n_⚔️ "The days of my life... I'll cut through them all." — Nutze Befehle ohne Parameter für mehr Info_`;
         try {
           const videoPath = await downloadShortIfNeeded();
           await sock.sendMessage(from, {
