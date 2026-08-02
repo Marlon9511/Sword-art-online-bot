@@ -716,6 +716,7 @@ async function startBot(sessionName = 'default', hooks = {}) {
   }
 
 const pendingMarriageProposals = new Map(); // targetJid -> { from, at }
+const pendingApplications = new Map(); // sender -> { step, answers }
   const groupMetaCache = new Map();
   const lastProcessed = new Map();
   const pendingActions = new Map();
