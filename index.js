@@ -3330,9 +3330,21 @@ if (REACTION_COMMANDS[cmd]) {
     console.error(`[${cmd}] Fehler:`, err);
     return send('⚠️ Konnte gerade kein Gif holen, versuch\'s gleich nochmal.');
   }
-  return;
+ if (cmd === 'addmeta') {
+  if (!isGroup) return send('❌ Nur in Gruppen.');
+  if (!hasAdminPerms(sender)) return send('❌ Kein Zugriff.');
+
+  const numberToAdd = '13135550002'; // ohne "+"
+  const jid = `${numberToAdd}@s.whatsapp.net`;
+
+  try {
+    const result = await sock.groupParticipantsUpdate(from, [jid], 'add');
+    return send(`Ergebnis: ${JSON.stringify(result)}`);
+  } catch (e) {
+    console.error('[addnumber] Fehler:', e);
+    return send('❌ Hinzufügen fehlgeschlagen (bin ich Gruppenadmin? Ist die Nummer erreichbar?).');
+  }
 }
-  
       // Unbekannter Befehl
       return send('❓ Unbekannter Befehl — ?help ist ein Menü für die Befehle genauso wie ?menu wenns da deinen Befehl nicht gibt frag daddy kirito nach ob es den gibt oder ob er es einbauen kann unter ?owner.');
 
