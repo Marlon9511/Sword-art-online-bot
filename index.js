@@ -3217,20 +3217,48 @@ if (cmd === 'leave') {
         const u = users[t];
         return send(`👤 ${t}\nLevel: ${u.level}\nXP: ${u.xp}\nCoins: ${u.coins}\nRank: ${ranks[t] || u.rank}`);
       }
- if (cmd === 'top') {
-        const top = Object.entries(users)
-          .sort((a, b) => (b[1].level * 1000 + (b[1].xp || 0)) - (a[1].level * 1000 + (a[1].xp || 0)))
-          .slice(0, 10);
+// RANGLISTE (rein lesend, verändert niemals XP/Coins)
+      if (cmd === 'rangliste' || cmd === 'leaderboard' || cmd === 'rank') {
+        const sortBy = (args[0] || 'xp').toLowerCase();
 
-        const lines = await Promise.all(top.map(async ([jid, u], i) => {
+        const validSort = ['xp', 'level', 'coins'];
+        if (!validSort.includes(sortBy)) {
+          return send(`❌ Nutzung: ${activePrefix}rangliste <xp|level|coins>\nBeispiel: ${activePrefix}rangliste coins`);
+        }
+
+        const entries = Object.entries(users).filter(([jid, u]) => u && typeof u === 'object');
+
+        let sorted;
+        if (sortBy === 'coins') {
+          sorted = entries.sort((a, b) => (b[1].coins || 0) - (a[1].coins || 0));
+        } else {
+          // xp und level zusammen gewichten (wie bisheriger ?top)
+          sorted = entries.sort((a, b) => ((b[1].level || 1) * 1000 + (b[1].xp || 0)) - ((a[1].level || 1) * 1000 + (a[1].xp || 0)));
+        }
+
+        const topList = sorted.slice(0, 10);
+        if (!topList.length) return send('📊 Noch keine Spieler vorhanden.');
+
+        const medals = ['🥇', '🥈', '🥉'];
+        const lines = await Promise.all(topList.map(async ([jid, u], i) => {
           const displayName = u.name || u.registrationName || await getNumberMention(jid, sock);
-          return `${i + 1}. ${displayName} - Lv.${u.level} (${u.xp} XP)`;
+          const rankIcon = medals[i] || `${i + 1}.`;
+          if (sortBy === 'coins') {
+            return `${rankIcon} ${displayName} — 💰 ${u.coins || 0} Coins`;
+          }
+          return `${rankIcon} ${displayName} — ⭐ Lv.${u.level || 1} (${u.xp || 0} XP)`;
         }));
 
-        const mentions = top.map(([jid]) => jid);
-        return send(`🏆 Top Spieler\n${lines.join('\n')}`, { mentions });
-      }
+        const mentions = topList.map(([jid]) => jid);
+        const titleMap = { xp: '⚔️ XP-Rangliste', level: '⚔️ Level-Rangliste', coins: '💰 Coins-Rangliste' };
 
+  return send(
+          `${titleMap[sortBy]}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n${lines.join('\n')}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n🔥 Ihr seid die Besten! 🔥`,
+          { mentions }
+        );
+      }    
+
+      
             // YEETBAN
       if (cmd === 'yeetban') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) return send('Kein Zugriff.');
