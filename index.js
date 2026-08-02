@@ -934,7 +934,7 @@ if (!m.key.fromMe && pendingApplications.has(sender)) {
     `🕓 Eingereicht: ${new Date().toLocaleString('de-DE')}`;
 
  try {
-    await sock.sendMessage(SUPPORT_CONFIG.TICKET_GROUP, {
+    await sock.sendMessage('120363429401880501@g.us', {
       text: summary,
       mentions: [sender]
     });
