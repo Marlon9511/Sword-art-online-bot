@@ -573,8 +573,11 @@ function ensureUser(rawJid) {
     items: {},
     registered: false,
     registrationDate: null,
-    name: null
-  };
+    name: null,
+    alter: null,
+    hobbys: null,
+    sexualitaet: null
+};
   const normalizedJid = normalizeJid(jid);
   if (!ranks[normalizedJid]) {
     ranks[normalizedJid] = (isSameJid(jid, OWNER_LID) || isSameJid(jid, OWNER_PRIV)) ? 'OWNER' : (isSameJid(jid, COOWNER_LID) ? 'COOWNER' : 'USER');
