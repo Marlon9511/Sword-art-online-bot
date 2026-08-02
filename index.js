@@ -1393,6 +1393,8 @@ helpText += `▸ ${PREFIX}punch @user — Schlagen\n`;
 helpText += `▸ ${PREFIX}love @user — Lieben\n`;
 helpText += `▸ ${PREFIX}blush @user — Erröten wegen jemandem\n`;
 helpText += `▸ ${PREFIX}handhold @user — Hand halten\n\n`;
+helpText += `▸ ${PREFIX}lick @user — Ablecken\n`;
+helpText += `▸ ${PREFIX}nervous @user — Nervös wegen jemandem sein\n\n`;
 
         helpText += `💬 *CHAT & GRUPPEN*\n${divider}\n`;
         helpText += `▸ ${PREFIX}gi — Gruppeneinstellungen anzeigen\n`;
