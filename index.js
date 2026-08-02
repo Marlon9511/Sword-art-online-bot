@@ -3333,11 +3333,20 @@ if (REACTION_COMMANDS[cmd]) {
   return;
 }
 
-if (cmd === 'addmeta') {
+if (cmd === 'add') {
   if (!isGroup) return send('❌ Nur in Gruppen.');
   if (!hasAdminPerms(sender)) return send('❌ Kein Zugriff.');
 
-  // Frische Metadaten holen, um wirklich aktuell zu prüfen ob der Bot Admin ist
+  const rawTarget = args[0];
+  if (!rawTarget) return send(`❌ Nutzung: ${activePrefix}add <nummer>\nBeispiel: ${activePrefix}add 4915123456789`);
+
+  const numberToAdd = rawTarget.replace(/[^0-9]/g, '');
+  if (!numberToAdd || numberToAdd.length < 6) {
+    return send('❌ Ungültige Nummer. Bitte mit Ländervorwahl angeben, z.B. 4915123456789 (ohne "+" oder Leerzeichen).');
+  }
+  const jid = `${numberToAdd}@s.whatsapp.net`;
+
+  // Frische Metadaten holen, um sicherzugehen, dass der Admin-Status aktuell ist
   const meta = await getGroupMetaSafe(from, true);
   const allBotIds = [...getBotSelfIds(sock)];
   const botPart = (meta?.participants || []).find(p => {
@@ -3347,33 +3356,62 @@ if (cmd === 'addmeta') {
   const botIsAdmin = !!(botPart?.admin === 'admin' || botPart?.admin === 'superadmin' || botPart?.admin === true || botPart?.isAdmin === true);
 
   if (!botIsAdmin) {
-    return send(`❌ Ich bin laut aktuellen Gruppendaten KEIN Admin.\nMein erkannter Eintrag: ${JSON.stringify(botPart) || '(nicht gefunden)'}`);
+    return send('❌ Ich bin kein Administrator in dieser Gruppe. Bitte mache mich zuerst zum Admin.');
   }
 
-  const numberToAdd = '13135550002';
-  const jid = `${numberToAdd}@s.whatsapp.net`;
+  // Bereits Mitglied?
+  const alreadyMember = (meta?.participants || []).some(p => {
+    const raw = (p.id || '').split('@')[0];
+    return raw === numberToAdd;
+  });
+  if (alreadyMember) return send(`ℹ️ ${numberToAdd} ist bereits Mitglied dieser Gruppe.`);
 
   try {
     const result = await sock.groupParticipantsUpdate(from, [jid], 'add');
-    // WICHTIG: result ist ein Array von { jid, status, content }.
-    // status "200" = erfolgreich, alles andere = fehlgeschlagen (auch ohne Exception!)
     const entry = Array.isArray(result) ? result[0] : result;
-    const status = entry?.status;
+    const status = String(entry?.status ?? '');
 
-    if (status === '200' || status === 200) {
-      return send(`✅ Erfolgreich hinzugefügt: ${jid}`);
+    if (status === '200') {
+      return send(`✅ @${numberToAdd} wurde zur Gruppe hinzugefügt.`, { mentions: [jid] });
     }
 
-    let explanation = `Status-Code: ${status}`;
-    if (status === '403') explanation += '\n(403 = nicht erlaubt / Nummer blockiert Einladungen / Bot fehlen Rechte)';
-    if (status === '408') explanation += '\n(408 = Timeout, Nummer evtl. nicht auf WhatsApp)';
-    if (status === '409') explanation += '\n(409 = bereits Mitglied)';
-    if (status === '401') explanation += '\n(401 = Nummer erlaubt kein direktes Hinzufügen, nur Einladungslink)';
+    // Status 403 / 401 -> Nummer erlaubt kein direktes Hinzufügen (z.B. wegen Datenschutzeinstellungen).
+    // In diesem Fall bietet Baileys oft einen invite_code im content-Feld an.
+    let inviteCode = null;
+    try {
+      const content = entry?.content;
+      if (Array.isArray(content)) {
+        const inviteNode = content.find(c => c?.tag === 'add_request');
+        inviteCode = inviteNode?.attrs?.code || null;
+      }
+    } catch (e) {}
 
-    return send(`⚠️ Hinzufügen nicht erfolgreich.\n${explanation}\nVolle Antwort: ${JSON.stringify(result)}`);
+    if (inviteCode) {
+      try {
+        const inviteLink = `https://chat.whatsapp.com/${inviteCode}`;
+        await sock.sendMessage(jid, {
+          text: `👋 Du wurdest eingeladen, der Gruppe "${meta?.subject || ''}" beizutreten:\n${inviteLink}`
+        });
+        return send(`ℹ️ ${numberToAdd} konnte nicht direkt hinzugefügt werden (Datenschutzeinstellung), aber ich habe eine private Einladung per Nachricht geschickt.`);
+      } catch (e) {
+        return send(`⚠️ ${numberToAdd} konnte nicht direkt hinzugefügt werden und die private Einladung ist fehlgeschlagen: ${e?.message || e}`);
+      }
+    }
+
+    const statusMessages = {
+      '403': 'Die Nummer erlaubt kein direktes Hinzufügen (Datenschutzeinstellungen) und akzeptiert auch keine automatische Einladung.',
+      '408': 'Zeitüberschreitung — die Nummer ist eventuell nicht (mehr) auf WhatsApp registriert.',
+      '409': 'Die Nummer ist bereits Mitglied.',
+      '401': 'Die Nummer/der Account lässt sich grundsätzlich nicht kontaktieren (z.B. gesperrte oder spezielle System-Accounts).',
+    };
+
+    return send(`⚠️ Hinzufügen von ${numberToAdd} fehlgeschlagen.\nGrund: ${statusMessages[status] || `Status-Code ${status}`}`);
   } catch (e) {
-    console.error('[addmeta] Fehler:', e);
-    return send('❌ Hinzufügen fehlgeschlagen (Exception): ' + (e?.message || 'Unbekannter Fehler'));
+    console.error('[add] Fehler:', e);
+    const msg = e?.data === 463 || String(e?.message).includes('account_reachout_restricted')
+      ? 'Diese Nummer/dieser Account lässt sich grundsätzlich nicht per automatischem Hinzufügen kontaktieren (z.B. spezielle System-/Business-Accounts wie MetaAI).'
+      : (e?.message || 'Unbekannter Fehler');
+    return send(`❌ Hinzufügen fehlgeschlagen: ${msg}`);
   }
 }
       // Unbekannter Befehl
