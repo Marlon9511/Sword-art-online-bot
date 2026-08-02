@@ -1698,26 +1698,60 @@ if ((cmd === 'games-an' || cmd === 'games-aus') && isGroup) {
         return send(`✅ Coins von @${targetJid.split('@')[0]} wurden zurückgesetzt (vorher: ${oldCoins} → jetzt: 0).`, { mentions: [targetJid] });
       }
       // LISTROLES
-      if (cmd === 'listroles') {
-        if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
-        let message = '📋 Rollen:\n\n';
-        for (const [role, jids] of Object.entries(ROLES)) {
-          message += `${role}:`;
-          if (Array.isArray(jids) && jids.length) {
-            for (const id of jids) {
-              const n = normalizeJid(id);
-              const lid = n ? (n.endsWith('@s.whatsapp.net') ? n.replace('@s.whatsapp.net', '@lid') : n) : id;
-              const name = (users[n] && (users[n].name || users[n].registrationName)) || '(kein name)';
-              const rankEntry = ranks[n] || '(kein rank)';
-              message += `\n${lid} — ${name} [${rankEntry}]`;
-            }
-            message += '\n\n';
-          } else {
-            message += ' (keine)\n\n';
-          }
-        }
-        return send(message.trim());
-      }
+if (cmd === 'listroles') {
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
+
+  // Feste Reihenfolge für eine übersichtliche Anzeige
+  const roleOrder = ['OWNER', 'COOWNER', 'ADMIN', 'MOD', 'VIP', 'SUPPORTER', 'TEST_SUPPORTER'];
+
+  // Zusammenführen: ranks.json ist die "lebendige" Quelle (wird von setrole/setrank
+  // sofort aktualisiert), ROLES-Arrays werden ergänzend dazugenommen, damit auch
+  // ältere/alternative Zuweisungswege nichts verlieren. Sets verhindern Duplikate,
+  // selbst wenn eine Person mehrfach (z.B. @lid und @s.whatsapp.net) auftaucht.
+  const grouped = {};
+  for (const r of roleOrder) grouped[r] = new Set();
+
+  for (const [jid, role] of Object.entries(ranks)) {
+    if (role === 'USER') continue;
+    const n = normalizeJid(jid);
+    if (!n) continue;
+    if (!grouped[role]) grouped[role] = new Set();
+    grouped[role].add(n);
+  }
+
+  for (const [role, jids] of Object.entries(ROLES)) {
+    if (role === 'USER' || !Array.isArray(jids)) continue;
+    if (!grouped[role]) grouped[role] = new Set();
+    for (const id of jids) {
+      const n = normalizeJid(id);
+      if (n) grouped[role].add(n);
+    }
+  }
+
+  const allRoleKeys = [...new Set([...roleOrder, ...Object.keys(grouped)])];
+
+  let message = `📋 *Rollen* (${new Date().toLocaleString('de-DE')})\n\n`;
+  const allMentions = [];
+
+  for (const role of allRoleKeys) {
+    const jidSet = grouped[role];
+    if (!jidSet || jidSet.size === 0) {
+      message += `*${prettyRank(role)}* (0):\n(keine)\n\n`;
+      continue;
+    }
+
+    message += `*${prettyRank(role)}* (${jidSet.size}):\n`;
+    for (const n of jidSet) {
+      const lid = n.endsWith('@s.whatsapp.net') ? n.replace('@s.whatsapp.net', '@lid') : n;
+      const name = (users[n] && (users[n].name || users[n].registrationName)) || '(kein name)';
+      message += `• @${n.split('@')[0]} — ${name}\n`;
+      allMentions.push(n);
+    }
+    message += '\n';
+  }
+
+  return send(message.trim(), { mentions: allMentions });
+}
 
       // CMBAN / CMDBAN
       if (cmd === 'cmdban' || cmd === 'bancmd') {
