@@ -1665,31 +1665,32 @@ if ((cmd === 'games-an' || cmd === 'games-aus') && isGroup) {
           return send('❌ Der Haupt-Owner ist geschützt und kann nicht heruntergestuft werden.');
         }
 
-        // Alle JIDs in ranks.json und users.json speichern
-        normalizedJids.forEach(jid => {
-          // ranks.json aktualisieren
-          ranks[jid] = roleUpper;
+ // Alle JIDs in ranks.json und users.json speichern
+normalizedJids.forEach(jid => {
+  // ranks.json aktualisieren
+  ranks[jid] = roleUpper;
 
-          // users.json aktualisieren (User anlegen falls nötig)
-          if (!users[jid]) users[jid] = {
-    xp: 0,
-    level: 1,
-    coins: 100,
-    rank: 'USER',
-    msgCount: 0,
-    lastDaily: 0,
-    items: {},
-    registered: false,
-    registrationDate: null,
-    name: null,
-    alter: null,
-    hobbys: null,
-    sexualitaet: null
-};
-          } else {
-            users[jid].rank = roleUpper;
-          }
-        });
+  // users.json aktualisieren (User anlegen falls nötig)
+  if (!users[jid]) {
+    users[jid] = {
+      xp: 0,
+      level: 1,
+      coins: 100,
+      rank: roleUpper,
+      msgCount: 0,
+      lastDaily: 0,
+      items: {},
+      registered: false,
+      registrationDate: null,
+      name: null,
+      alter: null,
+      hobbys: null,
+      sexualitaet: null
+    };
+  } else {
+    users[jid].rank = roleUpper;
+  }
+});
 
         // Aus anderen ROLES-Arrays entfernen (keine veralteten Einträge)
         for (const otherRole of Object.keys(ROLES)) {
