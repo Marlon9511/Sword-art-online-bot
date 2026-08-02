@@ -1290,7 +1290,11 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
         await sock.sendMessage(from, { text: `Die LID ist ${lid}` });
         return;
       }
-
+// GROUPID
+      if (cmd === 'groupid' || cmd === 'gruppenid') {
+        if (!isGroup) return send('❌ Dieser Befehl funktioniert nur in Gruppen.');
+        return send(`📋 Diese Gruppen-ID ist:\n${from}`);
+      }
       // AFK
       if (cmd === 'afk') {
         const reason = args.length ? args.join(' ') : 'Abwesend';
