@@ -3413,6 +3413,10 @@ const REACTION_COMMANDS = {
   cuddle: { emoji: "🥰", verb: "kuschelt mit" },
   bite: { emoji: "😬", verb: "beißt" },
   punch: { emoji: "🥊", verb: "verpasst einen Schlag" },
+hug: { emoji: "🤗", verb: "umarmt", apiReaction: "hug" },
+  love: { emoji: "❤️", verb: "liebt", apiReaction: "love" },
+  blush: { emoji: "😳", verb: "wird rot wegen", apiReaction: "blush" },
+  handhold: { emoji: "🤝", verb: "hält die Hand von", apiReaction: "handhold" },
 };
 
 async function getReactionGifUrl(reaction) {
