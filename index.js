@@ -3450,6 +3450,11 @@ angrystare: { emoji: "😠", verb: "starrt wütend" },
   surprised: { emoji: "😲", verb: "ist überrascht" },
   tired: { emoji: "😴", verb: "ist müde" },
   yes: { emoji: "🙆", verb: "sagt Ja" },
+  love: { emoji: "❤️", verb: "liebt", apiReaction: "love" },
+  blush: { emoji: "😳", verb: "wird rot wegen", apiReaction: "blush" },
+  handhold: { emoji: "🤝", verb: "hält die Hand von", apiReaction: "handhold" },
+  lick: { emoji: "👅", verb: "leckt", apiReaction: "lick" },
+  nervous: { emoji: "😅", verb: "ist nervös wegen", apiReaction: "nervous" },
 };
 
 async function getReactionGifUrl(reaction) {
