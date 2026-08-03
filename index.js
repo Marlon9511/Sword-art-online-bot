@@ -3430,6 +3430,26 @@ const REACTION_COMMANDS = {
   bite:   { emoji: "😬", verb: "beißt",                  query: "anime bite" },
   punch:  { emoji: "🥊", verb: "verpasst einen Schlag",   query: "anime punch" },
   sleep:  { emoji: "😴", verb: "schläft ein neben",       query: "anime sleep" }, // NEU
+angrystare: { emoji: "😠", verb: "starrt wütend" },
+  bleh: { emoji: "😝", verb: "streckt die Zunge raus" },
+  confused: { emoji: "😕", verb: "ist verwirrt" },
+  cry: { emoji: "😭", verb: "weint" },
+  evillaugh: { emoji: "😈", verb: "lacht böse" },
+  facepalm: { emoji: "🤦", verb: "macht einen Facepalm" },
+  happy: { emoji: "😊", verb: "ist glücklich" },
+  laugh: { emoji: "😂", verb: "lacht" },
+  mad: { emoji: "😡", verb: "ist sauer" },
+  nuzzle: { emoji: "🥺", verb: "schmiegt sich an" },
+  no: { emoji: "🙅", verb: "sagt Nein" },
+  nosebleed: { emoji: "🩸", verb: "hat Nasenbluten" },
+  sad: { emoji: "😢", verb: "ist traurig" },
+  scared: { emoji: "😱", verb: "hat Angst" },
+  shout: { emoji: "📢", verb: "schreit" },
+  shy: { emoji: "🙈", verb: "ist schüchtern" },
+  sneeze: { emoji: "🤧", verb: "niest" },
+  surprised: { emoji: "😲", verb: "ist überrascht" },
+  tired: { emoji: "😴", verb: "ist müde" },
+  yes: { emoji: "🙆", verb: "sagt Ja" },
 };
 
 async function getReactionGifUrl(reaction) {
