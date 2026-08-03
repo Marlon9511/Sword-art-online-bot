@@ -3751,7 +3751,7 @@ if (cmd === 'setinfo') {
   return send(`✅ ${feld.charAt(0).toUpperCase() + feld.slice(1)} wurde gespeichert. Nutze ${activePrefix}me, um dein Profil anzuzeigen.`);
 }
 const FUN_ACTIONS = [
- "hat Sex mit ,
+ "hat Sex mit" ,
 ];
 if (cmd === 'sex') {
   const ctx = m.message?.extendedTextMessage?.contextInfo;
