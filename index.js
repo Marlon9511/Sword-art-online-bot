@@ -4160,12 +4160,14 @@ if (cmd === 'addpartner') {
   }
 
   const input = args.join(' ');
-  const [name, link] = input.split('|').map(s => s?.trim());
+  const parts = input.split('|').map(s => s ? s.trim() : s);
+  const name = parts[0];
+  const link = parts[1];
 
   if (!name || !link) {
     return send(
-      `❌ Nutzung: ${activePrefix}addpartner Bot-Name | Link\n` +
-      `Beispiel: ${activePrefix}addpartner Elucidator-Bot | https://chat.whatsapp.com/XXXXXXXX`
+      '❌ Nutzung: ' + activePrefix + 'addpartner Bot-Name | Link\n' +
+      'Beispiel: ' + activePrefix + 'addpartner Elucidator-Bot | https://chat.whatsapp.com/XXXXXXXX'
     );
   }
 
@@ -4173,10 +4175,10 @@ if (cmd === 'addpartner') {
     return send('❌ Bitte gib einen gültigen Link an (muss mit http:// oder https:// beginnen).');
   }
 
-  partners.list.push({ name, link, addedBy: sender, at: Date.now() });
+  partners.list.push({ name: name, link: link, addedBy: sender, at: Date.now() });
   save(FILES.partners, partners);
 
-  return send(`✅ Bündnis mit *${name}* wurde geschlossen und in die Gildenchronik eingetragen! ⚔️`);
+  return send('✅ Bündnis mit *' + name + '* wurde geschlossen und in die Gildenchronik eingetragen! ⚔️');
 }
 
 // DELPARTNER
@@ -4187,12 +4189,12 @@ if (cmd === 'delpartner') {
 
   const index = parseInt(args[0]) - 1;
   if (isNaN(index) || index < 0 || index >= partners.list.length) {
-    return send(`❌ Ungültige Nummer. Nutze ${activePrefix}partner um die Liste mit Nummern zu sehen.`);
+    return send('❌ Ungültige Nummer. Nutze ' + activePrefix + 'partner um die Liste mit Nummern zu sehen.');
   }
 
   const removed = partners.list.splice(index, 1)[0];
   save(FILES.partners, partners);
-  return send(`💔 Bündnis mit *${removed.name}* wurde aufgelöst.`);
+  return send('💔 Bündnis mit *' + removed.name + '* wurde aufgelöst.');
 }
 // Unbekannter Befehl
 const suggestion = findClosestCommand(cmd);
