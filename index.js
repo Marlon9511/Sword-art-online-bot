@@ -333,7 +333,6 @@ const save = (f, d) => {
       return;
     }
   }
-let commandAllow = load(FILES.commandAllow.file) || {};
   const filePath = path.join(DATA_PATH, f);
   fs.writeFileSync(filePath, JSON.stringify(d, null, 2));
 };
