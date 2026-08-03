@@ -4021,6 +4021,62 @@ if (cmd === 'say') {
   await sock.sendMessage(from, { text });
   return;
 }
+// PARTNER (Gilden-Bündnisse anzeigen)
+if (cmd === 'partner' || cmd === 'partners' || cmd === 'buendnisse') {
+  if (!partners.list || partners.list.length === 0) {
+    return send('⚔️ *— GILDEN-BÜNDNISSE —* ⚔️\n\nAktuell bestehen keine Bündnisse mit anderen Gilden.');
+  }
+
+  const divider = '⚔️┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈⚔️';
+  let out = `⚔️ *— GILDEN-BÜNDNISSE —* ⚔️\n${divider}\n\n`;
+  partners.list.forEach((p, i) => {
+    out += `🛡️ *${p.name}*\n🔗 ${p.link}\n\n`;
+  });
+  out += `${divider}\n_"Gemeinsam sind wir stärker." — Verbündete Gilden von AINCRAD_`;
+  return send(out);
+}
+
+// ADDPARTNER
+if (cmd === 'addpartner') {
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) {
+    return send('❌ Nur der Gildenmeister darf neue Bündnisse eingehen.');
+  }
+
+  const input = args.join(' ');
+  const [name, link] = input.split('|').map(s => s?.trim());
+
+  if (!name || !link) {
+    return send(
+      `❌ Nutzung: ${activePrefix}addpartner Bot-Name | Link\n` +
+      `Beispiel: ${activePrefix}addpartner Elucidator-Bot | https://chat.whatsapp.com/XXXXXXXX`
+    );
+  }
+
+  if (!/^https?:\/\//i.test(link)) {
+    return send('❌ Bitte gib einen gültigen Link an (muss mit http:// oder https:// beginnen).');
+  }
+
+  partners.list.push({ name, link, addedBy: sender, at: Date.now() });
+  save(FILES.partners, partners);
+
+  return send(`✅ Bündnis mit *${name}* wurde geschlossen und in die Gildenchronik eingetragen! ⚔️`);
+}
+
+// DELPARTNER
+if (cmd === 'delpartner') {
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) {
+    return send('❌ Nur der Gildenmeister darf Bündnisse auflösen.');
+  }
+
+  const index = parseInt(args[0]) - 1;
+  if (isNaN(index) || index < 0 || index >= partners.list.length) {
+    return send(`❌ Ungültige Nummer. Nutze ${activePrefix}partner um die Liste mit Nummern zu sehen.`);
+  }
+
+  const removed = partners.list.splice(index, 1)[0];
+  save(FILES.partners, partners);
+  return send(`💔 Bündnis mit *${removed.name}* wurde aufgelöst.`);
+}
       // Unbekannter Befehl
       return send('❓ Unbekannter Befehl — ?help ist ein Menü für die Befehle genauso wie ?menu wenns da deinen Befehl nicht gibt frag daddy kirito nach ob es den gibt oder ob er es einbauen kann unter ?owner.');
 
