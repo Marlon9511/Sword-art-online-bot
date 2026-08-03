@@ -986,7 +986,7 @@ function levenshtein(a, b) {
 
 // Alle bekannten Befehle — bei neuen Commands hier ergänzen!
 const ALL_COMMANDS = [
-  'help', 'menu', 'ping', 'owner', 'com', 'whoami', 'me', 'afk',
+  'help', 'menu', 'sao', 'ping', 'owner', 'com', 'whoami', 'me', 'afk',
   'register', 'unregister', 'backup', 'balance', 'stats', 'profile', 'userinfo',
   'daily', 'work', 'fish', 'give', 'shop', 'buy', 'inventory', 'use',
   'slot', 'rps', 'blackjack', 'bj', 'bjstart', 'hit', 'stand',
@@ -1457,7 +1457,7 @@ helpText += `▸ ${PREFIX}divorce — Ring zurückgeben\n`;
 helpText += `▸ ${PREFIX}sticker — Bild/GIF antworten → Sticker craften\n`;
 helpText += `▸ ${PREFIX}bewerbung — Gildenbeitritt beantragen\n`;
 helpText += `▸ ${PREFIX}setinfo <feld> <wert> — Profilinfos setzen (name/alter/hobbys/sexualitaet)\n`;
-
+helpText += `▸ ${PREFIX}sao — Zufälligen Sword Art Online Edit abspielen\n`;
         helpText += `⚔️ *ARENA & WIRTSCHAFT* (Cor & Kämpfe)\n${divider}\n`;
         helpText += `▸ ${PREFIX}daily — Tägliche Quest-Belohnung\n`;
         helpText += `▸ ${PREFIX}blackjack — Glücksspiel im Coliseum\n`;
