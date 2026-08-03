@@ -3433,7 +3433,7 @@ const REACTION_COMMANDS = {
 angrystare: { emoji: "😠", verb: "starrt wütend" },
   bleh: { emoji: "😝", verb: "streckt die Zunge raus" },
   confused: { emoji: "😕", verb: "ist verwirrt" },
-  cry: { emoji: "😭", verb: "weint" },
+  cry: { emoji: "😭", verb: "weint wegen " },
   evillaugh: { emoji: "😈", verb: "lacht böse" },
   facepalm: { emoji: "🤦", verb: "macht einen Facepalm" },
   happy: { emoji: "😊", verb: "ist glücklich" },
