@@ -3779,6 +3779,25 @@ if (cmd === 'sex') {
     mentions: [sender, targetJid],
   }, { quoted: m });
 }
+function loadBannedCommands() {
+  try {
+    if (!fs.existsSync(BANNED_CMDS_FILE)) return [];
+    return JSON.parse(fs.readFileSync(BANNED_CMDS_FILE, 'utf8'));
+  } catch (e) {
+    console.error('[bancmd] Fehler beim Laden:', e.message);
+    return [];
+  }
+}
+
+function saveBannedCommands(list) {
+  fs.mkdirSync(path.dirname(BANNED_CMDS_FILE), { recursive: true });
+  fs.writeFileSync(BANNED_CMDS_FILE, JSON.stringify(list, null, 2));
+}
+
+function isCommandBanned(cmdName) {
+  const banned = loadBannedCommands();
+  return banned.includes(cmdName.toLowerCase());
+}
 if (cmd === 'bancmd') {
   if (!hasAdminPerms(sender)) {
     return send('❌ Nur der Owner darf Befehle sperren.');
