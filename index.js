@@ -3891,6 +3891,34 @@ function downloadMdEdit(url) {
     });
   });
 }
+// MD
+if (cmd === 'md') {
+  await send('🔍 Suche einen Edit...');
+
+  try {
+    const url = await searchMdEditUrl();
+    await send('⏳ Lade Edit, bitte warten...');
+
+    const videoPath = await downloadMdEdit(url);
+    const stats = fs.statSync(videoPath);
+
+    if (stats.size > 95 * 1024 * 1024) {
+      fs.unlinkSync(videoPath);
+      return send('❌ Das gefundene Video ist zu groß für WhatsApp. Versuch es nochmal.');
+    }
+
+    await sock.sendMessage(from, {
+      video: fs.readFileSync(videoPath),
+      caption: '🤖 Murder Drones Edit',
+      mimetype: 'video/mp4'
+    }, { quoted: m });
+    fs.unlinkSync(videoPath);
+  } catch (e) {
+    console.error('[md] Fehler:', e?.message || e);
+    return send('❌ Konnte keinen passenden Edit finden oder herunterladen. Versuch es später erneut.');
+  }
+  return;
+}
       // Unbekannter Befehl
       return send('❓ Unbekannter Befehl — ?help ist ein Menü für die Befehle genauso wie ?menu wenns da deinen Befehl nicht gibt frag daddy kirito nach ob es den gibt oder ob er es einbauen kann unter ?owner.');
 
