@@ -79,10 +79,9 @@ const FILES = {
   credits: { file: 'credits.json', default: { list: [] } },
 marriages: { file: 'marriages.json', default: {} },   
 commandAllow: { file: 'command-allow.json', default: {} },
-  officialGroup: { file: 'official-group.json', default: { link: 'https://chat.whatsapp.com/DBiDcF2s16FEWiGKyZA7Nl' } }
-partners: { file: 'partners.json', default: { list: [] } },
+  officialGroup: { file: 'official-group.json', default: { link: 'https://chat.whatsapp.com/DBiDcF2s16FEWiGKyZA7Nl' } },
+partners: { file: 'partners.json', default: { list: [] } }
 };
-
 Object.values(FILES).forEach(({ file, default: def }) => {
   ensureFile(path.join(DATA_PATH, file), def);
 });
