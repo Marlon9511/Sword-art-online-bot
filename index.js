@@ -4130,8 +4130,11 @@ if (cmd === 'delpartner') {
   return send(`💔 Bündnis mit *${removed.name}* wurde aufgelöst.`);
 }
       // Unbekannter Befehl
-      return send('❓ Unbekannter Befehl — ?help ist ein Menü für die Befehle genauso wie ?menu wenns da deinen Befehl nicht gibt frag daddy kirito nach ob es den gibt oder ob er es einbauen kann unter ?owner.');
-
+const suggestion = findClosestCommand(cmd);
+if (suggestion) {
+  return send(`❓ Unbekannter Befehl "${cmd}". Meintest du vielleicht "${activePrefix}${suggestion}"?\n\nNutze ${activePrefix}help für alle Befehle.`);
+}
+return send('❓ Unbekannter Befehl — ?help ist ein Menü für die Befehle genauso wie ?menu wenns da deinen Befehl nicht gibt frag daddy kirito nach ob es den gibt oder ob er es einbauen kann unter ?owner.');
     } catch (err) {
       console.error('messages.upsert error:', err);
       log(`ERROR: ${err?.message || String(err)}`);
