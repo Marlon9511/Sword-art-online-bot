@@ -3836,9 +3836,16 @@ if (cmd === 'sticker' || cmd === 's' || cmd === 'stiker') {
       fromMe: false,
       participant: ctx.participant
     };
-    if (q.imageMessage) { targetMsg = { key: quotedKey, message: q }; mediaType = 'image'; }
-    else if (q.videoMessage) { targetMsg = { key: quotedKey, message: q }; mediaType = 'video'; }
-    else if (q.stickerMessage) { targetMsg = { key: quotedKey, message: q }; mediaType = 'sticker'; }
+    if (q.imageMessage) {
+      targetMsg = { key: quotedKey, message: q };
+      mediaType = 'image';
+    } else if (q.videoMessage) {
+      targetMsg = { key: quotedKey, message: q };
+      mediaType = 'video';
+    } else if (q.stickerMessage) {
+      targetMsg = { key: quotedKey, message: q };
+      mediaType = q.stickerMessage.isAnimated ? 'animatedSticker' : 'sticker';
+    }
   }
 
   // Fall 2: Bild/Video direkt mit Befehl als Bildunterschrift
@@ -3859,8 +3866,8 @@ if (cmd === 'sticker' || cmd === 's' || cmd === 'stiker') {
       { logger: P({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
     );
 
-    const isAnimated = mediaType === 'video';
-    const ext = mediaType === 'video' ? 'mp4' : (mediaType === 'sticker' ? 'webp' : 'jpg');
+    const isAnimated = mediaType === 'video' || mediaType === 'animatedSticker';
+    const ext = (mediaType === 'video') ? 'mp4' : (mediaType === 'image' ? 'jpg' : 'webp');
 
     let webpBuffer = await bufferToSticker(buffer, ext, isAnimated);
 
