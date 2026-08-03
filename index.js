@@ -1019,9 +1019,16 @@ function findClosestCommand(input) {
       best = c;
     }
   }
+
+  const maxLen = Math.max(input.length, best ? best.length : 1);
+  const similarity = Math.round((1 - bestDist / maxLen) * 100);
+
   // Nur vorschlagen, wenn der Tippfehler "klein genug" ist (max. 40% der Wortlänge abweichend)
   const threshold = Math.max(1, Math.floor(input.length * 0.4));
-  return bestDist <= threshold ? best : null;
+  if (bestDist <= threshold) {
+    return { command: best, similarity };
+  }
+  return null;
 }
 const rawBody = (body || '').trim();
 const noPrefixMatch = rawBody.match(/^[^\w]*(\w+)/);
@@ -4129,12 +4136,27 @@ if (cmd === 'delpartner') {
   save(FILES.partners, partners);
   return send(`💔 Bündnis mit *${removed.name}* wurde aufgelöst.`);
 }
-      // Unbekannter Befehl
+// Unbekannter Befehl
 const suggestion = findClosestCommand(cmd);
 if (suggestion) {
-  return send(`❓ Unbekannter Befehl "${cmd}". Meintest du vielleicht "${activePrefix}${suggestion}"?\n\nNutze ${activePrefix}help für alle Befehle.`);
+  return send(
+    `⚠️ *SYSTEM-FEHLER* ⚠️\n` +
+    `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+    `Der Befehl "${cmd}" existiert nicht im Aincrad-System.\n\n` +
+    `🔍 *Ähnlichste Erkenntnis:*\n` +
+    `⌈ ${activePrefix}${suggestion.command} ⌋ — Übereinstimmung: ${suggestion.similarity}%\n\n` +
+    `Meintest du das, Schwertkämpfer?\n` +
+    `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+    `_Nutze ${activePrefix}help für das vollständige Skill-Menü._`
+  );
 }
-return send('❓ Unbekannter Befehl — ?help ist ein Menü für die Befehle genauso wie ?menu wenns da deinen Befehl nicht gibt frag daddy kirito nach ob es den gibt oder ob er es einbauen kann unter ?owner.');
+return send(
+  `❓ *UNBEKANNTER BEFEHL* ❓\n` +
+  `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+  `Dieser Skill wurde noch nicht erlernt.\n` +
+  `Nutze ${activePrefix}help oder ${activePrefix}menu für das Command-Window.\n\n` +
+  `Falls du glaubst, dieser Skill sollte existieren, wende dich an Daddy Kirito unter ${activePrefix}owner.`
+);
     } catch (err) {
       console.error('messages.upsert error:', err);
       log(`ERROR: ${err?.message || String(err)}`);
