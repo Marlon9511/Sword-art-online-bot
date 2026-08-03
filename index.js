@@ -3420,21 +3420,16 @@ if (cmd === 'ytmp3') {
   return;
 }
 const REACTION_COMMANDS = {
-  throw: { emoji: "🤾", verb: "wirft" },
-  slap: { emoji: "👋", verb: "verpasst eine Ohrfeige" },
-  hug: { emoji: "🤗", verb: "umarmt" },
-  kiss: { emoji: "😘", verb: "küsst" },
-  pat: { emoji: "🤚", verb: "tätschelt" },
-  poke: { emoji: "👉", verb: "pikst" },
-  cuddle: { emoji: "🥰", verb: "kuschelt mit" },
-  bite: { emoji: "😬", verb: "beißt" },
-  punch: { emoji: "🥊", verb: "verpasst einen Schlag" },
-hug: { emoji: "🤗", verb: "umarmt", apiReaction: "hug" },
-  love: { emoji: "❤️", verb: "liebt", apiReaction: "love" },
-  blush: { emoji: "😳", verb: "wird rot wegen", apiReaction: "blush" },
-  handhold: { emoji: "🤝", verb: "hält die Hand von", apiReaction: "handhold" },
-  lick: { emoji: "👅", verb: "leckt", apiReaction: "lick" },
-  nervous: { emoji: "😅", verb: "ist nervös wegen", apiReaction: "nervous" },
+  throw:  { emoji: "🤾", verb: "wirft",                 query: "anime throw" },
+  slap:   { emoji: "👋", verb: "verpasst eine Ohrfeige",  query: "anime slap" },
+  hug:    { emoji: "🤗", verb: "umarmt",                 query: "anime hug" },
+  kiss:   { emoji: "😘", verb: "küsst",                  query: "anime kiss" },
+  pat:    { emoji: "🤚", verb: "tätschelt",              query: "anime pat head" },
+  poke:   { emoji: "👉", verb: "pikst",                  query: "anime poke" },
+  cuddle: { emoji: "🥰", verb: "kuschelt mit",           query: "anime cuddle" },
+  bite:   { emoji: "😬", verb: "beißt",                  query: "anime bite" },
+  punch:  { emoji: "🥊", verb: "verpasst einen Schlag",   query: "anime punch" },
+  sleep:  { emoji: "😴", verb: "schläft ein neben",       query: "anime sleep" }, // NEU
 };
 
 async function getReactionGifUrl(reaction) {
