@@ -3816,38 +3816,40 @@ function isCommandBanned(cmdName) {
   const banned = loadBannedCommands();
   return banned.includes(cmdName.toLowerCase());
 }
+// BANCMD
 if (cmd === 'bancmd') {
-  if (!hasAdminPerms(sender)) {
-    return send('❌ Nur der Owner darf Befehle sperren.');
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Nur Owner/CoOwner.');
+
+  const target = args[0];
+  const action = (args[1] || 'ban').toLowerCase();
+
+  if (!target) {
+    return send(`Nutzung: ${PREFIX}bancmd <befehl> [ban|unban]`);
   }
 
-  const targetCmd = args[0]?.toLowerCase();
-  const action = args[1]?.toLowerCase(); // "ban" | "unban"
+  const tcmd = String(target).toLowerCase().replace(new RegExp(`^\\${PREFIX}`), '').trim();
+  if (!tcmd) return send('❌ Ungültiger Befehl.');
 
-  if (!targetCmd || !['ban', 'unban'].includes(action)) {
-    return send(`⚙️ Nutzung: ${PREFIX}bancmd <befehl> ban\n${PREFIX}bancmd <befehl> unban`);
-  }
-
-  const banned = loadBannedCommands();
-
-  if (action === 'ban') {
-    if (banned.includes(targetCmd)) {
-      return send(`⚠️ *${targetCmd}* ist bereits gesperrt.`);
-    }
-    banned.push(targetCmd);
-    saveBannedCommands(banned);
-    return send(`🔒 Befehl *${targetCmd}* wurde gesperrt.`);
+  // Schutz: Kritische Befehle dürfen nicht gesperrt werden
+  const protectedCmds = ['bancmd', 'unbancmd', 'help', 'menu'];
+  if (protectedCmds.includes(tcmd)) {
+    return send(`❌ Der Befehl "${tcmd}" kann nicht gesperrt werden.`);
   }
 
   if (action === 'unban') {
-    const idx = banned.indexOf(targetCmd);
-    if (idx === -1) {
-      return send(`⚠️ *${targetCmd}* ist gar nicht gesperrt.`);
+    if (commandBans[tcmd]) {
+      delete commandBans[tcmd];
+      save(FILES.commandBans, commandBans);
+      return send(`✅ Befehl ${tcmd} wurde entsperrt.`);
+    } else {
+      return send(`ℹ️ Befehl ${tcmd} war nicht gesperrt.`);
     }
-    banned.splice(idx, 1);
-    saveBannedCommands(banned);
-    return send(`🔓 Befehl *${targetCmd}* wurde entsperrt.`);
   }
+
+  // Default: ban
+  commandBans[tcmd] = { by: sender, at: new Date().toISOString() };
+  save(FILES.commandBans, commandBans);
+  return send(`⛔ Befehl ${tcmd} wurde gesperrt und ist nur noch für Owner/CoOwner verfügbar.`);
 }
       // Unbekannter Befehl
       return send('❓ Unbekannter Befehl — ?help ist ein Menü für die Befehle genauso wie ?menu wenns da deinen Befehl nicht gibt frag daddy kirito nach ob es den gibt oder ob er es einbauen kann unter ?owner.');
