@@ -210,7 +210,6 @@ const saveBotState = () => {
     fs.writeFileSync(BOT_STATE_FILE, JSON.stringify({ offline: !!BOT_OFFLINE, prefix: PREFIX }, null, 2));
   } catch (e) { console.error('Failed to save bot state:', e); }
 };
-let commandAllow = load(FILES.commandAllow.file) || {};
 
 const _teamTodosPath = path.join(DATA_PATH, FILES.teamTodos.file);
 if (!fs.existsSync(_teamTodosPath)) fs.writeFileSync(_teamTodosPath, '{}');
@@ -334,7 +333,7 @@ const save = (f, d) => {
       return;
     }
   }
-
+let commandAllow = load(FILES.commandAllow.file) || {};
   const filePath = path.join(DATA_PATH, f);
   fs.writeFileSync(filePath, JSON.stringify(d, null, 2));
 };
