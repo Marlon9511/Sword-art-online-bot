@@ -684,7 +684,25 @@ function trackGroupMessage(groupJid, msgId, participant) {
     arr.splice(0, arr.length - MAX_TRACKED_PER_GROUP);
   }
 }
+function loadBannedCommands() {
+  try {
+    if (!fs.existsSync(BANNED_CMDS_FILE)) return [];
+    return JSON.parse(fs.readFileSync(BANNED_CMDS_FILE, 'utf8'));
+  } catch (e) {
+    console.error('[bancmd] Fehler beim Laden:', e.message);
+    return [];
+  }
+}
 
+function saveBannedCommands(list) {
+  fs.mkdirSync(path.dirname(BANNED_CMDS_FILE), { recursive: true });
+  fs.writeFileSync(BANNED_CMDS_FILE, JSON.stringify(list, null, 2));
+}
+
+function isCommandBanned(cmdName) {
+  const banned = loadBannedCommands();
+  return banned.includes(cmdName.toLowerCase());
+}
 // ========== GAME HELPERS ==========
 const SLOT_SYMBOLS = ['🍒', '🍋', '🍇', '🍉', '⭐', '💎'];
 function spinSlots() { return [SLOT_SYMBOLS[randInt(0, SLOT_SYMBOLS.length - 1)], SLOT_SYMBOLS[randInt(0, SLOT_SYMBOLS.length - 1)], SLOT_SYMBOLS[randInt(0, SLOT_SYMBOLS.length - 1)]]; }
