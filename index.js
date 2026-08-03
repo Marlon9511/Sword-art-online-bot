@@ -4124,9 +4124,7 @@ if (cmd === 'sao') {
 if (cmd === 'say') {
   const text = args.join(' ').trim();
   if (!text) {
-    return send(`❌ Nutzung: ${activePrefix}say <nachricht>`);
-  }
-
+    return send('❌ Nutzung: ' + activePrefix + 'say <nachricht>');
   // Erst versuchen, die eigene Befehlsnachricht zu löschen (nur in Gruppen, wenn Bot Admin ist)
   if (isGroup) {
     try {
