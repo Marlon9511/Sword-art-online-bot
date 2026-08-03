@@ -4206,6 +4206,49 @@ if (cmd === 'delpartner') {
   save(FILES.partners, partners);
   return send('💔 Bündnis mit *' + removed.name + '* wurde aufgelöst.');
 }
+// NACHTSPERRE
+if (cmd === 'nachtsperre' || cmd === 'quiethours') {
+  if (!isGroup) return send('❌ Nur in Gruppen.');
+
+  const groupMetadata = await getGroupMetaSafe(from);
+  const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
+  if (!isGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) {
+    return send('❌ Du musst Admin in dieser Gruppe sein.');
+  }
+
+  const sub = (args[0] || '').toLowerCase();
+
+  if (sub === 'aus' || sub === 'off') {
+    delete groupLockSchedules[from];
+    save(FILES.groupLockSchedule, groupLockSchedules);
+    // Zur Sicherheit sofort wieder entsperren, falls sie gerade gesperrt ist
+    try { await sock.groupSettingUpdate(from, 'not_announcement'); } catch (e) {}
+    return send('✅ Nachtsperre deaktiviert. Die Gruppe ist dauerhaft offen.');
+  }
+
+  if (sub === 'status' || !sub) {
+    const entry = groupLockSchedules[from];
+    if (!entry) return send('ℹ️ Für diese Gruppe ist keine Nachtsperre aktiv.\n\nNutzung: ' + activePrefix + 'nachtsperre an 22:00 07:00');
+    return send('🌙 Nachtsperre aktiv:\nSperrt um ' + entry.start + ' Uhr\nÖffnet um ' + entry.end + ' Uhr');
+  }
+
+  if (sub === 'an' || sub === 'on') {
+    const start = args[1];
+    const end = args[2];
+    const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+    if (!start || !end || !timeRegex.test(start) || !timeRegex.test(end)) {
+      return send('❌ Nutzung: ' + activePrefix + 'nachtsperre an <start HH:MM> <ende HH:MM>\nBeispiel: ' + activePrefix + 'nachtsperre an 22:00 07:00');
+    }
+
+    groupLockSchedules[from] = { start: start, end: end, setBy: sender };
+    save(FILES.groupLockSchedule, groupLockSchedules);
+
+    return send('✅ Nachtsperre aktiviert.\nSperrt täglich um ' + start + ' Uhr\nÖffnet täglich um ' + end + ' Uhr\n\nNur Admins können während der Sperrzeit schreiben.');
+  }
+
+  return send('❌ Nutzung: ' + activePrefix + 'nachtsperre an/aus/status');
+}
 // Unbekannter Befehl
 const suggestion = findClosestCommand(cmd);
 if (suggestion) {
