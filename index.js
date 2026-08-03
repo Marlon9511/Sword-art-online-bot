@@ -969,7 +969,60 @@ if (!m.key.fromMe && pendingApplications.has(sender)) {
   }
   return;
 }
+// Levenshtein-Distanz: misst, wie "ähnlich" zwei Strings sind
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (a[i - 1] === b[j - 1]) dp[i][j] = dp[i - 1][j - 1];
+      else dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
 
+// Alle bekannten Befehle — bei neuen Commands hier ergänzen!
+const ALL_COMMANDS = [
+  'help', 'menu', 'ping', 'owner', 'com', 'whoami', 'me', 'afk',
+  'register', 'unregister', 'backup', 'balance', 'stats', 'profile', 'userinfo',
+  'daily', 'work', 'fish', 'give', 'shop', 'buy', 'inventory', 'use',
+  'slot', 'rps', 'blackjack', 'bj', 'bjstart', 'hit', 'stand',
+  'adopt', 'pet', 'petinfo', 'feed', 'play',
+  'support', 'ticket', 'tickets', 'answer', 'closeticket', 'cleartickets',
+  'todo', 'todos', 'usertodo', 'usertodos',
+  'gi', 'welcome-an', 'welcome-aus', 'welcome-set', 'games-an', 'games-aus',
+  'antilink-an', 'antilink-aus', 'setprefix', 'resetprefix', 'hidetag', 'delete', 'del', 'purge', 'clearchat',
+  'ban', 'unban', 'banlist', 'kick', 'warn', 'clearwarns', 'promote', 'demote',
+  'setrole', 'setrank', 'listroles', 'applyroles', 'addxp', 'addcash', 'addvip', 'resetcoins',
+  'bancmd', 'unbancmd', 'broadcast', 'restart', 'updateprofile',
+  'newsession', 'sessions', 'stopsession', 'deletesession', 'delsession',
+  'grouplist', 'gl', 'join', 'leave', 'joinreq', 'getlid', 'groupid', 'gruppenid',
+  'credits', 'addcredit', 'delcredit', 'partner', 'partners', 'buendnisse', 'addpartner', 'delpartner',
+  'marry', 'divorce', 'bewerbung', 'bewerben', 'apply',
+  'dsgvo', 'ytmp3', 'sticker', 's', 'stiker', 'add', 'code', 'yeetban', 'datadelete',
+  'rangliste', 'leaderboard', 'rank', 'setinfo', 'allowcmd', 'say', 'md',
+  'selfpromote', 'sp', 'selfdemote', 'sd',
+  'slap', 'hug', 'kiss', 'pat', 'poke', 'cuddle', 'bite', 'punch', 'throw',
+  'love', 'blush', 'handhold', 'lick', 'nervous'
+];
+
+function findClosestCommand(input) {
+  let best = null;
+  let bestDist = Infinity;
+  for (const c of ALL_COMMANDS) {
+    const dist = levenshtein(input, c);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = c;
+    }
+  }
+  // Nur vorschlagen, wenn der Tippfehler "klein genug" ist (max. 40% der Wortlänge abweichend)
+  const threshold = Math.max(1, Math.floor(input.length * 0.4));
+  return bestDist <= threshold ? best : null;
+}
 const rawBody = (body || '').trim();
 const noPrefixMatch = rawBody.match(/^[^\w]*(\w+)/);
 const cmdNoPrefix = noPrefixMatch ? noPrefixMatch[1].toLowerCase() : '';
