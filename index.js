@@ -823,16 +823,22 @@ const pendingApplications = new Map(); // sender -> { step, answers }
       const now = new Date();
       const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
+      const scheduleCount = Object.keys(groupLockSchedules).length;
+      console.log('[nachtsperre] Check läuft:', now.toLocaleTimeString(), '| Gruppen mit Zeitplan:', scheduleCount);
+
       for (const [groupJid, schedule] of Object.entries(groupLockSchedules)) {
         const shouldBeLocked = isWithinLockWindow(schedule.start, schedule.end, nowMinutes);
         const currentState = lockStateCache.get(groupJid);
         const desiredState = shouldBeLocked ? 'locked' : 'unlocked';
+
+        console.log('[nachtsperre]', groupJid, '| soll:', desiredState, '| ist aktuell:', currentState || '(unbekannt)');
 
         if (currentState === desiredState) continue;
 
         try {
           await sock.groupSettingUpdate(groupJid, shouldBeLocked ? 'announcement' : 'not_announcement');
           lockStateCache.set(groupJid, desiredState);
+          console.log('[nachtsperre] ✅ Gruppe', groupJid, shouldBeLocked ? 'gesperrt' : 'entsperrt');
 
           if (shouldBeLocked) {
             await sock.sendMessage(groupJid, { text: '🌙 Nachtsperre aktiv. Die Gruppe wurde bis ' + schedule.end + ' Uhr gesperrt.' });
@@ -840,7 +846,7 @@ const pendingApplications = new Map(); // sender -> { step, answers }
             await sock.sendMessage(groupJid, { text: '☀️ Nachtsperre beendet. Die Gruppe ist wieder offen.' });
           }
         } catch (e) {
-          // Bot ist evtl. kein Admin mehr oder nicht mehr in der Gruppe — einfach überspringen
+          console.error('[nachtsperre] ❌ Fehler beim Sperren/Entsperren von', groupJid, ':', e?.message || e);
         }
       }
     } catch (e) {
