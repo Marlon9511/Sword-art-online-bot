@@ -3818,6 +3818,13 @@ function isCommandBanned(cmdName) {
   const banned = loadBannedCommands();
   return banned.includes(cmdName.toLowerCase());
 }
+if (commandAllow && commandAllow[cmd] && !isAuthorized(sender, ['OWNER', 'COOWNER'])) {
+  const allowedUsers = commandAllow[cmd].users || [];
+  const isAllowed = allowedUsers.some(jid => isSameJid(jid, sender));
+  if (!isAllowed) {
+    return send(`⛔ Der Befehl "${cmd}" ist nur für freigegebene Nutzer verfügbar.`);
+  }
+}
 // BANCMD
 if (cmd === 'bancmd') {
   if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Nur Owner/CoOwner.');
@@ -3852,6 +3859,76 @@ if (cmd === 'bancmd') {
   commandBans[tcmd] = { by: sender, at: new Date().toISOString() };
   save(FILES.commandBans, commandBans);
   return send(`⛔ Befehl ${tcmd} wurde gesperrt und ist nur noch für Owner/CoOwner verfügbar.`);
+}
+// ALLOWCMD
+if (cmd === 'allowcmd') {
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Nur Owner/CoOwner.');
+
+  const target = args[0];
+  if (!target) {
+    return send(
+      `Nutzung:\n` +
+      `${PREFIX}allowcmd <befehl> @user1 @user2 ... — Befehl auf diese Nutzer beschränken\n` +
+      `${PREFIX}allowcmd <befehl> reset — Beschränkung aufheben (Befehl wieder für alle)\n` +
+      `${PREFIX}allowcmd <befehl> list — Zeigt freigegebene Nutzer`
+    );
+  }
+
+  const tcmd = String(target).toLowerCase().replace(new RegExp(`^\\${PREFIX}`), '').trim();
+  if (!tcmd) return send('❌ Ungültiger Befehl.');
+
+  const sub = (args[1] || '').toLowerCase();
+
+  // Reset: Beschränkung entfernen
+  if (sub === 'reset') {
+    if (commandAllow[tcmd]) {
+      delete commandAllow[tcmd];
+      save(FILES.commandAllow, commandAllow);
+      return send(`✅ Beschränkung für "${tcmd}" wurde aufgehoben. Befehl ist wieder für alle nutzbar.`);
+    }
+    return send(`ℹ️ Für "${tcmd}" bestand keine Beschränkung.`);
+  }
+
+  // List: aktuelle Freigaben anzeigen
+  if (sub === 'list') {
+    const entry = commandAllow[tcmd];
+    if (!entry || !entry.users?.length) {
+      return send(`ℹ️ "${tcmd}" ist aktuell nicht eingeschränkt.`);
+    }
+    const mentions = entry.users;
+    const names = await Promise.all(entry.users.map(jid => getNumberMention(jid, sock)));
+    return send(`🔐 "${tcmd}" ist freigegeben für:\n${names.join('\n')}`, { mentions });
+  }
+
+  // Nutzer aus Mentions holen
+  const ctx = m.message?.extendedTextMessage?.contextInfo;
+  const mentioned = ctx?.mentionedJid || [];
+
+  if (!mentioned.length) {
+    return send(`❌ Bitte markiere mindestens einen Nutzer mit @.\nBeispiel: ${PREFIX}allowcmd ${tcmd} @user1 @user2`);
+  }
+
+  const normalizedMentions = mentioned.map(normalizeJid).filter(Boolean);
+
+  if (!commandAllow[tcmd]) {
+    commandAllow[tcmd] = { by: sender, at: new Date().toISOString(), users: [] };
+  }
+
+  // Neue Nutzer hinzufügen (Duplikate vermeiden)
+  for (const jid of normalizedMentions) {
+    if (!commandAllow[tcmd].users.some(id => isSameJid(id, jid))) {
+      commandAllow[tcmd].users.push(jid);
+    }
+  }
+
+  save(FILES.commandAllow, commandAllow);
+
+  const displayNames = await Promise.all(normalizedMentions.map(jid => getNumberMention(jid, sock)));
+  return send(
+    `✅ Befehl "${tcmd}" ist jetzt auf folgende Nutzer beschränkt:\n${displayNames.join('\n')}\n\n` +
+    `Owner/CoOwner können ihn weiterhin uneingeschränkt nutzen.`,
+    { mentions: normalizedMentions }
+  );
 }
 // ===== MURDER DRONES EDITS (automatische Suche) =====
 const MD_SEARCH_QUERIES = [
