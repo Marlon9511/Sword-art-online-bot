@@ -3760,7 +3760,7 @@ if (cmd === 'sex') {
   const target = mentioned[0] || repliedTo;
 
   if (!target) {
-    return send('mit wem willst du Sex haben? markiere die nachricht oder mache @makierung${activePrefix}fun`);
+    return send(`mit wem willst du Sex haben? markiere die nachricht oder mache @makierung${activePrefix}fun`);
   }
 
   const targetJid = normalizeJid(target);
