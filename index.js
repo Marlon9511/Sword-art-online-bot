@@ -2009,6 +2009,8 @@ console.log('[whoami] Socket-Status:', sock.ws?.readyState, '| User:', !!sock.us
         }
 
         return send(caption);
+      }
+
       // PING
       if (cmd === 'ping') {
         const startTime = Date.now();
