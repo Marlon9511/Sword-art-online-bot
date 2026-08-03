@@ -4056,13 +4056,19 @@ function searchSaoEditUrl() {
     });
   });
 }
-
 function downloadSaoEdit(url) {
   return new Promise((resolve, reject) => {
     fs.mkdirSync(SAO_CACHE_DIR, { recursive: true });
-    const outPath = path.join(SAO_CACHE_DIR, `${Date.now()}.mp4`);
+    const outPath = path.join(SAO_CACHE_DIR, Date.now() + '.mp4');
 
-    const cmd = `yt-dlp -f "mp4" --no-playlist -o "${outPath}" "${url}"
+    const cmd = 'yt-dlp -f "mp4" --no-playlist -o "' + outPath + '" "' + url + '"';
+    exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
+      if (err) return reject(err);
+      resolve(outPath);
+    });
+  });
+}
+
 // MD
 if (cmd === 'md') {
   await send('🔍 Suche einen Edit...');
