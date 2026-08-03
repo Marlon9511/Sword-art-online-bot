@@ -3866,10 +3866,17 @@ if (cmd === 'sticker' || cmd === 's' || cmd === 'stiker') {
       { logger: P({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
     );
 
-    const isAnimated = mediaType === 'video' || mediaType === 'animatedSticker';
-    const ext = (mediaType === 'video') ? 'mp4' : (mediaType === 'image' ? 'jpg' : 'webp');
+    let webpBuffer;
 
-    let webpBuffer = await bufferToSticker(buffer, ext, isAnimated);
+    if (mediaType === 'sticker' || mediaType === 'animatedSticker') {
+      // Ist bereits ein gültiger WhatsApp-Sticker (webp) -> keine ffmpeg-Konvertierung nötig,
+      // die scheitert bei animierten Stickern am ffmpeg-WebP-Demuxer.
+      webpBuffer = buffer;
+    } else {
+      const isAnimated = mediaType === 'video';
+      const ext = (mediaType === 'video') ? 'mp4' : 'jpg';
+      webpBuffer = await bufferToSticker(buffer, ext, isAnimated);
+    }
 
     const customName = args.join(' ').trim();
     const packName = 'Sword Art Online Bot';
