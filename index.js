@@ -4131,8 +4131,9 @@ if (cmd === 'say') {
   const text = args.join(' ').trim();
   if (!text) {
     return send('❌ Nutzung: ' + activePrefix + 'say <nachricht>');
-  // Erst versuchen, die eigene Befehlsnachricht zu löschen (nur in Gruppen, wenn Bot Admin ist)
-  if (isGroup) {
+  }
+
+  if (isGroup) { 
     try {
       await sock.sendMessage(from, {
         delete: { remoteJid: from, id: m.key.id, fromMe: false, participant: sender }
