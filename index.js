@@ -3779,6 +3779,39 @@ if (cmd === 'sex') {
     mentions: [sender, targetJid],
   }, { quoted: m });
 }
+if (cmd === 'bancmd') {
+  if (!hasAdminPerms(sender)) {
+    return send('❌ Nur der Owner darf Befehle sperren.');
+  }
+
+  const targetCmd = args[0]?.toLowerCase();
+  const action = args[1]?.toLowerCase(); // "ban" | "unban"
+
+  if (!targetCmd || !['ban', 'unban'].includes(action)) {
+    return send(`⚙️ Nutzung: ${PREFIX}bancmd <befehl> ban\n${PREFIX}bancmd <befehl> unban`);
+  }
+
+  const banned = loadBannedCommands();
+
+  if (action === 'ban') {
+    if (banned.includes(targetCmd)) {
+      return send(`⚠️ *${targetCmd}* ist bereits gesperrt.`);
+    }
+    banned.push(targetCmd);
+    saveBannedCommands(banned);
+    return send(`🔒 Befehl *${targetCmd}* wurde gesperrt.`);
+  }
+
+  if (action === 'unban') {
+    const idx = banned.indexOf(targetCmd);
+    if (idx === -1) {
+      return send(`⚠️ *${targetCmd}* ist gar nicht gesperrt.`);
+    }
+    banned.splice(idx, 1);
+    saveBannedCommands(banned);
+    return send(`🔓 Befehl *${targetCmd}* wurde entsperrt.`);
+  }
+}
       // Unbekannter Befehl
       return send('❓ Unbekannter Befehl — ?help ist ein Menü für die Befehle genauso wie ?menu wenns da deinen Befehl nicht gibt frag daddy kirito nach ob es den gibt oder ob er es einbauen kann unter ?owner.');
 
