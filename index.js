@@ -664,6 +664,7 @@ function persistAll() {
   save(FILES.pets, pets);
   save(FILES.tickets, tickets);
   save(FILES.ranks, ranks);
+  save(FILES.partners, partners);
   save(FILES.broadcastSettings, broadcastSettings);
   save(FILES.deleted, deletedUsers);
   save(FILES.credits, credits);
