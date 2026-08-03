@@ -501,6 +501,7 @@ let tickets = normalizeDataKeys(load(FILES.tickets.file));
 let ranks = normalizeDataKeys(load(FILES.ranks.file));
 let marriages = normalizeDataKeys(load(FILES.marriages.file));
 let commandBans = load(FILES.commandBans.file) || {};
+let commandAllow = load(FILES.commandAllow.file) || {};
 let credits = load(FILES.credits.file) || { list: [] };
 let officialGroup = load(FILES.officialGroup.file) || { link: 'https://chat.whatsapp.com/DBiDcF2s16FEWiGKyZA7Nl' };
 if (!officialGroup.link) officialGroup.link = 'https://chat.whatsapp.com/DBiDcF2s16FEWiGKyZA7Nl';
