@@ -3997,6 +3997,27 @@ if (cmd === 'md') {
   }
   return;
 }
+// SAY
+if (cmd === 'say') {
+  const text = args.join(' ').trim();
+  if (!text) {
+    return send(`❌ Nutzung: ${activePrefix}say <nachricht>`);
+  }
+
+  // Erst versuchen, die eigene Befehlsnachricht zu löschen (nur in Gruppen, wenn Bot Admin ist)
+  if (isGroup) {
+    try {
+      await sock.sendMessage(from, {
+        delete: { remoteJid: from, id: m.key.id, fromMe: false, participant: sender }
+      });
+    } catch (e) {
+      // Löschen fehlgeschlagen (z.B. kein Admin) — kein Problem, einfach weitermachen
+    }
+  }
+
+  await sock.sendMessage(from, { text });
+  return;
+}
       // Unbekannter Befehl
       return send('❓ Unbekannter Befehl — ?help ist ein Menü für die Befehle genauso wie ?menu wenns da deinen Befehl nicht gibt frag daddy kirito nach ob es den gibt oder ob er es einbauen kann unter ?owner.');
 
