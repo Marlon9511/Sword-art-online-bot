@@ -497,6 +497,7 @@ function isAuthorized(jid, allowedRoles) {
 let users = normalizeDataKeys(load(FILES.users.file));
 let bans = normalizeDataKeys(load(FILES.bans.file));
 let joinreqs = normalizeDataKeys(load(FILES.joinreq.file));
+let partners = load(FILES.partners.file) || { list: [] };
 let pets = normalizeDataKeys(load(FILES.pets.file));
 let tickets = normalizeDataKeys(load(FILES.tickets.file));
 let ranks = normalizeDataKeys(load(FILES.ranks.file));
