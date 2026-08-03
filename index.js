@@ -818,7 +818,8 @@ const pendingApplications = new Map(); // sender -> { step, answers }
     return nowMinutes >= start || nowMinutes < end;
   }
 
-  setInterval(async () => {
+ setInterval(async () => {
+    if (sessionName !== 'default') return; // Nur eine Session soll den Scheduler ausführen
     try {
       const now = new Date();
       const nowMinutes = now.getHours() * 60 + now.getMinutes();
