@@ -4031,6 +4031,38 @@ function downloadMdEdit(url) {
     });
   });
 }
+// ===== SWORD ART ONLINE EDITS (automatische Suche) =====
+const SAO_SEARCH_QUERIES = [
+  'sword art online edit',
+  'sword art online amv',
+  'sao edit shorts',
+  'kirito asuna edit',
+  'sword art online tiktok edit'
+];
+
+const SAO_CACHE_DIR = path.join(__dirname, 'cache', 'saoedits');
+
+function searchSaoEditUrl() {
+  return new Promise((resolve, reject) => {
+    const query = SAO_SEARCH_QUERIES[randInt(0, SAO_SEARCH_QUERIES.length - 1)];
+    const cmd = `yt-dlp "ytsearch10:${query}" --get-id --no-playlist --match-filter "duration < 180"`;
+
+    exec(cmd, { maxBuffer: 1024 * 1024 * 10 }, (err, stdout) => {
+      if (err) return reject(err);
+      const ids = stdout.split('\n').map(s => s.trim()).filter(Boolean);
+      if (!ids.length) return reject(new Error('Keine Ergebnisse gefunden'));
+      const chosenId = ids[randInt(0, ids.length - 1)];
+      resolve(`https://www.youtube.com/watch?v=${chosenId}`);
+    });
+  });
+}
+
+function downloadSaoEdit(url) {
+  return new Promise((resolve, reject) => {
+    fs.mkdirSync(SAO_CACHE_DIR, { recursive: true });
+    const outPath = path.join(SAO_CACHE_DIR, `${Date.now()}.mp4`);
+
+    const cmd = `yt-dlp -f "mp4" --no-playlist -o "${outPath}" "${url}"
 // MD
 if (cmd === 'md') {
   await send('🔍 Suche einen Edit...');
@@ -4055,6 +4087,34 @@ if (cmd === 'md') {
     fs.unlinkSync(videoPath);
   } catch (e) {
     console.error('[md] Fehler:', e?.message || e);
+    return send('❌ Konnte keinen passenden Edit finden oder herunterladen. Versuch es später erneut.');
+  }
+  return;
+}
+// SAO
+if (cmd === 'sao') {
+  await send('⚔️ Durchsuche die Aincrad-Archive nach einem Edit...');
+
+  try {
+    const url = await searchSaoEditUrl();
+    await send('⏳ Lade Edit, bitte warten...');
+
+    const videoPath = await downloadSaoEdit(url);
+    const stats = fs.statSync(videoPath);
+
+    if (stats.size > 95 * 1024 * 1024) {
+      fs.unlinkSync(videoPath);
+      return send('❌ Das gefundene Video ist zu groß für WhatsApp. Versuch es nochmal.');
+    }
+
+    await sock.sendMessage(from, {
+      video: fs.readFileSync(videoPath),
+      caption: '⚔️ Sword Art Online Edit',
+      mimetype: 'video/mp4'
+    }, { quoted: m });
+    fs.unlinkSync(videoPath);
+  } catch (e) {
+    console.error('[sao] Fehler:', e?.message || e);
     return send('❌ Konnte keinen passenden Edit finden oder herunterladen. Versuch es später erneut.');
   }
   return;
