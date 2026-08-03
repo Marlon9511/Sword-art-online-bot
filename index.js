@@ -4146,14 +4146,13 @@ if (cmd === 'partner' || cmd === 'partners' || cmd === 'buendnisse') {
   }
 
   const divider = '⚔️┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈⚔️';
-  let out = `⚔️ *— GILDEN-BÜNDNISSE —* ⚔️\n${divider}\n\n`;
+  let out = '⚔️ *— GILDEN-BÜNDNISSE —* ⚔️\n' + divider + '\n\n';
   partners.list.forEach((p, i) => {
-    out += `🛡️ *${p.name}*\n🔗 ${p.link}\n\n`;
+    out += '🛡️ *' + p.name + '*\n🔗 ' + p.link + '\n\n';
   });
-  out += `${divider}\n_"Gemeinsam sind wir stärker." — Verbündete Gilden von AINCRAD_`;
+  out += divider + '\n_"Gemeinsam sind wir stärker." — Verbündete Gilden von AINCRAD_';
   return send(out);
 }
-
 // ADDPARTNER
 if (cmd === 'addpartner') {
   if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) {
