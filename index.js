@@ -3717,7 +3717,28 @@ function bufferToSticker(inputBuffer, ext, isAnimated) {
     });
   });
 }
+async function addStickerExif(webpBuffer, packName, authorName) {
+  const img = new webp.Image();
+  await img.load(webpBuffer);
 
+  const json = {
+    'sticker-pack-id': 'sao-bot-' + Date.now(),
+    'sticker-pack-name': packName,
+    'sticker-pack-publisher': authorName,
+    'emojis': ['⚔️']
+  };
+
+  const exifAttr = Buffer.from([
+    0x49, 0x49, 0x2A, 0x00, 0x08, 0x00, 0x00, 0x00, 0x01, 0x00, 0x41, 0x57,
+    0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x16, 0x00, 0x00, 0x00
+  ]);
+  const jsonBuffer = Buffer.from(JSON.stringify(json), 'utf-8');
+  const exif = Buffer.concat([exifAttr, jsonBuffer]);
+  exif.writeUIntLE(jsonBuffer.length, 14, 4);
+
+  img.exif = exif;
+  return await img.save(null);
+}
 if (cmd === 'add') {
   if (!isGroup) return send('❌ Nur in Gruppen.');
   if (!hasAdminPerms(sender)) return send('❌ Kein Zugriff.');
@@ -3825,7 +3846,7 @@ if (cmd === 'sticker' || cmd === 's' || cmd === 'stiker') {
   if (!targetMsg && m.message.videoMessage) { targetMsg = m; mediaType = 'video'; }
 
   if (!targetMsg) {
-    return send(`❓ Schick ein Bild/GIF direkt mit "${activePrefix}${cmd}" als Bildunterschrift, oder antworte mit "${activePrefix}${cmd}" auf ein Bild/Video/GIF.`);
+    return send('❓ Schick ein Bild/GIF direkt mit "' + activePrefix + cmd + '" als Bildunterschrift, oder antworte mit "' + activePrefix + cmd + '" auf ein Bild/Video/GIF.');
   }
 
   await send('⏳ Erstelle Sticker...');
@@ -3841,11 +3862,18 @@ if (cmd === 'sticker' || cmd === 's' || cmd === 'stiker') {
     const isAnimated = mediaType === 'video';
     const ext = mediaType === 'video' ? 'mp4' : (mediaType === 'sticker' ? 'webp' : 'jpg');
 
-    const webpBuffer = await bufferToSticker(buffer, ext, isAnimated);
+    let webpBuffer = await bufferToSticker(buffer, ext, isAnimated);
+
+    const customName = args.join(' ').trim();
+    const packName = 'Sword Art Online Bot';
+    const authorName = customName ? packName + ' | ' + customName : packName;
+
+    webpBuffer = await addStickerExif(webpBuffer, packName, authorName);
+
     await sock.sendMessage(from, { sticker: webpBuffer }, { quoted: m });
   } catch (e) {
     console.error('[sticker] Fehler:', e);
-    return send('❌ Sticker-Erstellung fehlgeschlagen. (ffmpeg installiert?)');
+    return send('❌ Sticker-Erstellung fehlgeschlagen. (ffmpeg/node-webpmux installiert?)');
   }
   return;
 }
