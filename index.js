@@ -497,6 +497,7 @@ function isAuthorized(jid, allowedRoles) {
 let users = normalizeDataKeys(load(FILES.users.file));
 let bans = normalizeDataKeys(load(FILES.bans.file));
 let joinreqs = normalizeDataKeys(load(FILES.joinreq.file));
+let groupLockSchedules = load(FILES.groupLockSchedule.file) || {};
 let partners = load(FILES.partners.file) || { list: [] };
 let pets = normalizeDataKeys(load(FILES.pets.file));
 let tickets = normalizeDataKeys(load(FILES.tickets.file));
@@ -669,7 +670,8 @@ function persistAll() {
   save(FILES.deleted, deletedUsers);
   save(FILES.credits, credits);
 save(FILES.marriages, marriages); 
-  save(FILES.officialGroup, officialGroup);
+  save(FILES.groupLockSchedule, groupLockSchedules);
+save(FILES.officialGroup, officialGroup);
   try {
     save(FILES.owner, { ownerLid: OWNER_LID, ownerPriv: OWNER_PRIV, coownerLid: COOWNER_LID });
   } catch (e) { console.error('Failed to save owner config:', e); }
