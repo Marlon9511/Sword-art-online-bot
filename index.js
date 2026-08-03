@@ -80,6 +80,7 @@ const FILES = {
 marriages: { file: 'marriages.json', default: {} },   
 commandAllow: { file: 'command-allow.json', default: {} },
   officialGroup: { file: 'official-group.json', default: { link: 'https://chat.whatsapp.com/DBiDcF2s16FEWiGKyZA7Nl' } }
+partners: { file: 'partners.json', default: { list: [] } },
 };
 
 Object.values(FILES).forEach(({ file, default: def }) => {
