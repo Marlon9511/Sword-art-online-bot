@@ -3770,7 +3770,7 @@ if (cmd === 'sex') {
   const action = FUN_ACTIONS[Math.floor(Math.random() * FUN_ACTIONS.length)];
 
   return sock.sendMessage(from, {
-    text: `🎉 @${sender.split('@')[0]} ${action} @${targetJid.split('@')[0]}!`,
+    text: `🍆🍑💦 @${sender.split('@')[0]} ${action} @${targetJid.split('@')[0]}!`,
     mentions: [sender, targetJid],
   }, { quoted: m });
 }
