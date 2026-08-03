@@ -4200,22 +4200,22 @@ if (cmd === 'delpartner') {
 const suggestion = findClosestCommand(cmd);
 if (suggestion) {
   return send(
-    `⚠️ *SYSTEM-FEHLER* ⚠️\n` +
-    `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
-    `Der Befehl "${cmd}" existiert nicht im Aincrad-System.\n\n` +
-    `🔍 *Ähnlichste Erkenntnis:*\n` +
-    `⌈ ${activePrefix}${suggestion.command} ⌋ — Übereinstimmung: ${suggestion.similarity}%\n\n` +
-    `Meintest du das, Schwertkämpfer?\n` +
-    `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
-    `_Nutze ${activePrefix}help für das vollständige Skill-Menü._`
+    '⚠️ *SYSTEM-FEHLER* ⚠️\n' +
+    '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n' +
+    'Der Befehl "' + cmd + '" existiert nicht im Aincrad-System.\n\n' +
+    '🔍 *Ähnlichste Erkenntnis:*\n' +
+    '⌈ ' + activePrefix + suggestion.command + ' ⌋ — Übereinstimmung: ' + suggestion.similarity + '%\n\n' +
+    'Meintest du das, Schwertkämpfer?\n' +
+    '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n' +
+    '_Nutze ' + activePrefix + 'help für das vollständige Skill-Menü._'
   );
 }
 return send(
-  `❓ *UNBEKANNTER BEFEHL* ❓\n` +
-  `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
-  `Dieser Skill wurde noch nicht erlernt.\n` +
-  `Nutze ${activePrefix}help oder ${activePrefix}menu für das Command-Window.\n\n` +
-  `Falls du glaubst, dieser Skill sollte existieren, wende dich an Daddy Kirito unter ${activePrefix}owner.`
+  '❓ *UNBEKANNTER BEFEHL* ❓\n' +
+  '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n' +
+  'Dieser Skill wurde noch nicht erlernt.\n' +
+  'Nutze ' + activePrefix + 'help oder ' + activePrefix + 'menu für das Command-Window.\n\n' +
+  'Falls du glaubst, dieser Skill sollte existieren, wende dich an Daddy Kirito unter ' + activePrefix + 'owner.'
 );
     } catch (err) {
       console.error('messages.upsert error:', err);
