@@ -84,6 +84,7 @@ partners: { file: 'partners.json', default: { list: [] } }
 };
 Object.values(FILES).forEach(({ file, default: def }) => {
   ensureFile(path.join(DATA_PATH, file), def);
+groupLockSchedule: { file: 'group-lock-schedule.json', default: {} },
 });
 
 const activeSessions = new Map();
