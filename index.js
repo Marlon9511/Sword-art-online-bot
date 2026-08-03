@@ -78,6 +78,7 @@ const FILES = {
   groupSettings: { file: 'group-settings.json', default: {} },
   credits: { file: 'credits.json', default: { list: [] } },
 marriages: { file: 'marriages.json', default: {} },   
+commandAllow: { file: 'command-allow.json', default: {} },
   officialGroup: { file: 'official-group.json', default: { link: 'https://chat.whatsapp.com/DBiDcF2s16FEWiGKyZA7Nl' } }
 };
 
@@ -209,6 +210,7 @@ const saveBotState = () => {
     fs.writeFileSync(BOT_STATE_FILE, JSON.stringify({ offline: !!BOT_OFFLINE, prefix: PREFIX }, null, 2));
   } catch (e) { console.error('Failed to save bot state:', e); }
 };
+let commandAllow = load(FILES.commandAllow.file) || {};
 
 const _teamTodosPath = path.join(DATA_PATH, FILES.teamTodos.file);
 if (!fs.existsSync(_teamTodosPath)) fs.writeFileSync(_teamTodosPath, '{}');
