@@ -3851,6 +3851,46 @@ if (cmd === 'bancmd') {
   save(FILES.commandBans, commandBans);
   return send(`⛔ Befehl ${tcmd} wurde gesperrt und ist nur noch für Owner/CoOwner verfügbar.`);
 }
+// ===== MURDER DRONES EDITS (automatische Suche) =====
+const MD_SEARCH_QUERIES = [
+  'murder drones edit',
+  'murder drones amv',
+  'murder drones edit shorts',
+  'uzi doorman edit',
+  'murder drones tiktok edit'
+];
+
+const MD_CACHE_DIR = path.join(__dirname, 'cache', 'murderdrones');
+
+// Sucht mehrere Ergebnisse zu einer zufälligen Query und gibt eine zufällige URL daraus zurück
+function searchMdEditUrl() {
+  return new Promise((resolve, reject) => {
+    const query = MD_SEARCH_QUERIES[randInt(0, MD_SEARCH_QUERIES.length - 1)];
+    // ytsearch10: holt die Top 10 Treffer, --get-id gibt nur die Video-IDs zurück
+    const cmd = `yt-dlp "ytsearch10:${query}" --get-id --no-playlist --match-filter "duration < 180"`;
+
+    exec(cmd, { maxBuffer: 1024 * 1024 * 10 }, (err, stdout) => {
+      if (err) return reject(err);
+      const ids = stdout.split('\n').map(s => s.trim()).filter(Boolean);
+      if (!ids.length) return reject(new Error('Keine Ergebnisse gefunden'));
+      const chosenId = ids[randInt(0, ids.length - 1)];
+      resolve(`https://www.youtube.com/watch?v=${chosenId}`);
+    });
+  });
+}
+
+function downloadMdEdit(url) {
+  return new Promise((resolve, reject) => {
+    fs.mkdirSync(MD_CACHE_DIR, { recursive: true });
+    const outPath = path.join(MD_CACHE_DIR, `${Date.now()}.mp4`);
+
+    const cmd = `yt-dlp -f "mp4" --no-playlist -o "${outPath}" "${url}"`;
+    exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
+      if (err) return reject(err);
+      resolve(outPath);
+    });
+  });
+}
       // Unbekannter Befehl
       return send('❓ Unbekannter Befehl — ?help ist ein Menü für die Befehle genauso wie ?menu wenns da deinen Befehl nicht gibt frag daddy kirito nach ob es den gibt oder ob er es einbauen kann unter ?owner.');
 
