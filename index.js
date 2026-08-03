@@ -157,55 +157,7 @@ async function connectBot() {
 
   sock.ev.on("creds.update", saveCreds);
 }
-// Nachtsperre-Scheduler: prüft jede Minute, ob Gruppen gesperrt/entsperrt werden müssen
-  const lockStateCache = new Map(); // groupJid -> 'locked' | 'unlocked'
 
-  function timeToMinutes(t) {
-    const parts = t.split(':');
-    return parseInt(parts[0]) * 60 + parseInt(parts[1]);
-  }
-
-  function isWithinLockWindow(startStr, endStr, nowMinutes) {
-    const start = timeToMinutes(startStr);
-    const end = timeToMinutes(endStr);
-    if (start === end) return false;
-    if (start < end) {
-      // z.B. 08:00 - 18:00 (gleicher Tag)
-      return nowMinutes >= start && nowMinutes < end;
-    }
-    // z.B. 22:00 - 07:00 (über Mitternacht)
-    return nowMinutes >= start || nowMinutes < end;
-  }
-
-  setInterval(async () => {
-    try {
-      const now = new Date();
-      const nowMinutes = now.getHours() * 60 + now.getMinutes();
-
-      for (const [groupJid, schedule] of Object.entries(groupLockSchedules)) {
-        const shouldBeLocked = isWithinLockWindow(schedule.start, schedule.end, nowMinutes);
-        const currentState = lockStateCache.get(groupJid);
-        const desiredState = shouldBeLocked ? 'locked' : 'unlocked';
-
-        if (currentState === desiredState) continue;
-
-        try {
-          await sock.groupSettingUpdate(groupJid, shouldBeLocked ? 'announcement' : 'not_announcement');
-          lockStateCache.set(groupJid, desiredState);
-
-          if (shouldBeLocked) {
-            await sock.sendMessage(groupJid, { text: '🌙 Nachtsperre aktiv. Die Gruppe wurde bis ' + schedule.end + ' Uhr gesperrt.' });
-          } else {
-            await sock.sendMessage(groupJid, { text: '☀️ Nachtsperre beendet. Die Gruppe ist wieder offen.' });
-          }
-        } catch (e) {
-          // Bot ist evtl. kein Admin mehr oder nicht mehr in der Gruppe — einfach überspringen
-        }
-      }
-    } catch (e) {
-      console.error('[nachtsperre] Scheduler-Fehler:', e);
-    }
-  }, 60 * 1000); // jede Minute prüfen
 // ========== CONFIG ==========
 
 const ROLES = {
@@ -845,7 +797,55 @@ const pendingApplications = new Map(); // sender -> { step, answers }
 
     return null;
   }
+// Nachtsperre-Scheduler: prüft jede Minute, ob Gruppen gesperrt/entsperrt werden müssen
+  const lockStateCache = new Map(); // groupJid -> 'locked' | 'unlocked'
 
+  function timeToMinutes(t) {
+    const parts = t.split(':');
+    return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+  }
+
+  function isWithinLockWindow(startStr, endStr, nowMinutes) {
+    const start = timeToMinutes(startStr);
+    const end = timeToMinutes(endStr);
+    if (start === end) return false;
+    if (start < end) {
+      // z.B. 08:00 - 18:00 (gleicher Tag)
+      return nowMinutes >= start && nowMinutes < end;
+    }
+    // z.B. 22:00 - 07:00 (über Mitternacht)
+    return nowMinutes >= start || nowMinutes < end;
+  }
+
+  setInterval(async () => {
+    try {
+      const now = new Date();
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+      for (const [groupJid, schedule] of Object.entries(groupLockSchedules)) {
+        const shouldBeLocked = isWithinLockWindow(schedule.start, schedule.end, nowMinutes);
+        const currentState = lockStateCache.get(groupJid);
+        const desiredState = shouldBeLocked ? 'locked' : 'unlocked';
+
+        if (currentState === desiredState) continue;
+
+        try {
+          await sock.groupSettingUpdate(groupJid, shouldBeLocked ? 'announcement' : 'not_announcement');
+          lockStateCache.set(groupJid, desiredState);
+
+          if (shouldBeLocked) {
+            await sock.sendMessage(groupJid, { text: '🌙 Nachtsperre aktiv. Die Gruppe wurde bis ' + schedule.end + ' Uhr gesperrt.' });
+          } else {
+            await sock.sendMessage(groupJid, { text: '☀️ Nachtsperre beendet. Die Gruppe ist wieder offen.' });
+          }
+        } catch (e) {
+          // Bot ist evtl. kein Admin mehr oder nicht mehr in der Gruppe — einfach überspringen
+        }
+      }
+    } catch (e) {
+      console.error('[nachtsperre] Scheduler-Fehler:', e);
+    }
+  }, 60 * 1000); // jede Minute prüfen
   async function updateBotProfile() {
     try {
       await sock.updateProfileName('Sword art online bot');
