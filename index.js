@@ -1540,6 +1540,8 @@ helpText += `▸ ${PREFIX}nervous @user — Nervös wegen jemandem sein\n\n`;
         helpText += `▸ ${PREFIX}hidetag <text> — Nachricht mit verstecktem Tag\n`;
         helpText += `▸ ${PREFIX}delete — Als Reply: Nachricht löschen\n`;
         helpText += `▸ ${PREFIX}ytmp3 <link> — YouTube als MP3\n\n`;
+helpText += `▸ ${PREFIX}nachtsperre an <HH:MM> <HH:MM> — Zeitgesteuerte Gildensperre\n`;
+helpText += `▸ ${PREFIX}nachtsperre aus / status — Sperre verwalten\n`;
 
         helpText += `⚙️ *Aktueller System-Befehl:* ${PREFIX}\n`;
 
