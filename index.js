@@ -4219,9 +4219,7 @@ return send(
 );
     } catch (err) {
       console.error('messages.upsert error:', err);
-      log(`ERROR: ${err?.message || String(err)}`);
-    }
-  });
+      log('ERROR: ' + (err?.message || String(err)));
 
   console.log(`✅ Sword-art-online-bot Session "${sessionName}" gestartet.`);
   return sock;
