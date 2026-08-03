@@ -4247,10 +4247,10 @@ initTelegramConnect();
   }
 
   if (existingSessions.length === 0) {
-    // Noch keine Session vorhanden -> Standard-Session anlegen (QR-Login)
+    
     await startBot('default');
   } else {
-    // Alle vorhandenen Sessions parallel wieder starten
+    
     for (const sessionName of existingSessions) {
       await startBot(sessionName);
       await sleep(1000);
