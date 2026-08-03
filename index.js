@@ -12,6 +12,7 @@ import readline from "readline";
 import gradient from "gradient-string";
 import { initTelegramConnect, setActiveSock, sendQrToTelegram } from './telegram-connect.js';
 import { fileURLToPath } from 'url';
+import webp from 'node-webpmux';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
