@@ -3598,12 +3598,59 @@ angrystare: { emoji: "😠", verb: "starrt wütend" },
   lick: { emoji: "👅", verb: "leckt", apiReaction: "lick" },
   nervous: { emoji: "😅", verb: "ist nervös wegen", apiReaction: "nervous" },
 };
+  // NEU: zusätzliche Reactions über Giphy
+  kill:      { emoji: "☠️", verb: "erledigt",              source: "giphy", query: "anime sword kill epic" },
+  yeet:      { emoji: "🚀", verb: "yeetet",                 source: "giphy", query: "anime throw yeet funny" },
+  nuke:      { emoji: "☢️", verb: "nukt",                   source: "giphy", query: "anime explosion" },
+  banish:    { emoji: "🌀", verb: "verbannt",               source: "giphy", query: "anime portal teleport" },
+  stab:      { emoji: "🗡️", verb: "durchbohrt",             source: "giphy", query: "anime sword attack" },
+  smash:     { emoji: "🔨", verb: "zerschmettert",          source: "giphy", query: "anime smash hit" },
+  vaporize:  { emoji: "💥", verb: "pulverisiert",           source: "giphy", query: "anime explosion attack" },
+  choke:     { emoji: "🫳", verb: "würgt",                  source: "giphy", query: "anime choke funny" },
+  kick:      { emoji: "🦵", verb: "verpasst einen Tritt",   source: "giphy", query: "anime kick" },
+  spin:      { emoji: "🌪️", verb: "wirbelt herum",          source: "giphy", query: "anime spin dizzy" },
+  facepalm2: { emoji: "🤦", verb: "macht einen Facepalm",   source: "giphy", query: "anime facepalm epic" },
+  glare:     { emoji: "👀", verb: "starrt böse an",         source: "giphy", query: "anime intense glare" },
+  smirk:     { emoji: "😏", verb: "grinst süffisant",       source: "giphy", query: "anime smirk" },
+  cry2:      { emoji: "😭", verb: "heult wegen",            source: "giphy", query: "anime crying dramatic" },
+  highfive:  { emoji: "🙌", verb: "gibt ein High Five",     source: "giphy", query: "anime high five" },
+  dance:     { emoji: "💃", verb: "tanzt mit",              source: "giphy", query: "anime dance funny" },
+  facepalm3: { emoji: "🤦‍♂️", verb: "schüttelt den Kopf über", source: "giphy", query: "anime disappointed headshake" },
+  protect:   { emoji: "🛡️", verb: "beschützt",              source: "giphy", query: "anime protect shield" },
+  heal:      { emoji: "✨", verb: "heilt",                   source: "giphy", query: "anime healing magic" },
+  revive:    { emoji: "💫", verb: "belebt wieder",          source: "giphy", query: "anime revive magic" },
+};
+// ---- API Keys ----
+const GIPHY_API_KEY = process.env.GIPHY_API_KEY; // in .env eintragen: GIPHY_API_KEY=dein_key_hier
 
+// ---- otakugifs (bestehend) ----
 async function getReactionGifUrl(reaction) {
   const res = await fetch(`https://api.otakugifs.xyz/gif?reaction=${reaction}`);
   if (!res.ok) throw new Error(`otakugifs API-Fehler: ${res.status}`);
   const data = await res.json();
   return data.url;
+}
+
+// ---- NEU: Giphy ----
+async function getGiphyGifUrl(query) {
+  const url = `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(query)}&limit=25&offset=0&rating=g&lang=en`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Giphy API-Fehler: ${res.status}`);
+  const data = await res.json();
+
+  if (!data.data?.length) throw new Error("Keine Giphy-Treffer gefunden");
+
+  const pick = data.data[Math.floor(Math.random() * data.data.length)];
+  return pick.images.original.url;
+}
+
+// ---- NEU: Router, wählt automatisch die richtige API je nach config.source ----
+async function getGifUrl(cmd, config) {
+  if (config.source === "giphy") {
+    return await getGiphyGifUrl(config.query);
+  }
+  // Default: otakugifs
+  return await getReactionGifUrl(config.apiReaction || cmd);
 }
 
 // NEU: Cache-Ordner für die Gif->mp4 Konvertierung (analog zu YTMP3_CACHE_DIR)
@@ -3673,9 +3720,9 @@ if (REACTION_COMMANDS[cmd]) {
   ensureUser(targetJid);
 
   try {
-    const gifUrl = await getReactionGifUrl(cmd);
+    // GEÄNDERT: nutzt jetzt den Router, der zwischen otakugifs und giphy wählt
+    const gifUrl = await getGifUrl(cmd, config);
 
-    // GEÄNDERT: statt rohem Gif-Buffer jetzt der konvertierte mp4-Buffer
     const mp4Buffer = await fetchAndConvertGifToMp4(gifUrl);
 
     if (!isTeamMember) {
@@ -3687,7 +3734,7 @@ if (REACTION_COMMANDS[cmd]) {
     await sock.sendMessage(from, {
       video: mp4Buffer,
       gifPlayback: true,
-      mimetype: 'video/mp4', // GEÄNDERT: explizit gesetzt
+      mimetype: 'video/mp4',
       caption: `${config.emoji} @${sender.split('@')[0]} ${config.verb} @${targetJid.split('@')[0]}!`,
       mentions: [sender, targetJid],
     }, { quoted: m });
@@ -3697,6 +3744,8 @@ if (REACTION_COMMANDS[cmd]) {
   }
   return;
 }
+
+// ---- Sticker-Teil unverändert ----
 const STICKER_CACHE_DIR = path.join(__dirname, 'cache', 'stickers');
 
 function bufferToSticker(inputBuffer, ext, isAnimated) {
