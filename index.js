@@ -828,7 +828,7 @@ const pendingApplications = new Map(); // sender -> { step, answers }
       const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
       const scheduleCount = Object.keys(groupLockSchedules).length;
-      console.log('[nachtsperre] Check läuft:', now.toLocaleTimeString(), '| Gruppen mit Zeitplan:', scheduleCount);
+      console.log('[nachtsperre] Check läuft:', now.toLocaleTimeString('de-DE'), '| Zeitzone:', Intl.DateTimeFormat().resolvedOptions().timeZone, '| Gruppen mit Zeitplan:', scheduleCount);
 
       for (const [groupJid, schedule] of Object.entries(groupLockSchedules)) {
         const shouldBeLocked = isWithinLockWindow(schedule.start, schedule.end, nowMinutes);
@@ -838,6 +838,41 @@ const pendingApplications = new Map(); // sender -> { step, answers }
         console.log('[nachtsperre]', groupJid, '| soll:', desiredState, '| ist aktuell:', currentState || '(unbekannt)');
 
         if (currentState === desiredState) continue;
+
+        // NEU: Vorher prüfen, ob der Bot überhaupt Admin ist — sonst bricht
+        // groupSettingUpdate mit einem für uns schwer lesbaren Fehler ab.
+        try {
+          const meta = await getGroupMetaSafe(groupJid, true);
+          if (!meta) {
+            console.error('[nachtsperre] ❌ Konnte Gruppen-Metadaten nicht laden für', groupJid, '(Bot noch Mitglied?)');
+            continue;
+          }
+
+          const allBotIds = [...getBotSelfIds(sock)];
+          const botPart = (meta.participants || []).find(p => {
+            const pids = [
+              p.id,
+              p.id?.split('@')[0],
+              `${p.id?.split('@')[0]}@s.whatsapp.net`,
+            ].filter(Boolean).map(String);
+            return pids.some(pid => allBotIds.includes(pid));
+          });
+
+          const botIsAdmin = !!(
+            botPart?.admin === 'admin' ||
+            botPart?.admin === 'superadmin' ||
+            botPart?.admin === true ||
+            botPart?.isAdmin === true
+          );
+
+          if (!botIsAdmin) {
+            console.error('[nachtsperre] ❌ Bot ist kein Admin in', groupJid, '— kann nicht sperren/entsperren. Bitte Bot zum Admin machen.');
+            continue;
+          }
+        } catch (metaErr) {
+          console.error('[nachtsperre] ❌ Fehler beim Prüfen der Admin-Rechte für', groupJid, ':', metaErr?.message || metaErr);
+          continue;
+        }
 
         try {
           await sock.groupSettingUpdate(groupJid, shouldBeLocked ? 'announcement' : 'not_announcement');
