@@ -3668,7 +3668,7 @@ async function getReactionGifUrl(reaction) {
 
 // ---- NEU: Giphy ----
 async function getGiphyGifUrl(query) {
-  const url = `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(query)}&limit=25&offset=0&rating=g&lang=en`;
+const url = `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(query)}&limit=25&offset=0&rating=g&lang=en`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Giphy API-Fehler: ${res.status}`);
   const data = await res.json();
