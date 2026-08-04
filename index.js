@@ -1316,6 +1316,16 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
         }
       }
 
+     if (bans[normalizeJid(sender)]) {
+        try { await sock.sendMessage(from, { text: '🚫 Du bist gebannt und kannst den Bot nicht nutzen.' }); } catch {}
+        return;
+      }
+
+      if (deletedUsers[normalizeJid(sender)]) {
+        try { await sock.sendMessage(from, { text: '🚫 Dein Account wurde vom Inhaber gelöscht und ist gesperrt.' }); } catch {}
+        return;
+      }
+
       if (!isUserRegistered(sender)) {
         if (isCmd) {
           await sock.sendMessage(from, { text: 'Bitte registrieren Sie sich zuerst mit dem Befehl ' + PREFIX + 'register.' });
@@ -1330,17 +1340,6 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
         if (msgTs <= lastTs) return;
         lastProcessed.set(from, msgTs);
       } catch (e) {}
-
-      if (deletedUsers[sender]) {
-        try { await sock.sendMessage(from, { text: '🚫 Dein Account wurde vom Inhaber gelöscht und ist gesperrt.' }); } catch {}
-        return;
-      }
-
-      if (bans[sender]) {
-        try { await sock.sendMessage(from, { text: '🚫 Du bist gebannt.' }); } catch {}
-        return;
-      }
-
       ensureUser(sender);
 
       
