@@ -3027,6 +3027,15 @@ if (cmd === 'purge' || cmd === 'clearchat') {
       }
 
       // MODERATION
+async function getBanDisplayName(jid, sock) {
+  const n = normalizeJid(jid);
+  const u = users[n];
+  if (u?.name) return u.name;
+  if (u?.registrationName) return u.registrationName;
+  const resolved = await resolvePhoneJid(n, sock);
+  if (resolved) return resolved.split('@')[0];
+  return n.split('@')[0] + ' (nicht auflösbar)';
+}
 if (cmd === 'ban') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
 
@@ -3050,12 +3059,19 @@ if (cmd === 'ban') {
           } catch (e) {}
         }
         try { await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: `🚫 Gebannt: ${jid}\nDurch: ${sender}\nGrund: ${reason}` }); } catch {}
-        return send(`🚫 ${await getNumberMention(jid, sock)} gebannt.`, { mentions: [jid] });
+
+        const displayName = await getBanDisplayName(jid, sock);
+        return send(`🚫 ${displayName} wurde gebannt.`);
       }
       if (cmd === 'banlist') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
-        const list = Object.entries(bans).map(([j, b]) => `${j} — ${b.reason}`).join('\n') || '(keine)';
-        return send(`🚫 Banliste:\n${list}`);
+        const entries = Object.entries(bans);
+        if (!entries.length) return send('🚫 Banliste:\n(keine)');
+        const lines = await Promise.all(entries.map(async ([j, b]) => {
+          const name = await getBanDisplayName(j, sock);
+          return `${name} — ${b.reason}`;
+        }));
+        return send(`🚫 Banliste:\n${lines.join('\n')}`);
       }
       if (cmd === 'unban') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
@@ -3069,14 +3085,9 @@ if (cmd === 'ban') {
         const jid = normalizeJid(t);
         delete bans[jid];
         save(FILES.bans, bans);
-        return send(`✅ ${await getNumberMention(jid, sock)} entbannt.`, { mentions: [jid] });
-      }
-if (cmd === 'banlist') {
-        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
-        const entries = Object.entries(bans);
-        const lines = await Promise.all(entries.map(async ([j, b]) => `${await getNumberMention(j, sock)} — ${b.reason}`));
-        const mentions = entries.map(([j]) => j);
-        return send(`🚫 Banliste:\n${lines.join('\n') || '(keine)'}`, { mentions });
+
+        const displayName = await getBanDisplayName(jid, sock);
+        return send(`✅ ${displayName} wurde entbannt.`);
       }
 
       if (cmd === 'kick') {
