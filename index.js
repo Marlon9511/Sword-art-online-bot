@@ -862,8 +862,7 @@ async function updateBotProfile() {
 
       const profilePath = path.join(__dirname, '1b40b580eca7976d582b9afe0cd7bec5.jpg');
       if (fs.existsSync(profilePath)) {
-        const profileImage = fs.readFileSync(profilePath);
-        await sock.updateProfilePicture(sock.user.id, { url: profileImage });
+        await sock.updateProfilePicture(sock.user.id, { url: profilePath });
         console.log('✅ Profilbild wurde aktualisiert');
       } else {
         console.error('❌ Profilbild-Datei nicht gefunden unter:', profilePath);
