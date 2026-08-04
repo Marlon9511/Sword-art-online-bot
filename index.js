@@ -3571,8 +3571,8 @@ const REACTION_COMMANDS = {
   cuddle: { emoji: "🥰", verb: "kuschelt mit",           query: "anime cuddle" },
   bite:   { emoji: "😬", verb: "beißt",                  query: "anime bite" },
   punch:  { emoji: "🥊", verb: "verpasst einen Schlag",   query: "anime punch" },
-  sleep:  { emoji: "😴", verb: "schläft ein neben",       query: "anime sleep" }, // NEU
-angrystare: { emoji: "😠", verb: "starrt wütend" },
+  sleep:  { emoji: "😴", verb: "schläft ein neben",       query: "anime sleep" },
+  angrystare: { emoji: "😠", verb: "starrt wütend" },
   bleh: { emoji: "😝", verb: "streckt die Zunge raus" },
   confused: { emoji: "😕", verb: "ist verwirrt" },
   cry: { emoji: "😭", verb: "weint wegen " },
@@ -3597,7 +3597,7 @@ angrystare: { emoji: "😠", verb: "starrt wütend" },
   handhold: { emoji: "🤝", verb: "hält die Hand von", apiReaction: "handhold" },
   lick: { emoji: "👅", verb: "leckt", apiReaction: "lick" },
   nervous: { emoji: "😅", verb: "ist nervös wegen", apiReaction: "nervous" },
-};
+
   // NEU: zusätzliche Reactions über Giphy
   kill:      { emoji: "☠️", verb: "erledigt",              source: "giphy", query: "anime sword kill epic" },
   yeet:      { emoji: "🚀", verb: "yeetet",                 source: "giphy", query: "anime throw yeet funny" },
@@ -3614,11 +3614,7 @@ angrystare: { emoji: "😠", verb: "starrt wütend" },
   smirk:     { emoji: "😏", verb: "grinst süffisant",       source: "giphy", query: "anime smirk" },
   cry2:      { emoji: "😭", verb: "heult wegen",            source: "giphy", query: "anime crying dramatic" },
   highfive:  { emoji: "🙌", verb: "gibt ein High Five",     source: "giphy", query: "anime high five" },
-  dance:     { emoji: "💃", verb: "tanzt mit",              source: "giphy", query: "anime dance funny" },
-  facepalm3: { emoji: "🤦‍♂️", verb: "schüttelt den Kopf über", source: "giphy", query: "anime disappointed headshake" },
-  protect:   { emoji: "🛡️", verb: "beschützt",              source: "giphy", query: "anime protect shield" },
-  heal:      { emoji: "✨", verb: "heilt",                   source: "giphy", query: "anime healing magic" },
-  revive:    { emoji: "💫", verb: "belebt wieder",          source: "giphy", query: "anime revive magic" },
+  dance:     { emoji: "💃", verb: "tanzt mit",              source: "giphy", query: "anime dance
 };
 // ---- API Keys ----
 const GIPHY_API_KEY = process.env.GIPHY_API_KEY; // in .env eintragen: GIPHY_API_KEY=dein_key_hier
