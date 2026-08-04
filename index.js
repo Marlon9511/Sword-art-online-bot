@@ -3615,6 +3615,8 @@ const REACTION_COMMANDS = {
   cry2:      { emoji: "😭", verb: "heult wegen",            source: "giphy", query: "anime crying dramatic" },
   highfive:  { emoji: "🙌", verb: "gibt ein High Five",     source: "giphy", query: "anime high five" },
   dance: { emoji: "dance", verb: "tanzt mit", source: "giphy", query: "anime dance funny" },
+};
+
 // ---- API Keys ----
 const GIPHY_API_KEY = process.env.GIPHY_API_KEY; // in .env eintragen: GIPHY_API_KEY=dein_key_hier
 
