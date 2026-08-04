@@ -4347,7 +4347,7 @@ if (cmd === 'say') {
   return;
 }
 // SHOWER — Profil eines Users anzeigen (inkl. Registrierungsdatum)
-      if (cmd === 'shower') {
+      if (cmd === 'showuser') {
         const ctx = m.message?.extendedTextMessage?.contextInfo;
         let target = args[0];
         if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
