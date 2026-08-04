@@ -3050,7 +3050,7 @@ if (cmd === 'ban') {
           } catch (e) {}
         }
         try { await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: `🚫 Gebannt: ${jid}\nDurch: ${sender}\nGrund: ${reason}` }); } catch {}
-        return send(`🚫 @${jid.split('@')[0]} gebannt.`, { mentions: [jid] });
+        return send(`🚫 ${await getNumberMention(jid, sock)} gebannt.`, { mentions: [jid] });
       }
       if (cmd === 'banlist') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
@@ -3069,7 +3069,14 @@ if (cmd === 'ban') {
         const jid = normalizeJid(t);
         delete bans[jid];
         save(FILES.bans, bans);
-        return send(`✅ @${jid.split('@')[0]} entbannt.`, { mentions: [jid] });
+        return send(`✅ ${await getNumberMention(jid, sock)} entbannt.`, { mentions: [jid] });
+      }
+if (cmd === 'banlist') {
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
+        const entries = Object.entries(bans);
+        const lines = await Promise.all(entries.map(async ([j, b]) => `${await getNumberMention(j, sock)} — ${b.reason}`));
+        const mentions = entries.map(([j]) => j);
+        return send(`🚫 Banliste:\n${lines.join('\n') || '(keine)'}`, { mentions });
       }
 
       if (cmd === 'kick') {
