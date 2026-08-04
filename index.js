@@ -1135,13 +1135,8 @@ if (isGroup && m.key.id) {
           } catch (e) {}
         }
       }
-sock.ev.on('messages.upsert', async ({ messages }) => {
-    try {
-      if (!messages || !Array.isArray(messages) || messages.length === 0) return;
-      const m = messages[0];
-      if (!m || !m.message) return;
-};
-      
+
+   
 const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/channel)\/[a-zA-Z0-9]+/i;
 
       if (isGroup && body && !m.key.fromMe && whatsappLinkRegex.test(body)) {
@@ -1321,16 +1316,6 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
         }
       }
 
-     if (bans[normalizeJid(sender)]) {
-        try { await sock.sendMessage(from, { text: '🚫 Du bist gebannt und kannst den Bot nicht nutzen.' }); } catch {}
-        return;
-      }
-
-      if (deletedUsers[normalizeJid(sender)]) {
-        try { await sock.sendMessage(from, { text: '🚫 Dein Account wurde vom Inhaber gelöscht und ist gesperrt.' }); } catch {}
-        return;
-      }
-
       if (!isUserRegistered(sender)) {
         if (isCmd) {
           await sock.sendMessage(from, { text: 'Bitte registrieren Sie sich zuerst mit dem Befehl ' + PREFIX + 'register.' });
@@ -1345,6 +1330,17 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
         if (msgTs <= lastTs) return;
         lastProcessed.set(from, msgTs);
       } catch (e) {}
+
+      if (deletedUsers[sender]) {
+        try { await sock.sendMessage(from, { text: '🚫 Dein Account wurde vom Inhaber gelöscht und ist gesperrt.' }); } catch {}
+        return;
+      }
+
+      if (bans[sender]) {
+        try { await sock.sendMessage(from, { text: '🚫 Du bist gebannt.' }); } catch {}
+        return;
+      }
+
       ensureUser(sender);
 
       
@@ -3032,15 +3028,6 @@ if (cmd === 'purge' || cmd === 'clearchat') {
       }
 
       // MODERATION
-async function getBanDisplayName(jid, sock) {
-  const n = normalizeJid(jid);
-  const u = users[n];
-  if (u?.name) return u.name;
-  if (u?.registrationName) return u.registrationName;
-  const resolved = await resolvePhoneJid(n, sock);
-  if (resolved) return resolved.split('@')[0];
-  return n.split('@')[0] + ' (nicht auflösbar)';
-}
 if (cmd === 'ban') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
 
@@ -3064,19 +3051,12 @@ if (cmd === 'ban') {
           } catch (e) {}
         }
         try { await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: `🚫 Gebannt: ${jid}\nDurch: ${sender}\nGrund: ${reason}` }); } catch {}
-
-        const displayName = await getBanDisplayName(jid, sock);
-        return send(`🚫 ${displayName} wurde gebannt.`);
+        return send(`🚫 @${jid.split('@')[0]} gebannt.`, { mentions: [jid] });
       }
       if (cmd === 'banlist') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
-        const entries = Object.entries(bans);
-        if (!entries.length) return send('🚫 Banliste:\n(keine)');
-        const lines = await Promise.all(entries.map(async ([j, b]) => {
-          const name = await getBanDisplayName(j, sock);
-          return `${name} — ${b.reason}`;
-        }));
-        return send(`🚫 Banliste:\n${lines.join('\n')}`);
+        const list = Object.entries(bans).map(([j, b]) => `${j} — ${b.reason}`).join('\n') || '(keine)';
+        return send(`🚫 Banliste:\n${list}`);
       }
       if (cmd === 'unban') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
@@ -3090,9 +3070,7 @@ if (cmd === 'ban') {
         const jid = normalizeJid(t);
         delete bans[jid];
         save(FILES.bans, bans);
-
-        const displayName = await getBanDisplayName(jid, sock);
-        return send(`✅ ${displayName} wurde entbannt.`);
+        return send(`✅ @${jid.split('@')[0]} entbannt.`, { mentions: [jid] });
       }
 
       if (cmd === 'kick') {
