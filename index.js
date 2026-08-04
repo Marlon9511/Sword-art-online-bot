@@ -822,13 +822,12 @@ const pendingApplications = new Map(); // sender -> { step, answers }
   }
 
  setInterval(async () => {
-    if (sessionName !== 'default') return; // Nur eine Session soll den Scheduler ausführen
     try {
       const now = new Date();
       const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
       const scheduleCount = Object.keys(groupLockSchedules).length;
-      console.log('[nachtsperre] Check läuft:', now.toLocaleTimeString('de-DE'), '| Zeitzone:', Intl.DateTimeFormat().resolvedOptions().timeZone, '| Gruppen mit Zeitplan:', scheduleCount);
+      console.log('[nachtsperre] Check läuft:', now.toLocaleTimeString('de-DE'), '| Session:', sessionName, '| Zeitzone:', Intl.DateTimeFormat().resolvedOptions().timeZone, '| Gruppen mit Zeitplan:', scheduleCount);
 
       for (const [groupJid, schedule] of Object.entries(groupLockSchedules)) {
         const shouldBeLocked = isWithinLockWindow(schedule.start, schedule.end, nowMinutes);
@@ -839,8 +838,6 @@ const pendingApplications = new Map(); // sender -> { step, answers }
 
         if (currentState === desiredState) continue;
 
-        // NEU: Vorher prüfen, ob der Bot überhaupt Admin ist — sonst bricht
-        // groupSettingUpdate mit einem für uns schwer lesbaren Fehler ab.
         try {
           const meta = await getGroupMetaSafe(groupJid, true);
           if (!meta) {
