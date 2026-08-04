@@ -3281,27 +3281,39 @@ if (cmd === 'datadelete') {
         return send(`✅ Daten von ${jid} gelöscht.`);
       }
 
-      if (cmd === 'selfpromote' || cmd === 'sp') {
-        try {
-          if (!from?.endsWith('@g.us')) return send('⚠ Nur in Gruppen.');
-          if (sender !== OWNER_LID) if (sender !== COOWNER_LID) return send('⛔ Nur der Owner kann diesen Befehl nutzen.');
-          await sock.groupParticipantsUpdate(from, [sender], 'promote');
-          return send('🔰 Selfpromote ausgeführt.');
-        } catch (e) {
-          return send('❌ Selfpromote fehlgeschlagen.');
-        }
-      }
+   if (cmd === 'selfpromote' || cmd === 'sp') {
+  try {
+    if (!from?.endsWith('@g.us')) return send('⚠ Nur in Gruppen.');
+    if (
+      sender !== OWNER_LID &&
+      sender !== OWNER_LID2 &&
+      sender !== OWNER_PRIV &&
+      sender !== OWNER_PRIV2 &&
+      sender !== COOWNER_LID
+    ) return send('⛔ Nur der Owner kann diesen Befehl nutzen.');
+    await sock.groupParticipantsUpdate(from, [sender], 'promote');
+    return send('🔰 Selfpromote ausgeführt.');
+  } catch (e) {
+    return send('❌ Selfpromote fehlgeschlagen.');
+  }
+}
 
-      if (cmd === 'selfdemote' || cmd === 'sd') {
-        try {
-          if (!from?.endsWith('@g.us')) return send('⚠ Nur in Gruppen.');
-          if (sender !== OWNER_LID) if (sender !== COOWNER_LID) return send('⛔ Nur der Owner kann diesen Befehl nutzen.');
-          await sock.groupParticipantsUpdate(from, [sender], 'demote');
-          return send('🔱 Selfdemote ausgeführt.');
-        } catch (e) {
-          return send('❌ Selfdemote fehlgeschlagen.');
-        }
-      }
+if (cmd === 'selfdemote' || cmd === 'sd') {
+  try {
+    if (!from?.endsWith('@g.us')) return send('⚠ Nur in Gruppen.');
+    if (
+      sender !== OWNER_LID &&
+      sender !== OWNER_LID2 &&
+      sender !== OWNER_PRIV &&
+      sender !== OWNER_PRIV2 &&
+      sender !== COOWNER_LID
+    ) return send('⛔ Nur der Owner kann diesen Befehl nutzen.');
+    await sock.groupParticipantsUpdate(from, [sender], 'demote');
+    return send('🔱 Selfdemote ausgeführt.');
+  } catch (e) {
+    return send('❌ Selfdemote fehlgeschlagen.');
+  }
+}
 
       if (cmd === 'joinreq') {
         const link = args[0];
