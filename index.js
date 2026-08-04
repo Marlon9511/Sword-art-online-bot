@@ -4346,6 +4346,55 @@ if (cmd === 'say') {
   await sock.sendMessage(from, { text });
   return;
 }
+// SHOWER — Profil eines Users anzeigen (inkl. Registrierungsdatum)
+      if (cmd === 'shower') {
+        const ctx = m.message?.extendedTextMessage?.contextInfo;
+        let target = args[0];
+        if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+        if (!target && ctx?.participant) target = ctx.participant;
+        if (!target) target = sender; // ohne Angabe -> eigenes Profil
+
+        const targetJid = normalizeJid(target);
+        ensureUser(targetJid);
+        const u = users[targetJid];
+
+        const displayName = u.name || u.registrationName || targetJid.split('@')[0];
+        const rank = ranks[targetJid] || u.rank || 'USER';
+        const registriert = u.registered
+          ? '✅ Ja'
+          : '❌ Nein';
+        const regDatum = u.registrationDate
+          ? new Date(u.registrationDate).toLocaleString('de-DE', { dateStyle: 'long', timeStyle: 'short' })
+          : '—';
+
+        const infoLines = [];
+        if (u.alter) infoLines.push('🎂 Alter: ' + u.alter);
+        if (u.hobbys) infoLines.push('🎯 Hobbys: ' + u.hobbys);
+        if (u.sexualitaet) infoLines.push('💫 Sexualität: ' + u.sexualitaet);
+        const infoBlock = infoLines.length ? '\n' + infoLines.join('\n') : '';
+
+        const marriage = marriages[targetJid];
+        let marriageLine = '💍 Status: Single';
+        if (marriage) {
+          const partnerUser = users[marriage.partner] || {};
+          const partnerName = partnerUser.name || partnerUser.registrationName || marriage.partner.split('@')[0];
+          marriageLine = `💍 Verheiratet mit: ${partnerName}`;
+        }
+
+        const caption =
+          `👤 *Profil von ${displayName}*\n` +
+          `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+          `🏅 Rang: ${prettyRank(rank)}\n` +
+          `⭐ Level: ${u.level || 1}\n` +
+          `✨ XP: ${u.xp || 0}\n` +
+          `💰 Coins: ${u.coins || 0}\n` +
+          `📨 Nachrichten: ${u.msgCount || 0}\n` +
+          `📝 Registriert: ${registriert}\n` +
+          `📅 Registrierungsdatum: ${regDatum}\n` +
+          `${marriageLine}${infoBlock}`;
+
+        return send(caption, { mentions: [targetJid] });
+      }
 // PARTNER (Gilden-Bündnisse anzeigen)
 if (cmd === 'partner' || cmd === 'partners' || cmd === 'buendnisse') {
   if (!partners.list || partners.list.length === 0) {
