@@ -1140,7 +1140,7 @@ sock.ev.on('messages.upsert', async ({ messages }) => {
       if (!messages || !Array.isArray(messages) || messages.length === 0) return;
       const m = messages[0];
       if (!m || !m.message) return;
-
+};
       
 const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/channel)\/[a-zA-Z0-9]+/i;
 
