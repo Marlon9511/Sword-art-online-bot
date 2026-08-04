@@ -3028,12 +3028,18 @@ if (cmd === 'purge' || cmd === 'clearchat') {
       }
 
       // MODERATION
-      if (cmd === 'ban') {
-        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) return send('Kein Zugriff.');
-        const t = args[0]; if (!t) return send('Usage: $ban <num|jid> [kick]');
+if (cmd === 'ban') {
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
+
+        const ctx = m.message?.extendedTextMessage?.contextInfo;
+        let t = args[0];
+        if ((!t || t === 'kick' || t === 'remove') && ctx?.mentionedJid?.length) t = ctx.mentionedJid[0];
+        if ((!t || t === 'kick' || t === 'remove') && ctx?.participant) t = ctx.participant;
+
+        if (!t) return send('Usage: $ban <@user|num|jid> [kick]');
         const jid = normalizeJid(t);
         if (isPrimaryOwner(jid)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gebannt werden.');
-        const reason = args.slice(1).filter(a => a !== 'kick' && a !== 'remove').join(' ') || 'Kein Grund';
+        const reason = args.slice(1).filter(a => a !== 'kick' && a !== 'remove' && !a.startsWith('@')).join(' ') || 'Kein Grund';
         bans[jid] = { by: sender, at: new Date().toISOString(), reason };
         save(FILES.bans, bans);
         if (args.includes('kick') || args.includes('remove')) {
@@ -3045,19 +3051,26 @@ if (cmd === 'purge' || cmd === 'clearchat') {
           } catch (e) {}
         }
         try { await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: `🚫 Gebannt: ${jid}\nDurch: ${sender}\nGrund: ${reason}` }); } catch {}
-        return send(`🚫 ${jid} gebannt.`);
+        return send(`🚫 @${jid.split('@')[0]} gebannt.`, { mentions: [jid] });
       }
       if (cmd === 'banlist') {
-        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) return send('Kein Zugriff.');
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
         const list = Object.entries(bans).map(([j, b]) => `${j} — ${b.reason}`).join('\n') || '(keine)';
         return send(`🚫 Banliste:\n${list}`);
       }
       if (cmd === 'unban') {
-        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) return send('Kein Zugriff.');
-        const t = args[0]; if (!t) return send('Usage: $unban <num|jid>');
-        delete bans[normalizeJid(t)];
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
+
+        const ctx = m.message?.extendedTextMessage?.contextInfo;
+        let t = args[0];
+        if (!t && ctx?.mentionedJid?.length) t = ctx.mentionedJid[0];
+        if (!t && ctx?.participant) t = ctx.participant;
+
+        if (!t) return send('Usage: $unban <@user|num|jid>');
+        const jid = normalizeJid(t);
+        delete bans[jid];
         save(FILES.bans, bans);
-        return send(`✅ ${t} entbannt.`);
+        return send(`✅ @${jid.split('@')[0]} entbannt.`, { mentions: [jid] });
       }
 
       if (cmd === 'kick') {
