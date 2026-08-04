@@ -1135,30 +1135,16 @@ if (isGroup && m.key.id) {
           } catch (e) {}
         }
       }
-sock.ev.on('messages.upsert', async ({ messages }) => {
-    try {
-      if (!messages || !Array.isArray(messages) || messages.length === 0) return;
-      const m = messages[0];
-      if (!m || !m.message) return;
-
-      // Nachricht automatisch als gelesen markieren
-      if (!m.key.fromMe) {
+if (!m.key.fromMe) {
         try {
           await sock.readMessages([m.key]);
+          await sock.sendPresenceUpdate('available');
         } catch (e) {
           console.error('[read] Fehler beim Markieren als gelesen:', e?.message || e);
         }
       }
 
-      const rawFrom = m.key.remoteJid;
-      // ... Rest bleibt unverändert
-if (!m.key.fromMe) {
-        try {
-          await sock.readMessages([m.key]);
-          await sock.sendPresenceUpdate('available');
-        } catch (e) {}
-      }
-   
+      `;
 const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/channel)\/[a-zA-Z0-9]+/i;
 
       if (isGroup && body && !m.key.fromMe && whatsappLinkRegex.test(body)) {
