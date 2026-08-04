@@ -855,22 +855,23 @@ const pendingApplications = new Map(); // sender -> { step, answers }
       console.error('[nachtsperre] Scheduler-Fehler:', e);
     }
   }, 60 * 1000); // jede Minute prüfen
-  async function updateBotProfile() {
+async function updateBotProfile() {
     try {
       await sock.updateProfileName('Sword art online bot');
       console.log('✅ Bot-Name wurde zu Sword art online bot geändert');
 
-      const profilePath = './profil.jpg';
+      const profilePath = path.join(__dirname, '1b40b580eca7976d582b9afe0cd7bec5.jpg');
       if (fs.existsSync(profilePath)) {
         const profileImage = fs.readFileSync(profilePath);
-        await sock.updateProfilePicture(sock.user.id, profileImage);
+        await sock.updateProfilePicture(sock.user.id, { url: profileImage });
         console.log('✅ Profilbild wurde aktualisiert');
+      } else {
+        console.error('❌ Profilbild-Datei nicht gefunden unter:', profilePath);
       }
     } catch (error) {
       console.error('❌ Fehler beim Aktualisieren des Profils:', error);
     }
   }
-
   sock.ev.on('connection.update', async (update) => {
     const { connection, qr, lastDisconnect } = update;
 
