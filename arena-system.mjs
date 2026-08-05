@@ -80,12 +80,16 @@ export const ITEM_DB = {
   a_legendary_2: { name: 'Rune des Kobold-Königs',  type: 'armor',  rarity: 'legendary', power: 68 },
   a_legendary_3: { name: 'Himmlischer Panzer',      type: 'armor',  rarity: 'legendary', power: 66 },
 
-  // ---- SECRET (nicht über Kisten erhältlich, keine Anzeige in {P}arenaitems) ----
+  // ---- SECRET (extrem selten via {P}openkiste, keine Anzeige in {P}arenaitems) ----
   // Tarnung: Anzeigename ist absichtlich identisch mit dem gewöhnlichen
   // "Holzstab" (w_common_2) — im Inventar/Profil sieht man auf den ersten
   // Blick nur "Holzstab". Erst Seltenheit + Stärke verraten, dass es sich
   // um Kiritos legendäre Doppelklingen handelt. `secret: true` sorgt dafür,
-  // dass rollBoxItem() und der {P}arenaitems-Befehl dieses Item ignorieren.
+  // dass rollBoxItem() (die normale, gewichtete Ziehung) und der
+  // {P}arenaitems-Befehl dieses Item ignorieren. Der tatsächliche Drop läuft
+  // separat über eine eigene 0,0000001%-Chance direkt im openkiste-Handler
+  // (siehe SECRET_DROP_CHANCE_PERCENT) — zusätzlich weiterhin auch über den
+  // geheimen Owner-Befehl `kiritossecret` erhältlich.
   w_secret_dualblades: {
     name: 'Holzstab',
     trueName: 'Kiritos Doppelklingen (Dual Blades)',
@@ -335,13 +339,39 @@ export function createArenaSystem() {
       users[sender].items.kiste -= 1;
       if (users[sender].items.kiste <= 0) delete users[sender].items.kiste;
 
-      const itemId = rollBoxItem(randInt);
+      // Ultra-seltener Secret-Drop: 0,0000001 % Chance (≈ 1 zu 1 Milliarde)
+      // bei JEDEM Kisten-Öffnen. Läuft komplett getrennt von rollRarity()/
+      // rollBoxItem(), damit die normalen Gewichtungen unangetastet bleiben.
+      const SECRET_DROP_CHANCE_PERCENT = 0.0000001;
+      const isSecretDrop = Math.random() * 100 < SECRET_DROP_CHANCE_PERCENT;
+
+      const itemId = isSecretDrop ? SECRET_ITEM_ID : rollBoxItem(randInt);
       const it = ITEM_DB[itemId];
       users[sender].items[itemId] = (users[sender].items[itemId] || 0) + 1;
       save(FILES.users, users);
 
       const rarity = RARITY_INFO[it.rarity];
       const typeIcon = it.type === 'weapon' ? '🗡️ Waffe' : '🛡️ Rüstung';
+
+      if (isSecretDrop) {
+        // Besondere Aufmachung für den Sonderfall — verrät die wahre
+        // Identität erst hier, nachdem das Wunder tatsächlich passiert ist.
+        await send(
+          `📦 *Kiste geöffnet!*\n` +
+          `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+          `✨🤯 *DAS SYSTEM ERZITTERT...* 🤯✨\n\n` +
+          `${rarity.emoji} *${it.name}*\n` +
+          `_${it.trueName}_\n` +
+          `Typ: ${typeIcon}\n` +
+          `Seltenheit: ${rarity.label} (Secret)\n` +
+          `Stärke: ${it.power}\n` +
+          `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+          `🍀 Chance war ${SECRET_DROP_CHANCE_PERCENT}% — du gehörst zu den glücklichsten Spielern in ganz Aincrad!\n` +
+          `Ausrüsten mit: ${activePrefix}equip ${itemId}`
+        );
+        return true;
+      }
+
       await send(
         `📦 *Kiste geöffnet!*\n` +
         `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
