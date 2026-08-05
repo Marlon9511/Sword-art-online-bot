@@ -78,8 +78,27 @@ export const ITEM_DB = {
   a_epic_3:      { name: 'Titanplatte',             type: 'armor',  rarity: 'epic',      power: 48 },
   a_legendary_1: { name: 'Coat of Midnight',        type: 'armor',  rarity: 'legendary', power: 70 },
   a_legendary_2: { name: 'Rune des Kobold-Königs',  type: 'armor',  rarity: 'legendary', power: 68 },
-  a_legendary_3: { name: 'Himmlischer Panzer',      type: 'armor',  rarity: 'legendary', power: 66 }
+  a_legendary_3: { name: 'Himmlischer Panzer',      type: 'armor',  rarity: 'legendary', power: 66 },
+
+  // ---- SECRET (nicht über Kisten erhältlich, keine Anzeige in {P}arenaitems) ----
+  // Tarnung: Anzeigename ist absichtlich identisch mit dem gewöhnlichen
+  // "Holzstab" (w_common_2) — im Inventar/Profil sieht man auf den ersten
+  // Blick nur "Holzstab". Erst Seltenheit + Stärke verraten, dass es sich
+  // um Kiritos legendäre Doppelklingen handelt. `secret: true` sorgt dafür,
+  // dass rollBoxItem() und der {P}arenaitems-Befehl dieses Item ignorieren.
+  w_secret_dualblades: {
+    name: 'Holzstab',
+    trueName: 'Kiritos Doppelklingen (Dual Blades)',
+    type: 'weapon',
+    rarity: 'legendary',
+    power: 150,
+    secret: true
+  }
 };
+
+// Interne ID des Secret-Items — an einer Stelle definiert, damit sie sich
+// bei Bedarf leicht ändern lässt, ohne den Code an mehreren Stellen anzufassen.
+export const SECRET_ITEM_ID = 'w_secret_dualblades';
 
 export const ARENA_SHOP_ITEM = {
   id: 'kiste',
@@ -87,9 +106,14 @@ export const ARENA_SHOP_ITEM = {
   desc: '⚔️ SAO-Ausrüstungskiste: zufällige Waffe oder Rüstung'
 };
 
+// WICHTIG: Der geheime Owner-Befehl zum Verleihen des Secret-Items steht
+// absichtlich NICHT in dieser Liste. ALL_COMMANDS in bot.js (Tippfehler-
+// Vorschläge) und das Hilfe-Menü greifen auf ARENA_COMMANDS zurück — ein
+// Eintrag hier würde das Geheimnis sofort verraten.
 export const ARENA_COMMANDS = [
   'openkiste', 'kisteoeffnen', 'openbox', 'gear', 'ausruestung', 'equipment',
-  'equip', 'unequip', 'duell', 'duel', 'arena', 'duelleaderboard', 'kampfrangliste'
+  'equip', 'unequip', 'duell', 'duel', 'arena', 'duelleaderboard', 'kampfrangliste',
+  'arenaitems', 'itemliste'
 ];
 
 export const ARENA_HELP_TEXT =
@@ -100,7 +124,8 @@ export const ARENA_HELP_TEXT =
   `▸ {P}unequip weapon|armor — Ausrüstung ablegen\n` +
   `▸ {P}duell @user <einsatz> — Zum Duell herausfordern\n` +
   `▸ {P}duell accept/deny/cancel — Duell verwalten\n` +
-  `▸ {P}arena — Arena-Rangliste (meiste Siege)\n`;
+  `▸ {P}arena — Arena-Rangliste (meiste Siege)\n` +
+  `▸ {P}arenaitems — Alle erhältlichen Waffen & Rüstungen anzeigen\n`;
 
 // ---------------------------------------------------------------------
 // Fabrikfunktion — erstellt eine unabhängige Arena-Instanz.
@@ -129,8 +154,11 @@ export function createArenaSystem() {
   function rollBoxItem(randInt) {
     const rarity = rollRarity();
     const type = Math.random() < 0.5 ? 'weapon' : 'armor';
-    const pool = Object.entries(ITEM_DB).filter(([id, it]) => it.rarity === rarity && it.type === type);
-    const fallback = Object.entries(ITEM_DB).filter(([id, it]) => it.rarity === rarity);
+    // `!it.secret` schließt geheime Items (z.B. Kiritos Doppelklingen) aus
+    // dem normalen Kisten-Loot komplett aus — die kommen NUR über den
+    // geheimen Owner-Befehl ins Spiel.
+    const pool = Object.entries(ITEM_DB).filter(([id, it]) => it.rarity === rarity && it.type === type && !it.secret);
+    const fallback = Object.entries(ITEM_DB).filter(([id, it]) => it.rarity === rarity && !it.secret);
     const chosenPool = pool.length ? pool : fallback;
     const [id] = chosenPool[randInt(0, chosenPool.length - 1)];
     return id;
@@ -243,8 +271,57 @@ export function createArenaSystem() {
     const {
       cmd, args, sender, from, m, send, sock,
       users, save, FILES, ensureUser, normalizeJid, isSameJid,
-      getNumberMention, randInt, sleep, activePrefix
+      getNumberMention, randInt, sleep, activePrefix,
+      isOwner // optional — nur nötig für den geheimen Owner-Befehl unten
     } = ctx;
+
+    // ---------- ARENA-ITEMS (öffentliche Item-Übersicht, ohne Secrets) ----------
+    if (cmd === 'arenaitems' || cmd === 'itemliste') {
+      const order = ['legendary', 'epic', 'rare', 'uncommon', 'common'];
+      let out = `⚔️ *— ARENA-ITEMS —* ⚔️\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n`;
+
+      for (const rarity of order) {
+        const info = RARITY_INFO[rarity];
+        // Secret-Items (`secret: true`) werden hier bewusst NICHT gelistet.
+        const items = Object.entries(ITEM_DB).filter(([, it]) => it.rarity === rarity && !it.secret);
+        if (!items.length) continue;
+
+        out += `\n${info.emoji} *${info.label}*\n`;
+        for (const [, it] of items) {
+          const typeIcon = it.type === 'weapon' ? '🗡️' : '🛡️';
+          out += `  ${typeIcon} ${it.name} — Stärke ${it.power}\n`;
+        }
+      }
+
+      out += `\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n_Erhältlich über ${activePrefix}buy kiste (${ARENA_SHOP_ITEM.price} Coins) + ${activePrefix}openkiste, oder als seltener Fund beim Angeln._`;
+      await send(out);
+      return true;
+    }
+
+    // ---------- GEHEIMER OWNER-BEFEHL: Secret-Item verleihen ----------
+    // Absichtlich NICHT in ARENA_COMMANDS/ARENA_HELP_TEXT gelistet, damit der
+    // Befehl in ?help nirgends auftaucht und die "Ähnlicher Befehl?"-Tippfehler-
+    // Erkennung in bot.js ihn niemandem verrät. Nicht-Owner bekommen `false`
+    // zurück — der Bot reagiert dann wie bei einem völlig unbekannten Befehl,
+    // ohne die Existenz des Befehls überhaupt zu bestätigen.
+    if (cmd === 'kiritossecret') {
+      if (!isOwner) return false;
+
+      ensureUser(sender);
+      ensureArenaFields(users, sender);
+      users[sender].items[SECRET_ITEM_ID] = (users[sender].items[SECRET_ITEM_ID] || 0) + 1;
+      save(FILES.users, users);
+
+      const it = ITEM_DB[SECRET_ITEM_ID];
+      await send(
+        `🤫 *Ein Flüstern durchzieht das System...*\n` +
+        `Du hast erhalten: *${it.name}* 🟡\n` +
+        `_${it.trueName}_\n` +
+        `Stärke: ${it.power}\n\n` +
+        `Ausrüsten mit: ${activePrefix}equip ${SECRET_ITEM_ID}`
+      );
+      return true;
+    }
 
     // ---------- KISTE ÖFFNEN ----------
     if (cmd === 'openkiste' || cmd === 'kisteoeffnen' || cmd === 'openbox') {
