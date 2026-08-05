@@ -4447,7 +4447,8 @@ if (cmd === 'showuser') {
           `📅 Registrierungsdatum: ${regDatum}\n` +
           `${marriageLine}${infoBlock}`;
 
-        return send(caption,
+        return send(caption, { mentions: [targetJid] });
+      }
 // PARTNER (Gilden-Bündnisse anzeigen)
 if (cmd === 'partner' || cmd === 'partners' || cmd === 'buendnisse') {
   if (!partners.list || partners.list.length === 0) {
