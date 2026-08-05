@@ -2652,36 +2652,74 @@ if (cmd === 'divorce') {
         return send(`✅ VIP für @${targetJid.split('@')[0]} bis ${expiry}.`, { mentions: [targetJid] });
       }
 
-      // FISH
+      // FISH — Angeln in den Gewässern von Aincrad
       if (cmd === 'fish') {
-        const events = [
-          { chance: 30, text: '🐟 Kleinen Fisch gefangen! (+10 Coins)', coins: 10 },
-          { chance: 20, text: '🐠 Tropenfisch gefangen! (+20 Coins)', coins: 20 },
-          { chance: 10, text: '🐡 Kugelfisch gefangen! (+30 Coins)', coins: 30 },
-          { chance: 5, text: '🦈 Kleinen Hai gefangen! (+100 Coins)', coins: 100 },
-          { chance: 3, text: '📦 Schatztruhe gefunden! (+200 Coins)', coins: 200 },
-          { chance: 2, text: '📜 Flaschenpost gefunden! (+50 Coins)', coins: 50, xp: 20 },
-          { chance: 15, text: '💨 Köder gestohlen...' },
-          { chance: 10, text: '😅 Nur Seegras gefangen.' },
-          { chance: 4, text: '💦 Du bist ins Wasser gefallen!' },
-          { chance: 1, text: '🌊 Welle hat Boot umgeworfen! (-50 Coins)', coins: -50 }
+        const FISH_EVENTS = [
+          // ---- Floor 1: Stadt der Anfänge — Fluss ----
+          { chance: 20, rarity: 'common',    text: '🐟 *Flusswels* aus dem Fluss der Stadt der Anfänge gefangen! (+8 Coins)', coins: 8 },
+          { chance: 16, rarity: 'common',    text: '🐠 *Blauschuppen-Barsch* gefangen! (+15 Coins)', coins: 15, xp: 3 },
+          { chance: 12, rarity: 'uncommon',  text: '🐡 *Kugelfisch der ersten Ebene* gefangen! (+25 Coins)', coins: 25, xp: 5 },
+
+          // ---- Floor 22: Kristallwald-See ----
+          { chance: 10, rarity: 'uncommon',  text: '💎 *Kristallforelle* aus dem Kristallwald-See schimmert in der Sonne! (+30 Coins)', coins: 30, xp: 8 },
+          { chance: 7,  rarity: 'rare',      text: '🌫️ *Nebelaal* (Floor 35) aus dem Sumpf gezogen! (+45 Coins)', coins: 45, xp: 10 },
+
+          // ---- Comedic / kleine Mob-Drops ----
+          { chance: 8,  rarity: 'common',    text: '🦀 *Kobold-Krebs* hat sich in der Angel verheddert. (+5 Coins)', coins: 5 },
+          { chance: 5,  rarity: 'rare',      text: '🐍 *Riesenaal* zerrt dich fast von der Plattform, gibt aber auf! (+40 Coins)', coins: 40, xp: 8 },
+
+          // ---- Höhere Floors ----
+          { chance: 4,  rarity: 'epic',      text: '🦈 *Sturmhai* (Floor 50) durchbricht die Wasseroberfläche! (+90 Coins)', coins: 90, xp: 20 },
+          { chance: 3,  rarity: 'epic',      text: '🎐 *Leuchtqualle der Tiefen* (Floor 75) taucht schimmernd auf! (+70 Coins)', coins: 70, xp: 15 },
+          { chance: 1.5, rarity: 'legendary', text: '🐉 *Drachenkarpfen* (Floor 90) — ein legendärer Feldboss-Fisch! (+180 Coins)', coins: 180, xp: 35 },
+          { chance: 0.4, rarity: 'legendary', text: '🐋 *Der Weiße Wal von Aincrad* — eine Systemlegende wird wahr! JACKPOT! (+600 Coins)', coins: 600, xp: 120 },
+
+          // ---- Schätze & Botschaften ----
+          { chance: 3,  rarity: 'rare',      text: '📦 *Schatztruhe* am Grund des Sees entdeckt! (+200 Coins)', coins: 200, xp: 10 },
+          { chance: 2,  rarity: 'uncommon',  text: '📜 *Flaschenpost eines gefallenen Spielers* gefunden. (+50 Coins)', coins: 50, xp: 20 },
+
+          // ---- Item-Drops ----
+          { chance: 2,  rarity: 'epic',      text: '⚔️ Im Netz verfangen: eine *SAO-Ausrüstungskiste*! Nutze {P}openkiste, um sie zu öffnen.', item: 'kiste', itemQty: 1, xp: 15 },
+          { chance: 3,  rarity: 'uncommon',  text: '💊 Eine *Heiltrank-Flasche* trieb vorbei und wurde eingesammelt.', item: 'potion', itemQty: 1 },
+          { chance: 3,  rarity: 'uncommon',  text: '🎁 Eine *mysteriöse Kiste* hing im Schilf fest.', item: 'box', itemQty: 1 },
+
+          // ---- Nieten / Pech ----
+          { chance: 10, rarity: 'common',    text: '🌿 Nur Algen gefangen... Aincrad ist manchmal enttäuschend.' },
+          { chance: 8,  rarity: 'common',    text: '💨 Ein Fisch hat deinen Köder gestohlen und ist geflüchtet!' },
+          { chance: 4,  rarity: 'common',    text: '💦 Du bist ausgerutscht und ins eiskalte Wasser gefallen!' },
+          { chance: 3,  rarity: 'common',    text: '🦶 Ein *Kobold* hat dein Boot umgestoßen! (-30 Coins)', coins: -30 },
+          { chance: 2,  rarity: 'common',    text: '🪝 Deine Angel ist an einem Stein zerbrochen! (-10 Coins)', coins: -10 }
         ];
 
-        const totalWeight = events.reduce((sum, e) => sum + e.chance, 0);
+        const totalWeight = FISH_EVENTS.reduce((sum, e) => sum + e.chance, 0);
         let random = Math.random() * totalWeight;
-        let selectedEvent = events[events.length - 1];
-        for (const event of events) {
+        let selectedEvent = FISH_EVENTS[FISH_EVENTS.length - 1];
+        for (const event of FISH_EVENTS) {
           random -= event.chance;
           if (random <= 0) { selectedEvent = event; break; }
         }
 
         ensureUser(sender);
-        if (selectedEvent.coins) users[sender].coins = (users[sender].coins || 0) + selectedEvent.coins;
-        if (selectedEvent.xp) users[sender].xp = (users[sender].xp || 0) + selectedEvent.xp;
-        save(FILES.users, users);
-        return send(selectedEvent.text);
-      }
 
+        if (selectedEvent.coins) {
+          users[sender].coins = Math.max(0, (users[sender].coins || 0) + selectedEvent.coins);
+        }
+        if (selectedEvent.xp) {
+          users[sender].xp = (users[sender].xp || 0) + selectedEvent.xp;
+        }
+        if (selectedEvent.item) {
+          if (!users[sender].items) users[sender].items = {};
+          users[sender].items[selectedEvent.item] = (users[sender].items[selectedEvent.item] || 0) + (selectedEvent.itemQty || 1);
+        }
+        save(FILES.users, users);
+
+        const rarityTag = selectedEvent.rarity ? (RARITY_INFO[selectedEvent.rarity]?.emoji || '') : '';
+        const header = `🎣 *— ANGELN IN AINCRAD —* 🎣\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n`;
+        const footer = `\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈`;
+        const bodyText = selectedEvent.text.replace(/\{P\}/g, activePrefix);
+
+        return send(`${header}${rarityTag ? rarityTag + ' ' : ''}${bodyText}${footer}`);
+      }
       // GIVE
       if (cmd === 'give') {
         const target = args[0];
