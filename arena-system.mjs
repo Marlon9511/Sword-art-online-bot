@@ -14,6 +14,23 @@
    vorhandenes save(FILES.users, users).
 
    Einbau in bot.js: siehe integration-patch.txt (nur 4 Zeilen nötig).
+
+   ---------------------------------------------------------------------
+   ÄNDERUNG: Mention-Formatierung korrigiert.
+   Vorher wurde überall `@${jid.split('@')[0]}` als Anzeigetext verwendet.
+   Das funktioniert nur für normale WhatsApp-JIDs (...@s.whatsapp.net).
+   Bei JIDs vom Typ ...@lid ("linked ID") ist der Teil vor dem @ NICHT
+   die Telefonnummer, sondern eine interne LID-Nummer — der Mention-Text
+   passt dann nicht zur echten Nummer/Anzeige, obwohl der `mentions`-Array
+   die richtige JID enthält. Dadurch wirken @-Erwähnungen bei @lid-Usern
+   kaputt oder zeigen falsche Ziffern an.
+
+   Fix: eine zentrale Helper-Funktion `mentionText()`, die für @lid-JIDs
+   automatisch über die vorhandene `getNumberMention()`-Funktion (die ihr
+   schon fürs Leaderboard nutzt) den korrekten Anzeigenamen/Nummer auflöst,
+   und für normale JIDs weiterhin einfach die Nummer aus der JID nimmt.
+   Alle Stellen im Duell-Flow nutzen jetzt diesen Helper statt manuellem
+   `jid.split('@')[0]`.
    ===================================================================== */
 
 // ---------------------------------------------------------------------
@@ -187,6 +204,32 @@ export function createArenaSystem() {
   }
 
   /**
+   * Liefert den korrekten Anzeigetext für eine @-Erwähnung.
+   *
+   * Bei normalen JIDs (...@s.whatsapp.net, ...@c.us etc.) ist der Teil vor
+   * dem @ die Telefonnummer — der kann direkt als Anzeigetext verwendet
+   * werden, WhatsApp matcht ihn dann mit dem `mentions`-Array.
+   *
+   * Bei JIDs vom Typ ...@lid ist der Teil vor dem @ KEINE Telefonnummer,
+   * sondern eine interne LID. Damit die Erwähnung trotzdem korrekt
+   * angezeigt wird, wird hier die schon vorhandene getNumberMention()
+   * genutzt, die (laut eurem Leaderboard-Code) den passenden Namen/die
+   * passende Nummer zu einer JID auflöst.
+   */
+  async function mentionText(jid, sock, getNumberMention) {
+    if (typeof jid !== 'string') return '';
+    if (jid.endsWith('@lid')) {
+      try {
+        const resolved = await getNumberMention(jid, sock);
+        if (resolved) return resolved.startsWith('@') ? resolved : `@${resolved}`;
+      } catch {
+        // Fällt unten auf den Rohtext zurück, falls Auflösung fehlschlägt
+      }
+    }
+    return `@${jid.split('@')[0]}`;
+  }
+
+  /**
    * Haupt-Einstiegspunkt. In eurer messages.upsert-Logik aufrufen:
    *
    *   const handled = await arena.handle({ cmd, args, sender, from, m,
@@ -331,7 +374,13 @@ export function createArenaSystem() {
         const defenderJid = sender;
         const bet = proposal.bet;
 
-        await send(`⚔️ *DUELL BEGINNT!* ⚔️\n@${challengerJid.split('@')[0]} VS @${defenderJid.split('@')[0]}\nEinsatz: 💰 ${bet} Coins`);
+        const challengerMention = await mentionText(challengerJid, sock, getNumberMention);
+        const defenderMention = await mentionText(defenderJid, sock, getNumberMention);
+
+        await send(
+          `⚔️ *DUELL BEGINNT!* ⚔️\n${challengerMention} VS ${defenderMention}\nEinsatz: 💰 ${bet} Coins`,
+          { mentions: [challengerJid, defenderJid] }
+        );
         await sleep(1500);
 
         const result = simulateDuel(users, challengerJid, defenderJid);
@@ -352,13 +401,16 @@ export function createArenaSystem() {
 
         save(FILES.users, users);
 
+        const winnerMention = await mentionText(winnerJid, sock, getNumberMention);
+        const loserMention = await mentionText(loserJid, sock, getNumberMention);
+
         const shortLog = result.log.slice(-4).join('\n');
         await send(
           `🏆 *DUELL-ERGEBNIS* 🏆\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
           `${shortLog}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
-          `🥇 Gewinner: @${winnerJid.split('@')[0]}\n` +
-          `💀 Verlierer: @${loserJid.split('@')[0]}\n` +
-          `💰 @${winnerJid.split('@')[0]} erhält ${bet} Coins von @${loserJid.split('@')[0]}!`,
+          `🥇 Gewinner: ${winnerMention}\n` +
+          `💀 Verlierer: ${loserMention}\n` +
+          `💰 ${winnerMention} erhält ${bet} Coins von ${loserMention}!`,
           { mentions: [winnerJid, loserJid] }
         );
         return true;
@@ -368,7 +420,8 @@ export function createArenaSystem() {
         const proposal = pendingDuels.get(sender);
         if (!proposal) { await send('❌ Du hast keine offene Duell-Herausforderung.'); return true; }
         pendingDuels.delete(sender);
-        await send(`🛡️ @${sender.split('@')[0]} hat die Herausforderung abgelehnt.`, { mentions: [sender] });
+        const senderMention = await mentionText(sender, sock, getNumberMention);
+        await send(`🛡️ ${senderMention} hat die Herausforderung abgelehnt.`, { mentions: [sender] });
         return true;
       }
 
@@ -405,7 +458,8 @@ export function createArenaSystem() {
       if (isSameJid(sender, targetJid)) { await send('❌ Du kannst nicht gegen dich selbst kämpfen! 😅'); return true; }
       if ((users[sender].coins || 0) < bet) { await send('❌ Du hast nicht genug Coins für diesen Einsatz.'); return true; }
       if ((users[targetJid].coins || 0) < bet) {
-        await send(`❌ @${targetJid.split('@')[0]} hat nicht genug Coins für diesen Einsatz.`, { mentions: [targetJid] });
+        const targetMention = await mentionText(targetJid, sock, getNumberMention);
+        await send(`❌ ${targetMention} hat nicht genug Coins für diesen Einsatz.`, { mentions: [targetJid] });
         return true;
       }
 
@@ -417,10 +471,13 @@ export function createArenaSystem() {
 
       pendingDuels.set(targetJid, { from: sender, bet, at: Date.now() });
 
+      const senderMention = await mentionText(sender, sock, getNumberMention);
+      const targetMention = await mentionText(targetJid, sock, getNumberMention);
+
       await send(
-        `⚔️ @${sender.split('@')[0]} fordert @${targetJid.split('@')[0]} zum Duell heraus!\n` +
+        `⚔️ ${senderMention} fordert ${targetMention} zum Duell heraus!\n` +
         `💰 Einsatz: ${bet} Coins\n\n` +
-        `@${targetJid.split('@')[0]}, antworte mit:\n` +
+        `${targetMention}, antworte mit:\n` +
         `${activePrefix}duell accept — annehmen\n` +
         `${activePrefix}duell deny — ablehnen`,
         { mentions: [sender, targetJid] }
@@ -457,5 +514,5 @@ export function createArenaSystem() {
     return false; // nicht von der Arena behandelt
   }
 
-  return { handle, ensureArenaFields, getBattleStats, simulateDuel, rollBoxItem, formatItemLine };
+  return { handle, ensureArenaFields, getBattleStats, simulateDuel, rollBoxItem, formatItemLine, mentionText };
 }
