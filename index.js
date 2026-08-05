@@ -4393,7 +4393,15 @@ if (cmd === 'say') {
   return;
 }
 // SHOWER — Profil eines Users anzeigen (inkl. Registrierungsdatum)
-      if (cmd === 'showuser') {
+if (cmd === 'showuser') {
+        // 🔒 Berechtigungsprüfung: nur Team/VIP dürfen diesen Command nutzen
+        const senderRank = ranks[sender] || users[sender]?.rank || 'USER';
+        const allowedRanks = ['TEAM', 'VIP', 'OWNER', 'ADMIN']; // hier deine erlaubten Ränge eintragen
+
+        if (!allowedRanks.includes(senderRank)) {
+          return send('🚫 Dieser Befehl ist nur für Team/VIP-Mitglieder verfügbar.');
+        }
+
         const ctx = m.message?.extendedTextMessage?.contextInfo;
         let target = args[0];
         if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
@@ -4439,8 +4447,7 @@ if (cmd === 'say') {
           `📅 Registrierungsdatum: ${regDatum}\n` +
           `${marriageLine}${infoBlock}`;
 
-        return send(caption, { mentions: [targetJid] });
-      }
+        return send(caption,
 // PARTNER (Gilden-Bündnisse anzeigen)
 if (cmd === 'partner' || cmd === 'partners' || cmd === 'buendnisse') {
   if (!partners.list || partners.list.length === 0) {
