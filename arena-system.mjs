@@ -311,19 +311,38 @@ export function createArenaSystem() {
     if (cmd === 'kiritossecret') {
       ensureUser(sender);
       const senderRank = users[sender]?.rank || 'USER';
+
+      console.log('[DEBUG kiritossecret] sender:', sender, '| rank:', senderRank);
+
       if (senderRank !== 'OWNER') return false;
 
-      ensureArenaFields(users, sender);
-      users[sender].items[SECRET_ITEM_ID] = (users[sender].items[SECRET_ITEM_ID] || 0) + 1;
+      // Ziel bestimmen: Mention > Reply > Nummer als Argument > sich selbst
+      const ctx = m.message?.extendedTextMessage?.contextInfo;
+      let target = args[0];
+      if (ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+      else if (ctx?.participant) target = ctx.participant;
+
+      const targetJid = target ? normalizeJid(target) : sender;
+
+      ensureUser(targetJid);
+      ensureArenaFields(users, targetJid);
+      users[targetJid].items[SECRET_ITEM_ID] = (users[targetJid].items[SECRET_ITEM_ID] || 0) + 1;
       save(FILES.users, users);
 
       const it = ITEM_DB[SECRET_ITEM_ID];
+      const isSelf = isSameJid(targetJid, sender);
+
+      const targetMention = await mentionText(targetJid, sock, getNumberMention);
+
       await send(
         `🤫 *Ein Flüstern durchzieht das System...*\n` +
-        `Du hast erhalten: *${it.name}* 🟡\n` +
+        (isSelf
+          ? `Du hast erhalten: *${it.name}* 🟡\n`
+          : `${targetMention} hat erhalten: *${it.name}* 🟡\n`) +
         `_${it.trueName}_\n` +
         `Stärke: ${it.power}\n\n` +
-        `Ausrüsten mit: ${activePrefix}equip ${SECRET_ITEM_ID}`
+        `Ausrüsten mit: ${activePrefix}equip ${SECRET_ITEM_ID}`,
+        { mentions: [targetJid] }
       );
       return true;
     }
