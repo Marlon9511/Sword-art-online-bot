@@ -309,23 +309,12 @@ export function createArenaSystem() {
     // zurück — der Bot reagiert dann wie bei einem völlig unbekannten Befehl,
     // ohne die Existenz des Befehls überhaupt zu bestätigen.
     if (cmd === 'kiritossecret') {
-      if (!isOwner) return false;
-
-      ensureUser(sender);
-      ensureArenaFields(users, sender);
-      users[sender].items[SECRET_ITEM_ID] = (users[sender].items[SECRET_ITEM_ID] || 0) + 1;
-      save(FILES.users, users);
-
-      const it = ITEM_DB[SECRET_ITEM_ID];
-      await send(
-        `🤫 *Ein Flüstern durchzieht das System...*\n` +
-        `Du hast erhalten: *${it.name}* 🟡\n` +
-        `_${it.trueName}_\n` +
-        `Stärke: ${it.power}\n\n` +
-        `Ausrüsten mit: ${activePrefix}equip ${SECRET_ITEM_ID}`
-      );
-      return true;
-    }
+  ensureUser(sender);
+  console.log('[DEBUG kiritossecret] sender:', sender, '| rank:', users[sender]?.rank);
+  const senderRank = users[sender]?.rank || 'USER';
+  if (senderRank !== 'OWNER') return false;
+  ...
+}
 
     // ---------- KISTE ÖFFNEN ----------
     if (cmd === 'openkiste' || cmd === 'kisteoeffnen' || cmd === 'openbox') {
