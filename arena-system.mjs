@@ -438,8 +438,11 @@ export function createArenaSystem() {
 
       // Neue Herausforderung
       const ctxInfo = m.message?.extendedTextMessage?.contextInfo;
-      let target = args[0];
-      if (!target && ctxInfo?.mentionedJid?.length) target = ctxInfo.mentionedJid[0];
+      // Echtes @-Mention hat Vorrang vor dem rohen Text in args[0]: WhatsApp
+      // liefert hier die korrekte JID direkt mit (inkl. @lid), während der
+      // Text vor dem @ bei @lid-Kontakten NICHT die Telefonnummer ist und
+      // sonst fälschlich als @s.whatsapp.net interpretiert würde.
+      let target = ctxInfo?.mentionedJid?.length ? ctxInfo.mentionedJid[0] : args[0];
       if (!target && ctxInfo?.participant) target = ctxInfo.participant;
 
       const bet = parseInt(args[1]);
