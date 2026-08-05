@@ -14,6 +14,7 @@ import { initTelegramConnect, setActiveSock, sendQrToTelegram } from './telegram
 import { fileURLToPath } from 'url';
 import webp from 'node-webpmux';
 import 'dotenv/config';
+import { createArenaSystem, ARENA_SHOP_ITEM, ARENA_HELP_TEXT, ARENA_COMMANDS } from './arena-system.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -227,6 +228,9 @@ if (!fs.existsSync(_groupInvitesPath)) fs.writeFileSync(_groupInvitesPath, '{}')
 
 const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ⚔️ Arena-System (Ausrüstung, Kisten, PVP-Duelle, Leaderboard)
+const arena = createArenaSystem();
 
 async function createBackup() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -1146,7 +1150,8 @@ const ALL_COMMANDS = [
   'rangliste', 'leaderboard', 'rank', 'setinfo', 'allowcmd', 'say', 'md',
   'selfpromote', 'sp', 'selfdemote', 'sd',
   'slap', 'hug', 'kiss', 'pat', 'poke', 'cuddle', 'bite', 'punch', 'throw',
-  'love', 'blush', 'handhold', 'lick', 'nervous'
+  'love', 'blush', 'handhold', 'lick', 'nervous',
+  ...ARENA_COMMANDS
 ];
 
 function findClosestCommand(input) {
@@ -1606,6 +1611,8 @@ helpText += `▸ ${PREFIX}sao — Zufälligen Sword Art Online Edit abspielen\n`
         helpText += `▸ ${PREFIX}pet — Begleiter-Status prüfen\n`;
         helpText += `▸ ${PREFIX}adopt <name> — Begleiter zähmen\n`;
         helpText += `▸ ${PREFIX}feed — Begleiter füttern\n\n`;
+        helpText += `⚔️ *ARENA-SYSTEM* (Ausrüstung & PVP)\n${divider}\n`;
+        helpText += ARENA_HELP_TEXT.split('\n').filter(Boolean).map(l => l.replace(/\{P\}/g, PREFIX)).join('\n') + '\n\n';
 helpText += `\n💞 *SOCIAL SKILLS* (Interaktion)\n${divider}\n`;
 helpText += `▸ ${PREFIX}slap @user — Ohrfeige verpassen\n`;
 helpText += `▸ ${PREFIX}hug @user — Umarmen\n`;
@@ -2768,7 +2775,12 @@ if (cmd === 'purge' || cmd === 'clearchat') {
       }
 
       // SHOP
-      const SHOP = { potion: { price: 100, desc: 'Heilt 10 HP' }, box: { price: 500, desc: 'Zufälliger Gegenstand' }, vip: { price: 2000, desc: 'VIP-Rang' } };
+      const SHOP = {
+        potion: { price: 100, desc: 'Heilt 10 HP' },
+        box: { price: 500, desc: 'Zufälliger Gegenstand' },
+        vip: { price: 2000, desc: 'VIP-Rang' },
+        [ARENA_SHOP_ITEM.id]: { price: ARENA_SHOP_ITEM.price, desc: ARENA_SHOP_ITEM.desc }
+      };
       if (cmd === 'shop') {
         let out = '🛒 Shop:\n';
         for (const [k, v] of Object.entries(SHOP)) out += `• ${k} — ${v.price} 💰 | ${v.desc}\n`;
@@ -4595,6 +4607,15 @@ if (cmd === 'nachtsperre' || cmd === 'quiethours') {
 
   return send('❌ Nutzung: ' + activePrefix + 'nachtsperre an/aus/status');
 }
+
+// ⚔️ Arena-System: Kisten, Ausrüstung, Duelle, Leaderboard
+const arenaHandled = await arena.handle({
+  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
+  users, save, FILES, ensureUser, normalizeJid, isSameJid,
+  getNumberMention, randInt, sleep
+});
+if (arenaHandled) return;
+
 // Unbekannter Befehl
 const suggestion = findClosestCommand(cmd);
 if (suggestion) {
@@ -4648,4 +4669,3 @@ initTelegramConnect();
       await sleep(1000);
     }
   }
-})();
