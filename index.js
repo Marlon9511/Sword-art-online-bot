@@ -14,7 +14,7 @@ import { initTelegramConnect, setActiveSock, sendQrToTelegram } from './telegram
 import { fileURLToPath } from 'url';
 import webp from 'node-webpmux';
 import 'dotenv/config';
-import { createArenaSystem, ARENA_SHOP_ITEM, ARENA_HELP_TEXT, ARENA_COMMAND } from './arena-system.mjs';
+import { createArenaSystem, ARENA_SHOP_ITEM, ARENA_HELP_TEXT, ARENA_COMMANDS } from './arena-system.mjs';
 import { createGuildSystem, GUILD_COMMANDS, GUILD_HELP_TEXT } from './guild-system.mjs';
 import { createTitleSystem, TITLE_COMMANDS, TITLE_HELP_TEXT, checkProgress, TITLES } from './titel-achievments.js';
 
