@@ -4075,6 +4075,42 @@ if (REACTION_COMMANDS[cmd]) {
   }
   return;
 }
+// ---- NEU: Neko-Bilder (nekos.best) — png, nur für den Haupt-Owner ----
+const NEKO_IMAGE_CATEGORIES = ['neko', 'waifu', 'husbando', 'kitsune'];
+const NEKO_IMAGE_OWNER_JID = '4915111254435@s.whatsapp.net';
+
+async function getNekoImageUrl(category) {
+  const url = `https://nekos.best/api/v2/${category}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Neko-API-Fehler: ${res.status}`);
+  const data = await res.json();
+
+  if (!data.results?.length) throw new Error("Keine Neko-API-Treffer gefunden");
+
+  return data.results[0];
+}
+
+if (NEKO_IMAGE_CATEGORIES.includes(cmd)) {
+  if (!isSameJid(sender, NEKO_IMAGE_OWNER_JID)) {
+    return send('❌ Dieser Befehl ist nur für den Haupt-Owner verfügbar.');
+  }
+
+  try {
+    const result = await getNekoImageUrl(cmd);
+    let caption = `🖼️ *${cmd}*`;
+    if (result.artist_name) caption += `\n🎨 Künstler: ${result.artist_name}`;
+    if (result.source_url) caption += `\n🔗 Quelle: ${result.source_url}`;
+
+    await sock.sendMessage(from, {
+      image: { url: result.url },
+      caption
+    }, { quoted: m });
+  } catch (err) {
+    console.error(`[${cmd}] Fehler:`, err);
+    return send('⚠️ Konnte gerade kein Bild holen, versuch\'s gleich nochmal.');
+  }
+  return;
+}
 // ---- Sticker-Teil unverändert ----
 const STICKER_CACHE_DIR = path.join(__dirname, 'cache', 'stickers');
 
