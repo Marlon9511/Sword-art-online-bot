@@ -4693,11 +4693,20 @@ const arenaHandled = await arena.handle({
   isPrimaryOwner   // NEU: für die Excalibur-Sperre
 });
 if (arenaHandled) return;
-const guildHandled = await guildSystem.handle({
-  cmd, args, sender, send, sock,
-  users, guilds, save, FILES, ensureUser, normalizeJid, isSameJid,
-  getNumberMention, activePrefix, m
+const arenaHandled = await arena.handle({
+  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
+  users, save, FILES, ensureUser, normalizeJid, isSameJid,
+  getNumberMention, randInt, sleep, isPrimaryOwner
 });
+if (arenaHandled) {
+  // Nach jedem Arena-Command (inkl. Duellen) automatisch prüfen,
+  // ob der aufrufende Spieler neue Titel/Achievements freigeschaltet hat.
+  await checkProgress({
+    users, save, FILES, send, activePrefix,
+    guilds, ownerJids: [OWNER_LID, OWNER_LID2, OWNER_PRIV, OWNER_PRIV2]
+  }, sender);
+  return;
+}
 if (guildHandled) return;
 const titleHandled = await titleSystem.handle({
   cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
