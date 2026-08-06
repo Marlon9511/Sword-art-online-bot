@@ -3902,16 +3902,16 @@ if (cmd === 'ytmp3') {
   return;
 }
 const REACTION_COMMANDS = {
-  throw:  { emoji: "🤾", verb: "wirft",                 query: "anime throw" },
-  slap:   { emoji: "👋", verb: "verpasst eine Ohrfeige",  query: "anime slap" },
-  hug:    { emoji: "🤗", verb: "umarmt",                 query: "anime hug" },
-  kiss:   { emoji: "😘", verb: "küsst",                  query: "anime kiss" },
-  pat:    { emoji: "🤚", verb: "tätschelt",              query: "anime pat head" },
-  poke:   { emoji: "👉", verb: "pikst",                  query: "anime poke" },
-  cuddle: { emoji: "🥰", verb: "kuschelt mit",           query: "anime cuddle" },
-  bite:   { emoji: "😬", verb: "beißt",                  query: "anime bite" },
-  punch:  { emoji: "🥊", verb: "verpasst einen Schlag",   query: "anime punch" },
-  sleep:  { emoji: "😴", verb: "schläft ein neben",       query: "anime sleep" },
+  throw:  { emoji: "🤾", verb: "wirft",                 apiReaction: "throw" },
+  slap:   { emoji: "👋", verb: "verpasst eine Ohrfeige",  apiReaction: "slap" },
+  hug:    { emoji: "🤗", verb: "umarmt",                 apiReaction: "hug" },
+  kiss:   { emoji: "😘", verb: "küsst",                  apiReaction: "kiss" },
+  pat:    { emoji: "🤚", verb: "tätschelt",              apiReaction: "pat" },
+  poke:   { emoji: "👉", verb: "pikst",                  apiReaction: "poke" },
+  cuddle: { emoji: "🥰", verb: "kuschelt mit",           apiReaction: "cuddle" },
+  bite:   { emoji: "😬", verb: "beißt",                  apiReaction: "bite" },
+  punch:  { emoji: "🥊", verb: "verpasst einen Schlag",   apiReaction: "punch" },
+  sleep:  { emoji: "😴", verb: "schläft ein neben",       apiReaction: "sleep" },
   angrystare: { emoji: "😠", verb: "starrt wütend" },
   bleh: { emoji: "😝", verb: "streckt die Zunge raus" },
   confused: { emoji: "😕", verb: "ist verwirrt" },
@@ -3938,27 +3938,24 @@ const REACTION_COMMANDS = {
   lick: { emoji: "👅", verb: "leckt", apiReaction: "lick" },
   nervous: { emoji: "😅", verb: "ist nervös wegen", apiReaction: "nervous" },
 
-  // NEU: zusätzliche Reactions über Giphy
-  kill:      { emoji: "☠️", verb: "erledigt",              source: "giphy", query: "anime sword kill epic" },
-  yeet:      { emoji: "🚀", verb: "yeetet",                 source: "giphy", query: "anime throw yeet funny" },
-  nuke:      { emoji: "☢️", verb: "nukt",                   source: "giphy", query: "anime explosion" },
-  banish:    { emoji: "🌀", verb: "verbannt",               source: "giphy", query: "anime portal teleport" },
-  stab:      { emoji: "🗡️", verb: "durchbohrt",             source: "giphy", query: "anime sword attack" },
-  smash:     { emoji: "🔨", verb: "zerschmettert",          source: "giphy", query: "anime smash hit" },
-  vaporize:  { emoji: "💥", verb: "pulverisiert",           source: "giphy", query: "anime explosion attack" },
-  choke:     { emoji: "🫳", verb: "würgt",                  source: "giphy", query: "anime choke funny" },
-  kick:      { emoji: "🦵", verb: "verpasst einen Tritt",   source: "giphy", query: "anime kick" },
-  spin:      { emoji: "🌪️", verb: "wirbelt herum",          source: "giphy", query: "anime spin dizzy" },
-  facepalm2: { emoji: "🤦", verb: "macht einen Facepalm",   source: "giphy", query: "anime facepalm epic" },
-  glare:     { emoji: "👀", verb: "starrt böse an",         source: "giphy", query: "anime intense glare" },
-  smirk:     { emoji: "😏", verb: "grinst süffisant",       source: "giphy", query: "anime smirk" },
-  cry2:      { emoji: "😭", verb: "heult wegen",            source: "giphy", query: "anime crying dramatic" },
-  highfive:  { emoji: "🙌", verb: "gibt ein High Five",     source: "giphy", query: "anime high five" },
-  dance: { emoji: "dance", verb: "tanzt mit", source: "giphy", query: "anime dance funny" },
+  // Zusätzliche Reactions über die Neko API (nekos.best) — kein API-Key nötig
+  kill:      { emoji: "☠️", verb: "erledigt",              source: "neko", nekoCategory: "punch" },
+  yeet:      { emoji: "🚀", verb: "yeetet",                 source: "neko", nekoCategory: "yeet" },
+  nuke:      { emoji: "☢️", verb: "nukt",                   source: "neko", nekoCategory: "punch" },
+  banish:    { emoji: "🌀", verb: "verbannt",               source: "neko", nekoCategory: "wave" },
+  stab:      { emoji: "🗡️", verb: "durchbohrt",             source: "neko", nekoCategory: "punch" },
+  smash:     { emoji: "🔨", verb: "zerschmettert",          source: "neko", nekoCategory: "punch" },
+  vaporize:  { emoji: "💥", verb: "pulverisiert",           source: "neko", nekoCategory: "punch" },
+  choke:     { emoji: "🫳", verb: "würgt",                  source: "neko", nekoCategory: "bite" },
+  kick:      { emoji: "🦵", verb: "verpasst einen Tritt",   source: "neko", nekoCategory: "kick" },
+  spin:      { emoji: "🌪️", verb: "wirbelt herum",          source: "neko", nekoCategory: "dance" },
+  facepalm2: { emoji: "🤦", verb: "macht einen Facepalm",   source: "neko", nekoCategory: "facepalm" },
+  glare:     { emoji: "👀", verb: "starrt böse an",         source: "neko", nekoCategory: "stare" },
+  smirk:     { emoji: "😏", verb: "grinst süffisant",       source: "neko", nekoCategory: "smug" },
+  cry2:      { emoji: "😭", verb: "heult wegen",            source: "neko", nekoCategory: "cry" },
+  highfive:  { emoji: "🙌", verb: "gibt ein High Five",     source: "neko", nekoCategory: "highfive" },
+  dance:     { emoji: "💃", verb: "tanzt mit",              source: "neko", nekoCategory: "dance" },
 };
-
-// ---- API Keys ----
-const GIPHY_API_KEY = process.env.GIPHY_API_KEY; // in .env eintragen: GIPHY_API_KEY=dein_key_hier
 
 // ---- otakugifs (bestehend) ----
 async function getReactionGifUrl(reaction) {
@@ -3968,23 +3965,23 @@ async function getReactionGifUrl(reaction) {
   return data.url;
 }
 
-// ---- NEU: Giphy ----
-async function getGiphyGifUrl(query) {
-const url = `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(query)}&limit=25&offset=0&rating=g&lang=en`;
+// ---- Neko API (nekos.best) — kein API-Key nötig ----
+async function getNekoGifUrl(category) {
+  const url = `https://nekos.best/api/v2/${category}`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`Giphy API-Fehler: ${res.status}`);
+  if (!res.ok) throw new Error(`Neko-API-Fehler: ${res.status}`);
   const data = await res.json();
 
-  if (!data.data?.length) throw new Error("Keine Giphy-Treffer gefunden");
+  if (!data.results?.length) throw new Error("Keine Neko-API-Treffer gefunden");
 
-  const pick = data.data[Math.floor(Math.random() * data.data.length)];
-  return pick.images.original.url;
+  const pick = data.results[Math.floor(Math.random() * data.results.length)];
+  return pick.url;
 }
 
-// ---- NEU: Router, wählt automatisch die richtige API je nach config.source ----
+// ---- Router, wählt automatisch die richtige API je nach config.source ----
 async function getGifUrl(cmd, config) {
-  if (config.source === "giphy") {
-    return await getGiphyGifUrl(config.query);
+  if (config.source === "neko") {
+    return await getNekoGifUrl(config.nekoCategory || cmd);
   }
   // Default: otakugifs
   return await getReactionGifUrl(config.apiReaction || cmd);
@@ -4035,9 +4032,8 @@ function fetchAndConvertGifToMp4(gifUrl) {
   });
 }
 
-
 /* -----------------------------------------------------------
- * SCHRITT 2: Command-Block (ERSETZT deinen alten Block 1:1)
+ * Command-Handler für alle Reaction-Commands
  * ---------------------------------------------------------*/
 
 if (REACTION_COMMANDS[cmd]) {
@@ -4057,9 +4053,7 @@ if (REACTION_COMMANDS[cmd]) {
   ensureUser(targetJid);
 
   try {
-    // GEÄNDERT: nutzt jetzt den Router, der zwischen otakugifs und giphy wählt
     const gifUrl = await getGifUrl(cmd, config);
-
     const mp4Buffer = await fetchAndConvertGifToMp4(gifUrl);
 
     if (!isTeamMember) {
