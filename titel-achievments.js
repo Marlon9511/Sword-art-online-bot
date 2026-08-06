@@ -18,8 +18,11 @@
        um den Anzeigenamen zu bekommen.
      - Für Duell-/Gear-Ausgaben: renderHpBar(current, max) importieren
        und nur anzeigen, wenn users[jid].showHpBar !== false.
-     - Owner-Erkennung für den "Kayaba Akihiko"-Titel: setzt ctx.isOwner(jid)
-       oder ctx.owners / ctx.OWNER_NUMBERS (Telefonnummern-Array).
+     - Owner-Erkennung für den "Kayaba Akihiko"-Titel: übergib beim
+       Handler-Aufruf ctx.ownerJids = [OWNER_LID, OWNER_PRIV, ...]
+       (Array eurer Owner-JIDs/-Nummern aus index.js). Der Vergleich
+       läuft über die reine Rufnummer, also egal ob @lid oder
+       @s.whatsapp.net ankommt.
    ===================================================================== */
 
 export const TITLE_COMMANDS = [
@@ -185,6 +188,16 @@ export function renderHpBar(current, max, length = 10) {
 }
 
 /* ---------------------------------------------------------------------
+   Extrahiert nur die reine Ziffernfolge aus einer JID, egal ob @lid,
+   @s.whatsapp.net oder mit :device-Suffix — analog zu extractRawNumber()
+   in index.js, damit der Vergleich unabhängig vom JID-Typ funktioniert.
+--------------------------------------------------------------------- */
+function extractRawNumberTitle(jid) {
+  if (!jid) return null;
+  return String(jid).split(':')[0].split('@')[0].replace(/[^0-9]/g, '') || null;
+}
+
+/* ---------------------------------------------------------------------
    FORTSCHRITTS-CHECK — von anderen Modulen nach relevanten Events
    aufrufen (Duell gewonnen, Level-Up, Gilde beigetreten, ...).
    Schaltet automatisch neue Titel/Achievements frei und meldet sie.
@@ -203,18 +216,23 @@ export async function checkProgress(ctx, jid) {
   }
 
   // Hilfsflag für den exklusiven "Kayaba Akihiko"-Titel (Bot-Owner).
-  // Passt sich an eure vorhandene Owner-Erkennung an: nutzt ctx.isOwner(jid)
-  // falls vorhanden, sonst ctx.owners / ctx.OWNER_NUMBERS als Fallback.
-  if (typeof ctx.isOwner === 'function') {
+  // Priorität 1: direkter Abgleich gegen ctx.ownerJids (Array aus index.js,
+  // z.B. [OWNER_LID, OWNER_LID2, OWNER_PRIV, OWNER_PRIV2, COOWNER_LID]).
+  // Vergleich läuft über die reine Rufnummer, damit @lid <-> @s.whatsapp.net
+  // keine Rolle spielt.
+  if (Array.isArray(ctx.ownerJids) && ctx.ownerJids.length) {
+    const rawNum = extractRawNumberTitle(jid);
+    u.__isOwner = !!rawNum && ctx.ownerJids.some(o => extractRawNumberTitle(o) === rawNum);
+  } else if (typeof ctx.isOwner === 'function') {
     u.__isOwner = ctx.isOwner(jid);
   } else if (Array.isArray(ctx.owners)) {
-    const num = jid.split('@')[0];
-    u.__isOwner = ctx.owners.some(o => String(o).replace(/[^0-9]/g, '') === num.replace(/[^0-9]/g, ''));
+    const num = extractRawNumberTitle(jid);
+    u.__isOwner = ctx.owners.some(o => extractRawNumberTitle(o) === num);
   } else if (Array.isArray(ctx.OWNER_NUMBERS)) {
-    const num = jid.split('@')[0];
-    u.__isOwner = ctx.OWNER_NUMBERS.some(o => String(o).replace(/[^0-9]/g, '') === num.replace(/[^0-9]/g, ''));
+    const num = extractRawNumberTitle(jid);
+    u.__isOwner = ctx.OWNER_NUMBERS.some(o => extractRawNumberTitle(o) === num);
   } else {
-    u.__isOwner = u.__isOwner === true; // unverändert, falls ihr das Flag manuell setzt
+    u.__isOwner = u.__isOwner === true; // unverändert, falls das Flag manuell gesetzt wird
   }
 
   const newTitles = [];
