@@ -4178,30 +4178,7 @@ if (cmd === 'setinfo') {
   save(FILES.users, users);
   return send(`✅ ${feld.charAt(0).toUpperCase() + feld.slice(1)} wurde gespeichert. Nutze ${activePrefix}me, um dein Profil anzuzeigen.`);
 }
-const FUN_ACTIONS = [
- "hat Sex mit" ,
-];
-if (cmd === 'sex') {
-  const ctx = m.message?.extendedTextMessage?.contextInfo;
-  const mentioned = ctx?.mentionedJid || [];
-  const repliedTo = ctx?.participant;
-  const target = mentioned[0] || repliedTo;
 
-  if (!target) {
-    return send(`mit wem willst du Sex haben? markiere die nachricht oder mache @makierung${activePrefix}fun`);
-  }
-
-  const targetJid = normalizeJid(target);
-  ensureUser(sender);
-  ensureUser(targetJid);
-
-  const action = FUN_ACTIONS[Math.floor(Math.random() * FUN_ACTIONS.length)];
-
-  return sock.sendMessage(from, {
-    text: `🍆🍑💦 @${sender.split('@')[0]} ${action} @${targetJid.split('@')[0]}!`,
-    mentions: [sender, targetJid],
-  }, { quoted: m });
-}
 function loadBannedCommands() {
   try {
     if (!fs.existsSync(BANNED_CMDS_FILE)) return [];
