@@ -4547,10 +4547,25 @@ if (cmd === 'showuser') {
     : '🎖️ Titel: Keiner';
 
   // ⚔️ Ausrüstung aus dem Arena-System
+  // Owner-exklusive / geheime Items (z.B. Excalibur) werden für alle
+  // außer dem Haupt-Owner selbst als "Unbekannt" angezeigt, egal wer
+  // das Profil ansieht oder wessen Profil es ist.
+  const viewerIsPrimaryOwner = isPrimaryOwner(sender);
+
+  const formatGearLineForShowuser = (itemId) => {
+    if (!itemId) return '— (keine Ausrüstung)';
+    const it = ITEM_DB[itemId];
+    if (!it) return '— (unbekannt)';
+    if ((it.ownerOnly || it.secret) && !viewerIsPrimaryOwner) {
+      return '❓ Unbekannt';
+    }
+    return arena.formatItemLine(itemId, 1);
+  };
+
   const weaponId = u.equipped?.weapon;
   const armorId = u.equipped?.armor;
-  const weaponLine = weaponId ? arena.formatItemLine(weaponId, 1) : '— (keine Waffe)';
-  const armorLine = armorId ? arena.formatItemLine(armorId, 1) : '— (keine Rüstung)';
+  const weaponLine = formatGearLineForShowuser(weaponId);
+  const armorLine = formatGearLineForShowuser(armorId);
   const gearBlock = `\n⚔️ *Ausrüstung*\n🗡️ Waffe: ${weaponLine}\n🛡️ Rüstung: ${armorLine}`;
 
   const caption =
