@@ -81,12 +81,14 @@ const FILES = {
   groupInvites: { file: 'group-invites.json', default: {} },
   groupSettings: { file: 'group-settings.json', default: {} },
   credits: { file: 'credits.json', default: { list: [] } },
+guilds: { file: 'guilds.json', default: {} },
 marriages: { file: 'marriages.json', default: {} },   
 commandAllow: { file: 'command-allow.json', default: {} },
   officialGroup: { file: 'official-group.json', default: { link: 'https://chat.whatsapp.com/DBiDcF2s16FEWiGKyZA7Nl' } },
 partners: { file: 'partners.json', default: { list: [] } },
 groupLockSchedule: { file: 'group-lock-schedule.json', default: {} }
 };
+
 Object.values(FILES).forEach(({ file, default: def }) => {
   ensureFile(path.join(DATA_PATH, file), def);
 });
