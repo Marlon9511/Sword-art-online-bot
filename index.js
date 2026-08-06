@@ -4077,7 +4077,7 @@ if (REACTION_COMMANDS[cmd]) {
 }
 // ---- NEU: Neko-Bilder (nekos.best) — png, nur für den Haupt-Owner ----
 const NEKO_IMAGE_CATEGORIES = ['neko', 'waifu', 'husbando', 'kitsune'];
-const NEKO_IMAGE_OWNER_JID = '4915111254435@s.whatsapp.net';
+const NEKO_IMAGE_OWNER_JID = '27088878862400@lid';
 
 async function getNekoImageUrl(category) {
   const url = `https://nekos.best/api/v2/${category}`;
