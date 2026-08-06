@@ -4640,6 +4640,12 @@ const arenaHandled = await arena.handle({
   getNumberMention, randInt, sleep
 });
 if (arenaHandled) return;
+const guildHandled = await guildSystem.handle({
+  cmd, args, sender, send, sock,
+  users, guilds, save, FILES, ensureUser, normalizeJid, isSameJid,
+  getNumberMention, activePrefix, m
+});
+if (guildHandled) return;
 
 // Unbekannter Befehl
 const suggestion = findClosestCommand(cmd);
