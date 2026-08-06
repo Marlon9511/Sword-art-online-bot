@@ -4674,7 +4674,8 @@ if (cmd === 'nachtsperre' || cmd === 'quiethours') {
 const arenaHandled = await arena.handle({
   cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
   users, save, FILES, ensureUser, normalizeJid, isSameJid,
-  getNumberMention, randInt, sleep
+  getNumberMention, randInt, sleep,
+  isPrimaryOwner   // NEU: für die Excalibur-Sperre
 });
 if (arenaHandled) return;
 const guildHandled = await guildSystem.handle({
