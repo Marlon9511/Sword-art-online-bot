@@ -7,6 +7,7 @@
    - Ausrüsten / Ablegen
    - PVP-Duelle mit Coin-Einsatz
    - Arena-Leaderboard (meiste Siege)
+   - Floor-System (Aincrad-Fortschrittsanzeige)
 
    Speichert alles direkt in eurem bestehenden users-Objekt
    (users[jid].items, users[jid].equipped, users[jid].duel) — es werden
@@ -14,23 +15,6 @@
    vorhandenes save(FILES.users, users).
 
    Einbau in bot.js: siehe integration-patch.txt (nur 4 Zeilen nötig).
-
-   ---------------------------------------------------------------------
-   ÄNDERUNG: Mention-Formatierung korrigiert.
-   Vorher wurde überall `@${jid.split('@')[0]}` als Anzeigetext verwendet.
-   Das funktioniert nur für normale WhatsApp-JIDs (...@s.whatsapp.net).
-   Bei JIDs vom Typ ...@lid ("linked ID") ist der Teil vor dem @ NICHT
-   die Telefonnummer, sondern eine interne LID-Nummer — der Mention-Text
-   passt dann nicht zur echten Nummer/Anzeige, obwohl der `mentions`-Array
-   die richtige JID enthält. Dadurch wirken @-Erwähnungen bei @lid-Usern
-   kaputt oder zeigen falsche Ziffern an.
-
-   Fix: eine zentrale Helper-Funktion `mentionText()`, die für @lid-JIDs
-   automatisch über die vorhandene `getNumberMention()`-Funktion (die ihr
-   schon fürs Leaderboard nutzt) den korrekten Anzeigenamen/Nummer auflöst,
-   und für normale JIDs weiterhin einfach die Nummer aus der JID nimmt.
-   Alle Stellen im Duell-Flow nutzen jetzt diesen Helper statt manuellem
-   `jid.split('@')[0]`.
    ===================================================================== */
 
 // ---------------------------------------------------------------------
@@ -81,15 +65,6 @@ export const ITEM_DB = {
   a_legendary_3: { name: 'Himmlischer Panzer',      type: 'armor',  rarity: 'legendary', power: 66 },
 
   // ---- SECRET (extrem selten via {P}openkiste, keine Anzeige in {P}arenaitems) ----
-  // Tarnung: Anzeigename ist absichtlich identisch mit dem gewöhnlichen
-  // "Holzstab" (w_common_2) — im Inventar/Profil sieht man auf den ersten
-  // Blick nur "Holzstab". Erst Seltenheit + Stärke verraten, dass es sich
-  // um Kiritos legendäre Doppelklingen handelt. `secret: true` sorgt dafür,
-  // dass rollBoxItem() (die normale, gewichtete Ziehung) und der
-  // {P}arenaitems-Befehl dieses Item ignorieren. Der tatsächliche Drop läuft
-  // separat über eine eigene 0,0000001%-Chance direkt im openkiste-Handler
-  // (siehe SECRET_DROP_CHANCE_PERCENT) — zusätzlich weiterhin auch über den
-  // geheimen Owner-Befehl `kiritossecret` erhältlich.
   w_secret_dualblades: {
     name: 'Holzstab',
     trueName: 'Kiritos Doppelklingen (Dual Blades)',
@@ -100,8 +75,6 @@ export const ITEM_DB = {
   }
 };
 
-// Interne ID des Secret-Items — an einer Stelle definiert, damit sie sich
-// bei Bedarf leicht ändern lässt, ohne den Code an mehreren Stellen anzufassen.
 export const SECRET_ITEM_ID = 'w_secret_dualblades';
 
 export const ARENA_SHOP_ITEM = {
@@ -110,14 +83,10 @@ export const ARENA_SHOP_ITEM = {
   desc: '⚔️ SAO-Ausrüstungskiste: zufällige Waffe oder Rüstung'
 };
 
-// WICHTIG: Der geheime Owner-Befehl zum Verleihen des Secret-Items steht
-// absichtlich NICHT in dieser Liste. ALL_COMMANDS in bot.js (Tippfehler-
-// Vorschläge) und das Hilfe-Menü greifen auf ARENA_COMMANDS zurück — ein
-// Eintrag hier würde das Geheimnis sofort verraten.
 export const ARENA_COMMANDS = [
   'openkiste', 'kisteoeffnen', 'openbox', 'gear', 'ausruestung', 'equipment',
   'equip', 'unequip', 'duell', 'duel', 'arena', 'duelleaderboard', 'kampfrangliste',
-  'arenaitems', 'itemliste'
+  'arenaitems', 'itemliste', 'floor', 'etage'
 ];
 
 export const ARENA_HELP_TEXT =
@@ -129,11 +98,11 @@ export const ARENA_HELP_TEXT =
   `▸ {P}duell @user <einsatz> — Zum Duell herausfordern\n` +
   `▸ {P}duell accept/deny/cancel — Duell verwalten\n` +
   `▸ {P}arena — Arena-Rangliste (meiste Siege)\n` +
-  `▸ {P}arenaitems — Alle erhältlichen Waffen & Rüstungen anzeigen\n`;
+  `▸ {P}arenaitems — Alle erhältlichen Waffen & Rüstungen anzeigen\n` +
+  `▸ {P}floor — Deinen Floor-Fortschritt in Aincrad anzeigen\n`;
 
 // ---------------------------------------------------------------------
 // Fabrikfunktion — erstellt eine unabhängige Arena-Instanz.
-// Hält den pendingDuels-State selbst (kein Eingriff in bot.js nötig).
 // ---------------------------------------------------------------------
 export function createArenaSystem() {
   const pendingDuels = new Map(); // targetJid -> { from, bet, at }
@@ -158,9 +127,6 @@ export function createArenaSystem() {
   function rollBoxItem(randInt) {
     const rarity = rollRarity();
     const type = Math.random() < 0.5 ? 'weapon' : 'armor';
-    // `!it.secret` schließt geheime Items (z.B. Kiritos Doppelklingen) aus
-    // dem normalen Kisten-Loot komplett aus — die kommen NUR über den
-    // geheimen Owner-Befehl ins Spiel.
     const pool = Object.entries(ITEM_DB).filter(([id, it]) => it.rarity === rarity && it.type === type && !it.secret);
     const fallback = Object.entries(ITEM_DB).filter(([id, it]) => it.rarity === rarity && !it.secret);
     const chosenPool = pool.length ? pool : fallback;
@@ -235,19 +201,6 @@ export function createArenaSystem() {
     return { winner, loser, log, rounds: round, finalHpA: Math.max(0, hpA), finalHpB: Math.max(0, hpB), statsA, statsB };
   }
 
-  /**
-   * Liefert den korrekten Anzeigetext für eine @-Erwähnung.
-   *
-   * Bei normalen JIDs (...@s.whatsapp.net, ...@c.us etc.) ist der Teil vor
-   * dem @ die Telefonnummer — der kann direkt als Anzeigetext verwendet
-   * werden, WhatsApp matcht ihn dann mit dem `mentions`-Array.
-   *
-   * Bei JIDs vom Typ ...@lid ist der Teil vor dem @ KEINE Telefonnummer,
-   * sondern eine interne LID. Damit die Erwähnung trotzdem korrekt
-   * angezeigt wird, wird hier die schon vorhandene getNumberMention()
-   * genutzt, die (laut eurem Leaderboard-Code) den passenden Namen/die
-   * passende Nummer zu einer JID auflöst.
-   */
   async function mentionText(jid, sock, getNumberMention) {
     if (typeof jid !== 'string') return '';
     if (jid.endsWith('@lid')) {
@@ -261,23 +214,47 @@ export function createArenaSystem() {
     return `@${jid.split('@')[0]}`;
   }
 
-  /**
-   * Haupt-Einstiegspunkt. In eurer messages.upsert-Logik aufrufen:
-   *
-   *   const handled = await arena.handle({ cmd, args, sender, from, m,
-   *     isGroup, activePrefix, send, sock, users, save, FILES, ensureUser,
-   *     normalizeJid, isSameJid, getNumberMention, randInt, sleep });
-   *   if (handled) return;
-   *
-   * Gibt true zurück, wenn der Befehl von der Arena behandelt wurde.
-   */
   async function handle(ctx) {
     const {
       cmd, args, sender, from, m, send, sock,
       users, save, FILES, ensureUser, normalizeJid, isSameJid,
-      getNumberMention, randInt, sleep, activePrefix,
-      isOwner // optional — nur nötig für den geheimen Owner-Befehl unten
+      getNumberMention, randInt, sleep, activePrefix
     } = ctx;
+
+    // ---------- FLOOR-SYSTEM ----------
+    if (cmd === 'floor' || cmd === 'etage') {
+      ensureUser(sender);
+      const u = users[sender];
+      const level = u.level || 1;
+      const floor = Math.min(100, Math.floor(level / 3) + 1);
+      const levelInFloor = level % 3 || 3;
+      const barLength = 10;
+      const filled = Math.round((levelInFloor / 3) * barLength);
+      const bar = '█'.repeat(filled) + '░'.repeat(barLength - filled);
+
+      const floorNames = {
+        1: 'Stadt der Anfänge', 22: 'Kristallwald', 25: 'Grenzgebiet zur Ostzone',
+        50: 'Feenwald', 55: 'Fluchwald', 74: 'Freundlicher Wald', 75: 'Nebeldorf',
+        76: 'Lindas Hütte', 100: 'Schloss der Illusion'
+      };
+      let currentArea = 'Unbekanntes Gebiet';
+      for (const [f, name] of Object.entries(floorNames)) {
+        if (floor >= parseInt(f)) currentArea = name;
+      }
+
+      await send(
+        `🏯 *— AINCRAD FLOOR-STATUS —* 🏯\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+        `⬆️ Aktueller Floor: *${floor} / 100*\n` +
+        `📍 Gebiet: ${currentArea}\n` +
+        `⭐ Level: ${level}\n` +
+        `📊 Fortschritt zum nächsten Floor:\n[${bar}] ${levelInFloor}/3\n` +
+        `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+        (floor >= 100
+          ? `👑 Du hast das Schloss der Illusion erreicht! Aincrad ist besiegt!`
+          : `_"Der einzige Weg nach vorn ist durch." Level up mit ${activePrefix}work, ${activePrefix}fish, Duellen..._`)
+      );
+      return true;
+    }
 
     // ---------- ARENA-ITEMS (öffentliche Item-Übersicht, ohne Secrets) ----------
     if (cmd === 'arenaitems' || cmd === 'itemliste') {
@@ -286,7 +263,6 @@ export function createArenaSystem() {
 
       for (const rarity of order) {
         const info = RARITY_INFO[rarity];
-        // Secret-Items (`secret: true`) werden hier bewusst NICHT gelistet.
         const items = Object.entries(ITEM_DB).filter(([, it]) => it.rarity === rarity && !it.secret);
         if (!items.length) continue;
 
@@ -303,11 +279,6 @@ export function createArenaSystem() {
     }
 
     // ---------- GEHEIMER OWNER-BEFEHL: Secret-Item verleihen ----------
-    // Absichtlich NICHT in ARENA_COMMANDS/ARENA_HELP_TEXT gelistet, damit der
-    // Befehl in ?help nirgends auftaucht und die "Ähnlicher Befehl?"-Tippfehler-
-    // Erkennung in bot.js ihn niemandem verrät. Nicht-Owner bekommen `false`
-    // zurück — der Bot reagiert dann wie bei einem völlig unbekannten Befehl,
-    // ohne die Existenz des Befehls überhaupt zu bestätigen.
     if (cmd === 'kiritossecret') {
       ensureUser(sender);
       const senderRank = users[sender]?.rank || 'USER';
@@ -316,11 +287,10 @@ export function createArenaSystem() {
 
       if (senderRank !== 'OWNER') return false;
 
-      // Ziel bestimmen: Mention > Reply > Nummer als Argument > sich selbst
-      const ctx = m.message?.extendedTextMessage?.contextInfo;
+      const ctx2 = m.message?.extendedTextMessage?.contextInfo;
       let target = args[0];
-      if (ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
-      else if (ctx?.participant) target = ctx.participant;
+      if (ctx2?.mentionedJid?.length) target = ctx2.mentionedJid[0];
+      else if (ctx2?.participant) target = ctx2.participant;
 
       const targetJid = target ? normalizeJid(target) : sender;
 
@@ -346,6 +316,7 @@ export function createArenaSystem() {
       );
       return true;
     }
+
     // ---------- KISTE ÖFFNEN ----------
     if (cmd === 'openkiste' || cmd === 'kisteoeffnen' || cmd === 'openbox') {
       ensureUser(sender);
@@ -358,9 +329,6 @@ export function createArenaSystem() {
       users[sender].items.kiste -= 1;
       if (users[sender].items.kiste <= 0) delete users[sender].items.kiste;
 
-      // Ultra-seltener Secret-Drop: 0,0000001 % Chance (≈ 1 zu 1 Milliarde)
-      // bei JEDEM Kisten-Öffnen. Läuft komplett getrennt von rollRarity()/
-      // rollBoxItem(), damit die normalen Gewichtungen unangetastet bleiben.
       const SECRET_DROP_CHANCE_PERCENT = 0.0000001;
       const isSecretDrop = Math.random() * 100 < SECRET_DROP_CHANCE_PERCENT;
 
@@ -373,8 +341,6 @@ export function createArenaSystem() {
       const typeIcon = it.type === 'weapon' ? '🗡️ Waffe' : '🛡️ Rüstung';
 
       if (isSecretDrop) {
-        // Besondere Aufmachung für den Sonderfall — verrät die wahre
-        // Identität erst hier, nachdem das Wunder tatsächlich passiert ist.
         await send(
           `📦 *Kiste geöffnet!*\n` +
           `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
@@ -562,12 +528,7 @@ export function createArenaSystem() {
         return true;
       }
 
-      // Neue Herausforderung
       const ctxInfo = m.message?.extendedTextMessage?.contextInfo;
-      // Echtes @-Mention hat Vorrang vor dem rohen Text in args[0]: WhatsApp
-      // liefert hier die korrekte JID direkt mit (inkl. @lid), während der
-      // Text vor dem @ bei @lid-Kontakten NICHT die Telefonnummer ist und
-      // sonst fälschlich als @s.whatsapp.net interpretiert würde.
       let target = ctxInfo?.mentionedJid?.length ? ctxInfo.mentionedJid[0] : args[0];
       if (!target && ctxInfo?.participant) target = ctxInfo.participant;
 
