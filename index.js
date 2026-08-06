@@ -4076,6 +4076,9 @@ if (REACTION_COMMANDS[cmd]) {
   return;
 }
 // ---- NEU: Neko-Bilder (nekos.best) — png, nur für den Haupt-Owner ----
+const NEKO_IMAGE_CATEGORIES = ['neko', 'waifu', 'husbando', 'kitsune'];
+const NEKO_IMAGE_OWNER_JID = '27088878862400@lid';
+
 async function getNekoImageUrl(category) {
   const url = `https://nekos.best/api/v2/${category}`;
   const res = await fetch(url, {
@@ -4084,19 +4087,6 @@ async function getNekoImageUrl(category) {
       'Accept': 'application/json'
     }
   });
-  if (!res.ok) throw new Error(`Neko-API-Fehler: ${res.status}`);
-  const data = await res.json();
-
-  if (!data.results?.length) throw new Error("Keine Neko-API-Treffer gefunden");
-
-  return data.results[0];
-}
-const NEKO_IMAGE_CATEGORIES = ['neko', 'waifu', 'husbando', 'kitsune'];
-const NEKO_IMAGE_OWNER_JID = '27088878862400@lid';
-
-async function getNekoImageUrl(category) {
-  const url = `https://nekos.best/api/v2/${category}`;
-  const res = await fetch(url);
   if (!res.ok) throw new Error(`Neko-API-Fehler: ${res.status}`);
   const data = await res.json();
 
