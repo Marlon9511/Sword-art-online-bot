@@ -4621,6 +4621,32 @@ if (cmd === 'setinfo') {
   save(FILES.users, users);
   return send(`✅ ${feld.charAt(0).toUpperCase() + feld.slice(1)} wurde gespeichert. Nutze ${activePrefix}me, um dein Profil anzuzeigen.`);
 }
+// BANCMD
+if (cmd === 'bancmd') {
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Nur Owner/CoOwner.');
+  const target = args[0];
+  const action = (args[1] || 'ban').toLowerCase();
+  if (!target) return send(`Nutzung: ${PREFIX}bancmd <befehl> [ban|unban]`);
+
+  const tcmd = String(target).toLowerCase().replace(new RegExp(`^\\${PREFIX}`), '').trim();
+  if (!tcmd) return send('❌ Ungültiger Befehl.');
+
+  const protectedCmds = ['bancmd', 'unbancmd', 'help', 'menu'];
+  if (protectedCmds.includes(tcmd)) return send(`❌ Der Befehl "${tcmd}" kann nicht gesperrt werden.`);
+
+  if (action === 'unban') {
+    if (commandBans[tcmd]) {
+      delete commandBans[tcmd];
+      save(FILES.commandBans, commandBans);
+      return send(`✅ Befehl ${tcmd} wurde entsperrt.`);
+    }
+    return send(`ℹ️ Befehl ${tcmd} war nicht gesperrt.`);
+  }
+
+  commandBans[tcmd] = { by: sender, at: new Date().toISOString() };
+  save(FILES.commandBans, commandBans);
+  return send(`⛔ Befehl ${tcmd} wurde gesperrt und ist nur noch für Owner/CoOwner verfügbar.`);
+}
 // ⚔️ Arena-System: Kisten, Ausrüstung, Duelle, Leaderboard
 const arenaHandled = await arena.handle({
   cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
