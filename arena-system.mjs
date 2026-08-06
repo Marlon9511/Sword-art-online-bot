@@ -124,6 +124,30 @@ export const ITEM_DB = {
     power: 120,
     secret: true
   },
+  a_secret_negacloak: {
+    name: 'Nachtschwarzer Umhang',
+    trueName: 'Umhang der Laughing Coffin',
+    type: 'armor',
+    rarity: 'legendary',
+    power: 125,
+    secret: true
+  },
+  a_secret_flashcoat: {
+    name: 'Zerrissene rote Weste',
+    trueName: 'Flash-Panzerung — Asunas Kommandantinnen-Rüstung',
+    type: 'armor',
+    rarity: 'legendary',
+    power: 130,
+    secret: true
+  },
+  a_secret_bloodoath: {
+    name: 'Rostiger Plattenpanzer',
+    trueName: 'Rüstung der Blutschwur-Ritter (Knights of the Blood Oath)',
+    type: 'armor',
+    rarity: 'legendary',
+    power: 128,
+    secret: true
+  },
 
   // ---- EXCALIBUR — ausschließlich für den Haupt-Owner, niemals via Kiste/Shop erhältlich ----
   w_excalibur: {
@@ -134,12 +158,25 @@ export const ITEM_DB = {
     power: 10000,
     secret: true,
     ownerOnly: true
+  },
+
+  // ---- AEGIS DES SYSTEMADMINISTRATORS — Rüstungs-Pendant zu Excalibur,
+  // ausschließlich für den Haupt-Owner, niemals via Kiste/Shop erhältlich ----
+  a_aegis: {
+    name: 'Aegis des Systemadministrators',
+    trueName: 'Der unzerbrechliche Schild-Mantel von Kayaba Akihiko',
+    type: 'armor',
+    rarity: 'secret',
+    power: 8000,
+    secret: true,
+    ownerOnly: true
   }
 };
 
 // Feste Referenz auf das "klassische" Secret-Item (weiterhin für ?kiritossecret genutzt)
 export const SECRET_ITEM_ID = 'w_secret_dualblades';
 export const EXCALIBUR_ITEM_ID = 'w_excalibur';
+export const AEGIS_ITEM_ID = 'a_aegis';
 
 // Pool aller Secret-Items, die per Kiste (1:1000) fallen können.
 // ownerOnly-Items (Excalibur) sind hiervon immer ausgeschlossen.
@@ -176,7 +213,7 @@ export function getSellPrice(itemId) {
 export const ARENA_COMMANDS = [
   'openkiste', 'kisteoeffnen', 'openbox', 'gear', 'ausruestung', 'equipment',
   'equip', 'unequip', 'sell', 'verkaufen', 'duell', 'duel', 'arena', 'duelleaderboard',
-  'kampfrangliste', 'arenaitems', 'itemliste', 'floor', 'etage', 'excalibur'
+  'kampfrangliste', 'arenaitems', 'itemliste', 'floor', 'etage', 'excalibur', 'aegis'
 ];
 
 export const ARENA_HELP_TEXT =
@@ -190,7 +227,8 @@ export const ARENA_HELP_TEXT =
   `▸ {P}duell accept/deny/cancel — Duell verwalten\n` +
   `▸ {P}arena — Arena-Rangliste (meiste Siege)\n` +
   `▸ {P}arenaitems — Alle erhältlichen Waffen & Rüstungen anzeigen\n` +
-  `▸ {P}floor — Deinen Floor-Fortschritt in Aincrad anzeigen\n`;
+  `▸ {P}floor — Deinen Floor-Fortschritt in Aincrad anzeigen\n` +
+  `_Es gibt außerdem geheime Ausrüstung, die niemand kennt, bis sie gefunden wird..._\n`;
 
 // ---------------------------------------------------------------------
 // Fabrikfunktion — erstellt eine unabhängige Arena-Instanz.
@@ -441,6 +479,36 @@ export function createArenaSystem() {
         `⚔️ Schaden: ${it.power}\n` +
         `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
         `_"Nur der Schöpfer selbst kann diese Klinge führen."_`
+      );
+      return true;
+    }
+
+    // ---------- AEGIS — exklusiv für den Haupt-Owner, keine Vergabe an andere ----------
+    if (cmd === 'aegis') {
+      // Gleiche harte Sperre wie bei Excalibur: nur der im Code hinterlegte
+      // Haupt-Owner (isPrimaryOwner), nicht der vergebbare "OWNER"-Rang.
+      if (typeof isPrimaryOwner !== 'function' || !isPrimaryOwner(sender)) {
+        return false; // tut so, als gäbe es den Befehl nicht
+      }
+
+      ensureUser(sender);
+      ensureArenaFields(users, sender);
+
+      const it = ITEM_DB[AEGIS_ITEM_ID];
+      const rarity = RARITY_INFO[it.rarity];
+
+      users[sender].items[AEGIS_ITEM_ID] = 1;
+      users[sender].equipped.armor = AEGIS_ITEM_ID;
+      save(FILES.users, users);
+
+      await send(
+        `${rarity.emoji} *AEGIS* wurde beschworen und ausgerüstet! ${rarity.emoji}\n` +
+        `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+        `_${it.trueName}_\n` +
+        `Seltenheit: ${rarity.label}\n` +
+        `🛡️ Rüstung: ${it.power}\n` +
+        `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+        `_"Kein Schwert der Welt kann diesen Mantel durchdringen."_`
       );
       return true;
     }
