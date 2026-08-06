@@ -1,0 +1,287 @@
+/* =====================================================================
+   🎖️ SAO TITEL- & ACHIEVEMENT-SYSTEM — Modul
+   =====================================================================
+   Verwaltet: Freischaltbare Titel (?title), Erfolge/Meilensteine
+   (?achievements) und einen kosmetischen HP-Balken (?hpbar).
+
+   Speichert direkt in users[jid] (kein eigenes File nötig):
+     users[jid].unlockedTitles   -> string[] (Titel-IDs)
+     users[jid].activeTitle      -> string | null (Titel-ID)
+     users[jid].unlockedAchievements -> { [achievementId]: timestamp }
+     users[jid].showHpBar        -> boolean (Anzeige-Präferenz)
+
+   Integration in andere Module:
+     - Nach Duellen, Level-Ups, Gilden-Gründung etc. `checkProgress(ctx, jid)`
+       aufrufen. Neu freigeschaltete Titel/Erfolge werden automatisch
+       per ctx.send an den Spieler gemeldet.
+     - Für die Profilanzeige: users[jid].activeTitle -> TITLES.find(...)
+       um den Anzeigenamen zu bekommen.
+     - Für Duell-/Gear-Ausgaben: renderHpBar(current, max) importieren
+       und nur anzeigen, wenn users[jid].showHpBar !== false.
+     - Owner-Erkennung für den "Kayaba Akihiko"-Titel: setzt ctx.isOwner(jid)
+       oder ctx.owners / ctx.OWNER_NUMBERS (Telefonnummern-Array).
+   ===================================================================== */
+
+export const TITLE_COMMANDS = [
+  'title', 'titel', 'achievements', 'erfolge', 'hpbar'
+];
+
+export const TITLE_HELP_TEXT =
+  `▸ {P}title — Deine freigeschalteten Titel anzeigen\n` +
+  `▸ {P}title list — Alle Titel im Spiel anzeigen\n` +
+  `▸ {P}title set <name> — Aktiven Titel setzen\n` +
+  `▸ {P}title info <name> — Freischaltbedingung eines Titels anzeigen\n` +
+  `▸ {P}achievements — Deine Erfolge & Fortschritt anzeigen\n` +
+  `▸ {P}hpbar — HP-Balken-Anzeige an/aus umschalten\n`;
+
+/* ---------------------------------------------------------------------
+   TITEL-DEFINITIONEN
+   check(u) bekommt das users[jid]-Objekt und gibt true/false zurück.
+   Passe die Feldnamen (u.level, u.duelsWon, ...) an eure echten
+   Stat-Felder an, falls sie anders heißen.
+--------------------------------------------------------------------- */
+export const TITLES = [
+  {
+    id: 'beater',
+    name: 'Beater',
+    icon: '⚔️',
+    desc: 'Erreiche als einer der Ersten Level 15.',
+    check: (u) => (u.level || 1) >= 15
+  },
+  {
+    id: 'black_swordsman',
+    name: 'The Black Swordsman',
+    icon: '🗡️',
+    desc: 'Gewinne 50 Duelle.',
+    check: (u) => (u.duelsWon || 0) >= 50
+  },
+  {
+    id: 'flash',
+    name: 'The Flash',
+    icon: '⚡',
+    desc: 'Gewinne 10 Duelle in Folge, ohne zu verlieren.',
+    check: (u) => (u.duelWinStreak || 0) >= 10
+  },
+  {
+    id: 'guildmaster',
+    name: 'Gildenmeister',
+    icon: '🏰',
+    desc: 'Gründe eine Gilde.',
+    check: (u) => !!u.guildId && (u.__isGuildLeader === true)
+  },
+  {
+    id: 'lightning_flash',
+    name: 'Lichtschwert',
+    icon: '💫',
+    desc: 'Erreiche Level 30.',
+    check: (u) => (u.level || 1) >= 30
+  },
+  {
+    id: 'gold_hoarder',
+    name: 'Goldgräber',
+    icon: '💰',
+    desc: 'Sammle insgesamt 10.000 Gold.',
+    check: (u) => (u.gold || 0) >= 10000
+  },
+  {
+    id: 'front_liner',
+    name: 'Frontkämpfer',
+    icon: '🛡️',
+    desc: 'Erreiche Etage/Floor 20.',
+    check: (u) => (u.floor || 1) >= 20
+  },
+  {
+    id: 'kayaba',
+    name: 'Kayaba Akihiko',
+    icon: '👑',
+    desc: 'Der Schöpfer selbst. Exklusiv für den Bot-Owner.',
+    check: (u) => u.__isOwner === true
+  }
+];
+
+/* ---------------------------------------------------------------------
+   ACHIEVEMENT-DEFINITIONEN
+   check(u) wie oben. Diese sind reine Meilensteine (kein aktiver
+   Titel, nur Sammlung im Profil).
+--------------------------------------------------------------------- */
+export const ACHIEVEMENTS = [
+  {
+    id: 'first_duel_win',
+    name: 'Erster Sieg',
+    icon: '🥊',
+    desc: 'Gewinne dein erstes Duell.',
+    check: (u) => (u.duelsWon || 0) >= 1
+  },
+  {
+    id: 'level_10',
+    name: 'Aufsteiger',
+    icon: '⭐',
+    desc: 'Erreiche Level 10.',
+    check: (u) => (u.level || 1) >= 10
+  },
+  {
+    id: 'level_25',
+    name: 'Veteran',
+    icon: '🌟',
+    desc: 'Erreiche Level 25.',
+    check: (u) => (u.level || 1) >= 25
+  },
+  {
+    id: 'guild_joined',
+    name: 'Teamplayer',
+    icon: '🤝',
+    desc: 'Tritt einer Gilde bei.',
+    check: (u) => !!u.guildId
+  },
+  {
+    id: 'duels_10',
+    name: 'Kampferprobt',
+    icon: '⚔️',
+    desc: 'Gewinne 10 Duelle.',
+    check: (u) => (u.duelsWon || 0) >= 10
+  },
+  {
+    id: 'duels_50',
+    name: 'Klingenmeister',
+    icon: '🗡️',
+    desc: 'Gewinne 50 Duelle.',
+    check: (u) => (u.duelsWon || 0) >= 50
+  },
+  {
+    id: 'rich_1000',
+    name: 'Wohlhabend',
+    icon: '💰',
+    desc: 'Besitze 1.000 Gold gleichzeitig.',
+    check: (u) => (u.gold || 0) >= 1000
+  },
+  {
+    id: 'survivor',
+    name: 'Überlebenskünstler',
+    icon: '❤️',
+    desc: 'Überstehe ein Duell mit weniger als 10% HP.',
+    check: (u) => u.__survivedLowHp === true
+  }
+];
+
+/* ---------------------------------------------------------------------
+   HP-BALKEN — rein kosmetische Darstellung, z.B. für ?gear oder
+   Duell-Ergebnisse. Einfach importieren und aufrufen:
+     renderHpBar(current, max)
+--------------------------------------------------------------------- */
+export function renderHpBar(current, max, length = 10) {
+  const safeMax = Math.max(1, max || 1);
+  const safeCurrent = Math.max(0, Math.min(current ?? safeMax, safeMax));
+  const ratio = safeCurrent / safeMax;
+  const filled = Math.round(ratio * length);
+  const empty = length - filled;
+
+  let color = '🟩';
+  if (ratio <= 0.25) color = '🟥';
+  else if (ratio <= 0.5) color = '🟨';
+
+  const bar = color.repeat(filled) + '⬛'.repeat(empty);
+  const pct = Math.round(ratio * 100);
+  return `${bar} ${safeCurrent}/${safeMax} HP (${pct}%)`;
+}
+
+/* ---------------------------------------------------------------------
+   FORTSCHRITTS-CHECK — von anderen Modulen nach relevanten Events
+   aufrufen (Duell gewonnen, Level-Up, Gilde beigetreten, ...).
+   Schaltet automatisch neue Titel/Achievements frei und meldet sie.
+--------------------------------------------------------------------- */
+export async function checkProgress(ctx, jid) {
+  const { users, save, FILES, send } = ctx;
+  const u = users[jid];
+  if (!u) return;
+
+  if (!Array.isArray(u.unlockedTitles)) u.unlockedTitles = [];
+  if (!u.unlockedAchievements || typeof u.unlockedAchievements !== 'object') u.unlockedAchievements = {};
+
+  // Hilfsflag für Gildenmeister-Titel
+  if (ctx.guilds && u.guildId && ctx.guilds[u.guildId]) {
+    u.__isGuildLeader = ctx.guilds[u.guildId].leader === jid;
+  }
+
+  // Hilfsflag für den exklusiven "Kayaba Akihiko"-Titel (Bot-Owner).
+  // Passt sich an eure vorhandene Owner-Erkennung an: nutzt ctx.isOwner(jid)
+  // falls vorhanden, sonst ctx.owners / ctx.OWNER_NUMBERS als Fallback.
+  if (typeof ctx.isOwner === 'function') {
+    u.__isOwner = ctx.isOwner(jid);
+  } else if (Array.isArray(ctx.owners)) {
+    const num = jid.split('@')[0];
+    u.__isOwner = ctx.owners.some(o => String(o).replace(/[^0-9]/g, '') === num.replace(/[^0-9]/g, ''));
+  } else if (Array.isArray(ctx.OWNER_NUMBERS)) {
+    const num = jid.split('@')[0];
+    u.__isOwner = ctx.OWNER_NUMBERS.some(o => String(o).replace(/[^0-9]/g, '') === num.replace(/[^0-9]/g, ''));
+  } else {
+    u.__isOwner = u.__isOwner === true; // unverändert, falls ihr das Flag manuell setzt
+  }
+
+  const newTitles = [];
+  for (const t of TITLES) {
+    if (!u.unlockedTitles.includes(t.id) && t.check(u)) {
+      u.unlockedTitles.push(t.id);
+      newTitles.push(t);
+    }
+  }
+
+  const newAchievements = [];
+  for (const a of ACHIEVEMENTS) {
+    if (!u.unlockedAchievements[a.id] && a.check(u)) {
+      u.unlockedAchievements[a.id] = Date.now();
+      newAchievements.push(a);
+    }
+  }
+
+  if (newTitles.length || newAchievements.length) {
+    save(FILES.users, users);
+
+    for (const a of newAchievements) {
+      await send(`🏆 *Erfolg freigeschaltet!*\n${a.icon} *${a.name}* — ${a.desc}`);
+    }
+    for (const t of newTitles) {
+      await send(`🎖️ *Neuer Titel freigeschaltet!*\n${t.icon} *"${t.name}"*\nSetze ihn mit ${ctx.activePrefix}title set ${t.name}`);
+    }
+  }
+
+  return { newTitles, newAchievements };
+}
+
+function findTitleByName(query) {
+  const q = query.trim().toLowerCase();
+  return TITLES.find(t => t.name.toLowerCase() === q || t.id === q);
+}
+
+export function createTitleSystem() {
+  async function handle(ctx) {
+    const { cmd, args, sender, send, users, save, FILES, ensureUser, activePrefix } = ctx;
+
+    if (!TITLE_COMMANDS.includes(cmd)) return false;
+
+    ensureUser(sender);
+    const u = users[sender];
+    if (!Array.isArray(u.unlockedTitles)) u.unlockedTitles = [];
+    if (!u.unlockedAchievements || typeof u.unlockedAchievements !== 'object') u.unlockedAchievements = {};
+
+    // Bei jedem Aufruf still im Hintergrund prüfen, ob etwas nachzuholen ist
+    await checkProgress(ctx, sender);
+
+    // ---------------- ?hpbar ----------------
+    if (cmd === 'hpbar') {
+      const sub = (args[0] || '').toLowerCase();
+
+      if (sub === 'on' || sub === 'an') {
+        u.showHpBar = true;
+        save(FILES.users, users);
+        await send(`✅ HP-Balken aktiviert.\n${renderHpBar(u.hp ?? 100, u.maxHp ?? 100)}`);
+        return true;
+      }
+      if (sub === 'off' || sub === 'aus') {
+        u.showHpBar = false;
+        save(FILES.users, users);
+        await send('❌ HP-Balken deaktiviert.');
+        return true;
+      }
+      if (sub === 'preview' || sub === 'vorschau') {
+        const cur = parseInt(args[1], 10);
+        const max = parseInt(args[2]
