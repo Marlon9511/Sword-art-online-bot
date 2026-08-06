@@ -16,7 +16,7 @@ import webp from 'node-webpmux';
 import 'dotenv/config';
 import { createArenaSystem, ARENA_SHOP_ITEM, ARENA_HELP_TEXT, ARENA_COMMANDS } from './arena-system.mjs';
 import { createGuildSystem, GUILD_COMMANDS, GUILD_HELP_TEXT } from './guild-system.mjs';
-import { createTitleSystem, TITLE_COMMANDS, TITLE_HELP_TEXT, checkProgress } from './title-system.mjs';
+import { createTitleSystem, TITLE_COMMANDS, TITLE_HELP_TEXT, checkProgress, TITLES } from './titel-achievments.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
