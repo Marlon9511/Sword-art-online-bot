@@ -4466,7 +4466,161 @@ if (cmd === 'nachtsperre' || cmd === 'quiethours') {
 
   return send('❌ Nutzung: ' + activePrefix + 'nachtsperre an/aus/status');
 }
+// ===== MURDER DRONES EDITS (automatische Suche) =====
+const MD_SEARCH_QUERIES = [
+  'murder drones edit', 'murder drones amv', 'murder drones edit shorts',
+  'uzi doorman edit', 'murder drones tiktok edit'
+];
+const MD_CACHE_DIR = path.join(__dirname, 'cache', 'murderdrones');
 
+function searchMdEditUrl() {
+  return new Promise((resolve, reject) => {
+    const query = MD_SEARCH_QUERIES[randInt(0, MD_SEARCH_QUERIES.length - 1)];
+    const cmd = `yt-dlp "ytsearch10:${query}" --get-id --no-playlist --match-filter "duration < 180"`;
+    exec(cmd, { maxBuffer: 1024 * 1024 * 10 }, (err, stdout) => {
+      if (err) return reject(err);
+      const ids = stdout.split('\n').map(s => s.trim()).filter(Boolean);
+      if (!ids.length) return reject(new Error('Keine Ergebnisse gefunden'));
+      resolve(`https://www.youtube.com/watch?v=${ids[randInt(0, ids.length - 1)]}`);
+    });
+  });
+}
+
+function downloadMdEdit(url) {
+  return new Promise((resolve, reject) => {
+    fs.mkdirSync(MD_CACHE_DIR, { recursive: true });
+    const outPath = path.join(MD_CACHE_DIR, `${Date.now()}.mp4`);
+    exec(`yt-dlp -f "mp4" --no-playlist -o "${outPath}" "${url}"`, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
+      if (err) return reject(err);
+      resolve(outPath);
+    });
+  });
+}
+
+// ===== SWORD ART ONLINE EDITS (automatische Suche) =====
+const SAO_SEARCH_QUERIES = [
+  'sword art online edit', 'sword art online amv', 'sao edit shorts',
+  'kirito asuna edit', 'sword art online tiktok edit'
+];
+const SAO_CACHE_DIR = path.join(__dirname, 'cache', 'saoedits');
+
+function searchSaoEditUrl() {
+  return new Promise((resolve, reject) => {
+    const query = SAO_SEARCH_QUERIES[randInt(0, SAO_SEARCH_QUERIES.length - 1)];
+    const cmd = `yt-dlp "ytsearch10:${query}" --get-id --no-playlist --match-filter "duration < 180"`;
+    exec(cmd, { maxBuffer: 1024 * 1024 * 10 }, (err, stdout) => {
+      if (err) return reject(err);
+      const ids = stdout.split('\n').map(s => s.trim()).filter(Boolean);
+      if (!ids.length) return reject(new Error('Keine Ergebnisse gefunden'));
+      resolve(`https://www.youtube.com/watch?v=${ids[randInt(0, ids.length - 1)]}`);
+    });
+  });
+}
+
+function downloadSaoEdit(url) {
+  return new Promise((resolve, reject) => {
+    fs.mkdirSync(SAO_CACHE_DIR, { recursive: true });
+    const outPath = path.join(SAO_CACHE_DIR, `${Date.now()}.mp4`);
+    exec(`yt-dlp -f "mp4" --no-playlist -o "${outPath}" "${url}"`, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
+      if (err) return reject(err);
+      resolve(outPath);
+    });
+  });
+}
+// MD
+if (cmd === 'md') {
+  await send('🔍 Suche einen Edit...');
+  try {
+    const url = await searchMdEditUrl();
+    await send('⏳ Lade Edit, bitte warten...');
+    const videoPath = await downloadMdEdit(url);
+    const stats = fs.statSync(videoPath);
+    if (stats.size > 95 * 1024 * 1024) {
+      fs.unlinkSync(videoPath);
+      return send('❌ Das gefundene Video ist zu groß für WhatsApp. Versuch es nochmal.');
+    }
+    await sock.sendMessage(from, {
+      video: fs.readFileSync(videoPath), caption: '🤖 Murder Drones Edit', mimetype: 'video/mp4'
+    }, { quoted: m });
+    fs.unlinkSync(videoPath);
+  } catch (e) {
+    console.error('[md] Fehler:', e?.message || e);
+    return send('❌ Konnte keinen passenden Edit finden oder herunterladen. Versuch es später erneut.');
+  }
+  return;
+}
+
+// SAO
+if (cmd === 'sao') {
+  await send('⚔️ Durchsuche die Aincrad-Archive nach einem Edit...');
+  try {
+    const url = await searchSaoEditUrl();
+    await send('⏳ Lade Edit, bitte warten...');
+    const videoPath = await downloadSaoEdit(url);
+    const stats = fs.statSync(videoPath);
+    if (stats.size > 95 * 1024 * 1024) {
+      fs.unlinkSync(videoPath);
+      return send('❌ Das gefundene Video ist zu groß für WhatsApp. Versuch es nochmal.');
+    }
+    await sock.sendMessage(from, {
+      video: fs.readFileSync(videoPath), caption: '⚔️ Sword Art Online Edit', mimetype: 'video/mp4'
+    }, { quoted: m });
+    fs.unlinkSync(videoPath);
+  } catch (e) {
+    console.error('[sao] Fehler:', e?.message || e);
+    return send('❌ Konnte keinen passenden Edit finden oder herunterladen. Versuch es später erneut.');
+  }
+  return;
+}
+
+// SAY (Hinweis: Berechtigungsprüfung habe ich beibehalten, dein altes Script hatte
+// keine — bei einem offenen "Bot sagt was ich will"-Befehl rate ich davon ab)
+if (cmd === 'say') {
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) {
+    return send('❌ Kein Zugriff.');
+  }
+  const text = args.join(' ').trim();
+  if (!text) return send(`❌ Nutzung: ${activePrefix}say <nachricht>`);
+
+  if (isGroup) {
+    try {
+      await sock.sendMessage(from, {
+        delete: { remoteJid: from, id: m.key.id, fromMe: false, participant: sender }
+      });
+    } catch (e) {}
+  }
+  await sock.sendMessage(from, { text });
+  return;
+}
+// SETINFO
+if (cmd === 'setinfo') {
+  const feld = (args[0] || '').toLowerCase();
+  const wert = args.slice(1).join(' ').trim();
+  const erlaubteFelder = {
+    name: 'name', alter: 'alter', hobbys: 'hobbys', hobby: 'hobbys',
+    sexualitaet: 'sexualitaet', 'sexualität': 'sexualitaet'
+  };
+
+  if (!feld || !erlaubteFelder[feld] || !wert) {
+    return send(
+      `❌ Nutzung: ${activePrefix}setinfo <feld> <wert>\n\n` +
+      `Verfügbare Felder: name, alter, hobbys, sexualitaet\n\n` +
+      `Beispiele:\n${activePrefix}setinfo name Kirito\n${activePrefix}setinfo alter 22\n` +
+      `${activePrefix}setinfo hobbys Lesen, Gaming\n${activePrefix}setinfo sexualitaet Hetero`
+    );
+  }
+
+  const key = erlaubteFelder[feld];
+  if (key === 'alter') {
+    const num = parseInt(wert);
+    if (isNaN(num) || num < 1 || num > 120) return send('❌ Bitte gib ein gültiges Alter zwischen 1 und 120 an.');
+    users[sender].alter = num;
+  } else {
+    users[sender][key] = wert;
+  }
+  save(FILES.users, users);
+  return send(`✅ ${feld.charAt(0).toUpperCase() + feld.slice(1)} wurde gespeichert. Nutze ${activePrefix}me, um dein Profil anzuzeigen.`);
+}
 // ⚔️ Arena-System: Kisten, Ausrüstung, Duelle, Leaderboard
 const arenaHandled = await arena.handle({
   cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
