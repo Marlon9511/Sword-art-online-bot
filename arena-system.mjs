@@ -5,6 +5,7 @@
    - Item-Datenbank (Waffen & Rüstungen, 5 Seltenheitsstufen + Secret)
    - Lootboxen ("kiste" im Shop)
    - Ausrüsten / Ablegen
+   - Verkaufen von Items
    - PVP-Duelle mit Coin-Einsatz
    - Arena-Leaderboard (meiste Siege)
    - Floor-System (Aincrad-Fortschrittsanzeige)
@@ -65,13 +66,62 @@ export const ITEM_DB = {
   a_legendary_2: { name: 'Rune des Kobold-Königs',  type: 'armor',  rarity: 'legendary', power: 68 },
   a_legendary_3: { name: 'Himmlischer Panzer',      type: 'armor',  rarity: 'legendary', power: 66 },
 
-  // ---- SECRET (via {P}openkiste mit 1:1000-Chance, keine Anzeige in {P}arenaitems) ----
+  // ---- SECRET-POOL (via {P}openkiste mit 1:1000-Chance, keine Anzeige in {P}arenaitems) ----
+  // Bei einem Secret-Treffer wird zufällig EINES dieser Items vergeben.
   w_secret_dualblades: {
     name: 'Holzstab',
     trueName: 'Kiritos Doppelklingen (Dual Blades)',
     type: 'weapon',
     rarity: 'legendary',
     power: 150,
+    secret: true
+  },
+  w_secret_liberator: {
+    name: 'Rostiger schwarzer Rapier',
+    trueName: 'Liberator — Asunas Rapier aus Neu-Aincrad',
+    type: 'weapon',
+    rarity: 'legendary',
+    power: 130,
+    secret: true
+  },
+  w_secret_lightflash: {
+    name: 'Abgenutztes Übungsrapier',
+    trueName: 'Lightning Flash — Asunas erstes Rapier',
+    type: 'weapon',
+    rarity: 'epic',
+    power: 95,
+    secret: true
+  },
+  w_secret_bluerose: {
+    name: 'Zersplitterte blaue Klinge',
+    trueName: 'Blue Rose Sword',
+    type: 'weapon',
+    rarity: 'legendary',
+    power: 135,
+    secret: true
+  },
+  w_secret_nightsky: {
+    name: 'Schwarzes Schattenschwert',
+    trueName: 'Night Sky Sword — Klinge des Dunklen Ritters',
+    type: 'weapon',
+    rarity: 'legendary',
+    power: 140,
+    secret: true
+  },
+  w_secret_holyblade: {
+    name: 'Verzierte gesegnete Klinge',
+    trueName: 'Heathcliffs Heilige Klinge — Rache des Systemadministrators',
+    type: 'weapon',
+    rarity: 'legendary',
+    power: 155,
+    secret: true
+  },
+  a_secret_bwcoat: {
+    name: 'Zerschlissener schwarzer Mantel',
+    trueName: 'Blackwyrm Coat',
+    type: 'armor',
+    rarity: 'legendary',
+    power: 120,
     secret: true
   },
 
@@ -87,8 +137,15 @@ export const ITEM_DB = {
   }
 };
 
+// Feste Referenz auf das "klassische" Secret-Item (weiterhin für ?kiritossecret genutzt)
 export const SECRET_ITEM_ID = 'w_secret_dualblades';
 export const EXCALIBUR_ITEM_ID = 'w_excalibur';
+
+// Pool aller Secret-Items, die per Kiste (1:1000) fallen können.
+// ownerOnly-Items (Excalibur) sind hiervon immer ausgeschlossen.
+export const SECRET_POOL = Object.keys(ITEM_DB).filter(
+  (id) => ITEM_DB[id].secret && !ITEM_DB[id].ownerOnly
+);
 
 export const ARENA_SHOP_ITEM = {
   id: 'kiste',
@@ -96,10 +153,30 @@ export const ARENA_SHOP_ITEM = {
   desc: '⚔️ SAO-Ausrüstungskiste: zufällige Waffe oder Rüstung'
 };
 
+// ---------------------------------------------------------------------
+// Verkaufspreise (nach Seltenheit). Secret-Items bringen einen Aufschlag.
+// ---------------------------------------------------------------------
+export const SELL_PRICES = {
+  common: 50,
+  uncommon: 150,
+  rare: 400,
+  epic: 900,
+  legendary: 2000,
+  secret: 5000
+};
+
+export function getSellPrice(itemId) {
+  const it = ITEM_DB[itemId];
+  if (!it) return 0;
+  let price = SELL_PRICES[it.rarity] || 0;
+  if (it.secret) price = Math.round(price * 1.5);
+  return price;
+}
+
 export const ARENA_COMMANDS = [
   'openkiste', 'kisteoeffnen', 'openbox', 'gear', 'ausruestung', 'equipment',
-  'equip', 'unequip', 'duell', 'duel', 'arena', 'duelleaderboard', 'kampfrangliste',
-  'arenaitems', 'itemliste', 'floor', 'etage', 'excalibur'
+  'equip', 'unequip', 'sell', 'verkaufen', 'duell', 'duel', 'arena', 'duelleaderboard',
+  'kampfrangliste', 'arenaitems', 'itemliste', 'floor', 'etage', 'excalibur'
 ];
 
 export const ARENA_HELP_TEXT =
@@ -108,6 +185,7 @@ export const ARENA_HELP_TEXT =
   `▸ {P}gear — Ausrüstung & Inventar anzeigen\n` +
   `▸ {P}equip <id> — Waffe/Rüstung ausrüsten\n` +
   `▸ {P}unequip weapon|armor — Ausrüstung ablegen\n` +
+  `▸ {P}sell <id> [anzahl|all] — Item(s) verkaufen\n` +
   `▸ {P}duell @user <einsatz> — Zum Duell herausfordern\n` +
   `▸ {P}duell accept/deny/cancel — Duell verwalten\n` +
   `▸ {P}arena — Arena-Rangliste (meiste Siege)\n` +
@@ -145,6 +223,11 @@ export function createArenaSystem() {
     const chosenPool = pool.length ? pool : fallback;
     const [id] = chosenPool[randInt(0, chosenPool.length - 1)];
     return id;
+  }
+
+  function rollSecretItem(randInt) {
+    if (!SECRET_POOL.length) return SECRET_ITEM_ID;
+    return SECRET_POOL[randInt(0, SECRET_POOL.length - 1)];
   }
 
   function formatItemLine(itemId, count) {
@@ -286,7 +369,7 @@ export function createArenaSystem() {
         }
       }
 
-      out += `\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n_Erhältlich über ${activePrefix}buy kiste (${ARENA_SHOP_ITEM.price} Coins) + ${activePrefix}openkiste, oder als seltener Fund beim Angeln._`;
+      out += `\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n_Erhältlich über ${activePrefix}buy kiste (${ARENA_SHOP_ITEM.price} Coins) + ${activePrefix}openkiste, oder als seltener Fund beim Angeln._\n_Es gibt außerdem ultraseltene Secret-Items (1:1000 Chance) — welche das sind, bleibt geheim..._`;
       await send(out);
       return true;
     }
@@ -374,13 +457,14 @@ export function createArenaSystem() {
       users[sender].items.kiste -= 1;
       if (users[sender].items.kiste <= 0) delete users[sender].items.kiste;
 
-      // Dual Blades: 1:1000-Chance (0,1%) bei jedem Kisten-Öffnen.
+      // Secret-Items: 1:1000-Chance (0,1%) bei jedem Kisten-Öffnen.
+      // Bei Treffer wird eines der Secret-Items aus SECRET_POOL zufällig vergeben.
       // Excalibur ist hiervon NICHT betroffen — es wird nie über die
       // Kiste ausgegeben, nur exklusiv über ?excalibur an den Owner.
       const SECRET_DROP_CHANCE_PERCENT = 0.1; // 1 zu 1000
       const isSecretDrop = Math.random() * 100 < SECRET_DROP_CHANCE_PERCENT;
 
-      const itemId = isSecretDrop ? SECRET_ITEM_ID : rollBoxItem(randInt);
+      const itemId = isSecretDrop ? rollSecretItem(randInt) : rollBoxItem(randInt);
       const it = ITEM_DB[itemId];
       users[sender].items[itemId] = (users[sender].items[itemId] || 0) + 1;
       save(FILES.users, users);
@@ -439,7 +523,7 @@ export function createArenaSystem() {
       out += ownedWeapons.length ? ownedWeapons.map(([id, c]) => formatItemLine(id, c)).join('\n') : '(keine)';
       out += `\n\n🎒 *Eigene Rüstungen:*\n`;
       out += ownedArmors.length ? ownedArmors.map(([id, c]) => formatItemLine(id, c)).join('\n') : '(keine)';
-      out += `\n\n_${activePrefix}equip <id> — Ausrüsten_\n_${activePrefix}unequip weapon|armor — Ablegen_`;
+      out += `\n\n_${activePrefix}equip <id> — Ausrüsten_\n_${activePrefix}unequip weapon|armor — Ablegen_\n_${activePrefix}sell <id> [anzahl|all] — Verkaufen_`;
 
       await send(out);
       return true;
@@ -491,6 +575,69 @@ export function createArenaSystem() {
       else users[sender].equipped.armor = null;
       save(FILES.users, users);
       await send('✅ Ausrüstung abgelegt.');
+      return true;
+    }
+
+    // ---------- VERKAUFEN ----------
+    if (cmd === 'sell' || cmd === 'verkaufen') {
+      ensureUser(sender);
+      ensureArenaFields(users, sender);
+      const itemId = (args[0] || '').toLowerCase();
+      const it = ITEM_DB[itemId];
+
+      if (!itemId || !it) {
+        await send(
+          `❌ Nutzung: ${activePrefix}sell <item-id> [anzahl|all]\n` +
+          `Nutze ${activePrefix}gear um deine Item-IDs zu sehen.`
+        );
+        return true;
+      }
+
+      if (it.ownerOnly) {
+        await send('❌ Dieser Gegenstand kann nicht verkauft werden.');
+        return true;
+      }
+
+      const owned = users[sender].items[itemId] || 0;
+      if (owned < 1) {
+        await send('❌ Du besitzt diesen Gegenstand nicht.');
+        return true;
+      }
+
+      const isEquippedWeapon = it.type === 'weapon' && users[sender].equipped?.weapon === itemId;
+      const isEquippedArmor = it.type === 'armor' && users[sender].equipped?.armor === itemId;
+
+      const amountArgRaw = (args[1] || '1').toLowerCase();
+      let amount = (amountArgRaw === 'all' || amountArgRaw === 'alle') ? owned : parseInt(amountArgRaw);
+      if (isNaN(amount) || amount < 1) amount = 1;
+      amount = Math.min(amount, owned);
+
+      // Wenn das Item aktuell ausgerüstet ist und ALLE Exemplare verkauft würden,
+      // muss zuerst abgelegt werden.
+      if ((isEquippedWeapon || isEquippedArmor) && amount >= owned) {
+        await send(
+          `❌ Du kannst dein ausgerüstetes Item nicht (vollständig) verkaufen.\n` +
+          `Lege es zuerst ab mit ${activePrefix}unequip ${it.type === 'weapon' ? 'weapon' : 'armor'}.`
+        );
+        return true;
+      }
+
+      const unitPrice = getSellPrice(itemId);
+      const total = unitPrice * amount;
+
+      users[sender].items[itemId] -= amount;
+      if (users[sender].items[itemId] <= 0) delete users[sender].items[itemId];
+      users[sender].coins = (users[sender].coins || 0) + total;
+      save(FILES.users, users);
+
+      const rarity = RARITY_INFO[it.rarity];
+      await send(
+        `💰 *Verkauft!*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+        `${rarity.emoji} ${it.name} x${amount}${it.secret ? ' (Secret)' : ''}\n` +
+        `Erhalten: 💰 ${total} Coins (${unitPrice}/Stück)\n` +
+        `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+        `Neuer Kontostand: 💰 ${users[sender].coins} Coins`
+      );
       return true;
     }
 
@@ -661,5 +808,5 @@ export function createArenaSystem() {
     return false; // nicht von der Arena behandelt
   }
 
-  return { handle, ensureArenaFields, getBattleStats, simulateDuel, rollBoxItem, formatItemLine, mentionText };
+  return { handle, ensureArenaFields, getBattleStats, simulateDuel, rollBoxItem, rollSecretItem, formatItemLine, mentionText };
 }
