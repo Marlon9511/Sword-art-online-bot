@@ -3664,10 +3664,51 @@ if (cmd === 'leave') {
         return send('✅ Broadcast abgeschlossen.');
       }
 
-      if (cmd === 'stats' || cmd === 'profile') {
-        const u = users[sender];
-        return send(`📊 Profil:\nLevel: ${u.level}\nXP: ${u.xp}\nCoins: ${u.coins}\nNachrichten: ${u.msgCount}`);
-      }
+      // PROFILE — persönliche Werte (unverändert wie bisher)
+if (cmd === 'profile') {
+  const u = users[sender];
+  return send(`📊 Profil:\nLevel: ${u.level}\nXP: ${u.xp}\nCoins: ${u.coins}\nNachrichten: ${u.msgCount}`);
+}
+
+// STATS — System-weite Statistik über ALLE Sessions
+if (cmd === 'stats') {
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) {
+    return send(`❌ Kein Zugriff auf System-Statistiken. Nutze ${activePrefix}profile für deine persönlichen Werte.`);
+  }
+
+  await send('📊 Sammle System-Statistiken über alle Sessions, bitte warten...');
+
+  const totalCommands = ALL_COMMANDS.length;
+  const registeredUsersCount = Object.values(users).filter(u => u?.registered === true).length;
+  const totalUsersCount = Object.keys(users).length;
+
+  let totalGroups = 0;
+  const perSessionLines = [];
+  for (const [sName, sSock] of activeSessions.entries()) {
+    try {
+      const groups = await sSock.groupFetchAllParticipating();
+      const count = Object.keys(groups || {}).length;
+      totalGroups += count;
+      perSessionLines.push(`  • ${sName}: ${count} Gruppen`);
+    } catch (e) {
+      perSessionLines.push(`  • ${sName}: ⚠️ Fehler beim Abrufen`);
+    }
+  }
+
+  const out =
+    `📊 *— SYSTEM-STATISTIKEN (AINCRAD) —* 📊\n` +
+    `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+    `⚔️ Verfügbare Befehle: ${totalCommands}\n` +
+    `📝 Registrierte Nutzer: ${registeredUsersCount}\n` +
+    `👥 Bekannte Nutzer (gesamt): ${totalUsersCount}\n` +
+    `🖥️ Aktive Sessions: ${activeSessions.size}\n` +
+    `🏯 Gruppen (über alle Sessions): ${totalGroups}\n` +
+    (perSessionLines.length ? `\n*Aufschlüsselung pro Session:*\n${perSessionLines.join('\n')}\n` : '') +
+    `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+    `_Datenbank: lokale JSON-Dateien in /data (kein SQL/NoSQL-Server)_`;
+
+  return send(out);
+}
       if (cmd === 'userinfo') {
         const t = args[0] ? normalizeJid(args[0]) : sender;
         ensureUser(t);
