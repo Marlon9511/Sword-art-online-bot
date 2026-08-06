@@ -4076,6 +4076,21 @@ if (REACTION_COMMANDS[cmd]) {
   return;
 }
 // ---- NEU: Neko-Bilder (nekos.best) — png, nur für den Haupt-Owner ----
+async function getNekoImageUrl(category) {
+  const url = `https://nekos.best/api/v2/${category}`;
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'application/json'
+    }
+  });
+  if (!res.ok) throw new Error(`Neko-API-Fehler: ${res.status}`);
+  const data = await res.json();
+
+  if (!data.results?.length) throw new Error("Keine Neko-API-Treffer gefunden");
+
+  return data.results[0];
+}
 const NEKO_IMAGE_CATEGORIES = ['neko', 'waifu', 'husbando', 'kitsune'];
 const NEKO_IMAGE_OWNER_JID = '27088878862400@lid';
 
