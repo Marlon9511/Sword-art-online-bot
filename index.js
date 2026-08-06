@@ -1623,6 +1623,8 @@ helpText += `▸ ${PREFIX}sao — Zufälligen Sword Art Online Edit abspielen\n`
         helpText += ARENA_HELP_TEXT.split('\n').filter(Boolean).map(l => l.replace(/\{P\}/g, PREFIX)).join('\n') + '\n\n';
 helpText += `🏰 *GILDEN-SYSTEM* (Verbünde)\n${divider}\n`;
         helpText += GUILD_HELP_TEXT.split('\n').filter(Boolean).map(l => l.replace(/\{P\}/g, PREFIX)).join('\n') + '\n\n';
+helpText += `🎖️ *TITEL & ERFOLGE*\n${divider}\n`;
+helpText += TITLE_HELP_TEXT.split('\n').filter(Boolean).map(l => l.replace(/\{P\}/g, PREFIX)).join('\n') + '\n\n';
 helpText += `\n💞 *SOCIAL SKILLS* (Interaktion)\n${divider}\n`;
 helpText += `▸ ${PREFIX}slap @user — Ohrfeige verpassen\n`;
 helpText += `▸ ${PREFIX}hug @user — Umarmen\n`;
