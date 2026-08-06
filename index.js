@@ -4677,7 +4677,7 @@ if (guildHandled) return;
 const titleHandled = await titleSystem.handle({
   cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
   users, guilds, save, FILES, ensureUser, normalizeJid, isSameJid,
-  isOwner // wichtig für den "Kayaba Akihiko"-Titel
+  ownerJids: [OWNER_LID, OWNER_LID2, OWNER_PRIV, OWNER_PRIV2]
 });
 if (titleHandled) return;
 // Unbekannter Befehl
