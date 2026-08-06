@@ -1,4 +1,3 @@
-
 import { makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion, DisconnectReason, downloadMediaMessage } from '@whiskeysockets/baileys';
 import fs from 'fs';
 import path from 'path';
@@ -237,6 +236,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // ⚔️ Arena-System (Ausrüstung, Kisten, PVP-Duelle, Leaderboard)
 const arena = createArenaSystem();
 const guildSystem = createGuildSystem();
+const titleSystem = createTitleSystem();
 
 async function createBackup() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
