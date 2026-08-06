@@ -514,6 +514,7 @@ let partners = load(FILES.partners.file) || { list: [] };
 let pets = normalizeDataKeys(load(FILES.pets.file));
 let tickets = normalizeDataKeys(load(FILES.tickets.file));
 let ranks = normalizeDataKeys(load(FILES.ranks.file));
+let guilds = normalizeDataKeys(load(FILES.guilds.file));
 let marriages = normalizeDataKeys(load(FILES.marriages.file));
 let commandBans = load(FILES.commandBans.file) || {};
 let commandAllow = load(FILES.commandAllow.file) || {};
@@ -679,7 +680,8 @@ function persistAll() {
   save(FILES.ranks, ranks);
   save(FILES.partners, partners);
   save(FILES.broadcastSettings, broadcastSettings);
-  save(FILES.deleted, deletedUsers);
+  save(FILES.guilds, guilds);
+save(FILES.deleted, deletedUsers);
   save(FILES.credits, credits);
 save(FILES.marriages, marriages); 
   save(FILES.groupLockSchedule, groupLockSchedules);
