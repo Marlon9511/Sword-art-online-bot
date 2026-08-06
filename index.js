@@ -234,6 +234,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // ⚔️ Arena-System (Ausrüstung, Kisten, PVP-Duelle, Leaderboard)
 const arena = createArenaSystem();
+const guildSystem = createGuildSystem();
 
 async function createBackup() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
