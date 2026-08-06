@@ -17,6 +17,16 @@
      users[jid].duel.earnings  -> Netto-Coins aus Duellen
      users[jid].coins          -> aktuelle Coins (statt "gold")
      users[jid].level          -> Level
+     users[jid].floor          -> aktuelle Etage/Floor
+
+   OPTIONALE FLAGS (von euch in anderen Modulen gesetzt, analog zu
+   __isOwner / __survivedLowHp / __isGuildLeader):
+     users[jid].__clearedGame      -> true, wenn Floor 100 gecleart wurde
+     users[jid].__isBetaTester     -> true für Beta-Test-Teilnehmer
+     users[jid].__soloClearedBoss  -> true, wenn ein Boss solo gelegt wurde
+     users[jid].__wonWithoutDamage -> true, wenn ein Duell ohne Schaden gewonnen wurde
+     users[jid].__eventParticipant -> true für Event-Teilnahme
+     users[jid].__isGuildLeader    -> true, wenn Gildenleiter (wird automatisch gesetzt)
 
    Integration in andere Module:
      - Nach Duellen, Level-Ups, Gilden-Gründung etc. `checkProgress(ctx, jid)`
@@ -50,6 +60,14 @@ export const TITLE_HELP_TEXT =
    check(u) bekommt das users[jid]-Objekt und gibt true/false zurück.
 --------------------------------------------------------------------- */
 export const TITLES = [
+  // ---------- Einstieg / Level ----------
+  {
+    id: 'black_cat_rookie',
+    name: 'Frischling von Aincrad',
+    icon: '🐣',
+    desc: 'Erreiche Level 5.',
+    check: (u) => (u.level || 1) >= 5
+  },
   {
     id: 'beater',
     name: 'Beater',
@@ -57,6 +75,50 @@ export const TITLES = [
     desc: 'Erreiche als einer der Ersten Level 15.',
     check: (u) => (u.level || 1) >= 15
   },
+  {
+    id: 'lightning_flash',
+    name: 'Lichtschwert',
+    icon: '💫',
+    desc: 'Erreiche Level 30.',
+    check: (u) => (u.level || 1) >= 30
+  },
+  {
+    id: 'flash_of_battle',
+    name: 'Kampfblitz',
+    icon: '🌩️',
+    desc: 'Erreiche Level 40.',
+    check: (u) => (u.level || 1) >= 40
+  },
+  {
+    id: 'sword_saint',
+    name: 'Schwertheiliger',
+    icon: '⛩️',
+    desc: 'Erreiche Level 50.',
+    check: (u) => (u.level || 1) >= 50
+  },
+  {
+    id: 'incarnation',
+    name: 'Inkarnation der Klinge',
+    icon: '🔥',
+    desc: 'Erreiche Level 65.',
+    check: (u) => (u.level || 1) >= 65
+  },
+  {
+    id: 'absolute_sword',
+    name: 'Absolutes Schwert',
+    icon: '🌌',
+    desc: 'Erreiche Level 80.',
+    check: (u) => (u.level || 1) >= 80
+  },
+  {
+    id: 'god_of_aincrad',
+    name: 'Gott von Aincrad',
+    icon: '☄️',
+    desc: 'Erreiche Level 99.',
+    check: (u) => (u.level || 1) >= 99
+  },
+
+  // ---------- Duelle: Siege ----------
   {
     id: 'first_blood',
     name: 'Erstschlag',
@@ -86,6 +148,13 @@ export const TITLES = [
     check: (u) => (u.duel?.wins || 0) >= 50
   },
   {
+    id: 'blade_master',
+    name: 'Klingenmeister',
+    icon: '⚔️',
+    desc: 'Gewinne 75 Duelle.',
+    check: (u) => (u.duel?.wins || 0) >= 75
+  },
+  {
     id: 'aincrad_legend',
     name: 'Legende von Aincrad',
     icon: '🐉',
@@ -93,11 +162,173 @@ export const TITLES = [
     check: (u) => (u.duel?.wins || 0) >= 100
   },
   {
+    id: 'immortal_object',
+    name: 'Unsterblicher Gegenstand',
+    icon: '💠',
+    desc: 'Gewinne 150 Duelle.',
+    check: (u) => (u.duel?.wins || 0) >= 150
+  },
+  {
+    id: 'blood_king',
+    name: 'Blutkönig der Arena',
+    icon: '👹',
+    desc: 'Gewinne 200 Duelle.',
+    check: (u) => (u.duel?.wins || 0) >= 200
+  },
+
+  // ---------- Duelle: Serien & Sonderleistungen ----------
+  {
     id: 'undefeated',
     name: 'Unbesiegt',
     icon: '⚡',
     desc: 'Gewinne 20 Duelle, ohne mehr als 5 zu verlieren.',
     check: (u) => (u.duel?.wins || 0) >= 20 && (u.duel?.losses || 0) <= 5
+  },
+  {
+    id: 'flawless',
+    name: 'Makellos',
+    icon: '💎',
+    desc: 'Gewinne 10 Duelle, ohne ein einziges zu verlieren.',
+    check: (u) => (u.duel?.wins || 0) >= 10 && (u.duel?.losses || 0) === 0
+  },
+  {
+    id: 'punching_bag',
+    name: 'Der Unverwüstliche',
+    icon: '🥊',
+    desc: 'Verliere 25 Duelle und kämpfe trotzdem weiter.',
+    check: (u) => (u.duel?.losses || 0) >= 25
+  },
+  {
+    id: 'never_give_up',
+    name: 'Niemals aufgeben',
+    icon: '🔁',
+    desc: 'Verliere 10 Duelle, aber gewinne trotzdem mindestens 1.',
+    check: (u) => (u.duel?.losses || 0) >= 10 && (u.duel?.wins || 0) >= 1
+  },
+  {
+    id: 'arena_veteran',
+    name: 'Arena-Veteran',
+    icon: '🏟️',
+    desc: 'Bestreite insgesamt 50 Duelle.',
+    check: (u) => (u.duel?.fights || 0) >= 50
+  },
+  {
+    id: 'arena_addict',
+    name: 'Arena-Süchtiger',
+    icon: '🎯',
+    desc: 'Bestreite insgesamt 150 Duelle.',
+    check: (u) => (u.duel?.fights || 0) >= 150
+  },
+  {
+    id: 'arena_god',
+    name: 'Gott der Arena',
+    icon: '🏆',
+    desc: 'Bestreite insgesamt 300 Duelle.',
+    check: (u) => (u.duel?.fights || 0) >= 300
+  },
+  {
+    id: 'flawless_victory',
+    name: 'Fehlerloser Sieg',
+    icon: '🌟',
+    desc: 'Gewinne ein Duell, ohne selbst Schaden zu nehmen.',
+    check: (u) => u.__wonWithoutDamage === true
+  },
+
+  // ---------- Wirtschaft ----------
+  {
+    id: 'gold_hoarder',
+    name: 'Goldgräber',
+    icon: '💰',
+    desc: 'Sammle insgesamt 10.000 Coins.',
+    check: (u) => (u.coins || 0) >= 10000
+  },
+  {
+    id: 'coin_baron',
+    name: 'Coin-Baron',
+    icon: '🪙',
+    desc: 'Sammle insgesamt 50.000 Coins.',
+    check: (u) => (u.coins || 0) >= 50000
+  },
+  {
+    id: 'coin_emperor',
+    name: 'Coin-Kaiser',
+    icon: '👑',
+    desc: 'Sammle insgesamt 100.000 Coins.',
+    check: (u) => (u.coins || 0) >= 100000
+  },
+  {
+    id: 'high_roller',
+    name: 'Hochstapler',
+    icon: '🎲',
+    desc: 'Verdiene netto 5.000 Coins allein durch Duelle.',
+    check: (u) => (u.duel?.earnings || 0) >= 5000
+  },
+  {
+    id: 'bounty_hunter',
+    name: 'Kopfgeldjäger',
+    icon: '🎯',
+    desc: 'Verdiene netto 15.000 Coins allein durch Duelle.',
+    check: (u) => (u.duel?.earnings || 0) >= 15000
+  },
+  {
+    id: 'gambling_king',
+    name: 'König des Glücksspiels',
+    icon: '🃏',
+    desc: 'Verdiene netto 30.000 Coins allein durch Duelle.',
+    check: (u) => (u.duel?.earnings || 0) >= 30000
+  },
+
+  // ---------- Floor / Fortschritt ----------
+  {
+    id: 'front_liner',
+    name: 'Frontkämpfer',
+    icon: '🛡️',
+    desc: 'Erreiche Etage/Floor 20.',
+    check: (u) => (u.floor || 1) >= 20
+  },
+  {
+    id: 'floor_50_climber',
+    name: 'Etagenbezwinger',
+    icon: '🏯',
+    desc: 'Erreiche Etage/Floor 50.',
+    check: (u) => (u.floor || 1) >= 50
+  },
+  {
+    id: 'floor_75_climber',
+    name: 'Höhenwanderer von Aincrad',
+    icon: '🗻',
+    desc: 'Erreiche Etage/Floor 75.',
+    check: (u) => (u.floor || 1) >= 75
+  },
+  {
+    id: 'clearer',
+    name: 'Clearer',
+    icon: '🏁',
+    desc: 'Erreiche die letzte Etage — Floor 100.',
+    check: (u) => (u.floor || 1) >= 100
+  },
+  {
+    id: 'game_cleared',
+    name: 'Spielbezwinger',
+    icon: '🎖️',
+    desc: 'Cleare das gesamte Spiel.',
+    check: (u) => u.__clearedGame === true
+  },
+  {
+    id: 'boss_slayer',
+    name: 'Bosstöter',
+    icon: '🐲',
+    desc: 'Besiege einen Etagenboss im Alleingang.',
+    check: (u) => u.__soloClearedBoss === true
+  },
+
+  // ---------- Gilde ----------
+  {
+    id: 'guild_member',
+    name: 'Gildenmitglied',
+    icon: '🤝',
+    desc: 'Tritt einer Gilde bei.',
+    check: (u) => !!u.guildId
   },
   {
     id: 'guildmaster',
@@ -107,32 +338,34 @@ export const TITLES = [
     check: (u) => !!u.guildId && (u.__isGuildLeader === true)
   },
   {
-    id: 'lightning_flash',
-    name: 'Lichtschwert',
-    icon: '💫',
-    desc: 'Erreiche Level 30.',
-    check: (u) => (u.level || 1) >= 30
+    id: 'lone_wolf',
+    name: 'Einzelgänger',
+    icon: '🐺',
+    desc: 'Erreiche Level 25, ohne je einer Gilde beizutreten.',
+    check: (u) => (u.level || 1) >= 25 && !u.guildId
+  },
+
+  // ---------- Besondere / seltene Titel ----------
+  {
+    id: 'beta_tester',
+    name: 'Beta-Tester',
+    icon: '🧪',
+    desc: 'Nimm an der Beta-Phase teil.',
+    check: (u) => u.__isBetaTester === true
   },
   {
-    id: 'gold_hoarder',
-    name: 'Goldgräber',
-    icon: '💰',
-    desc: 'Sammle insgesamt 10.000 Coins.',
-    check: (u) => (u.coins || 0) >= 10000
+    id: 'event_champion',
+    name: 'Event-Champion',
+    icon: '🎉',
+    desc: 'Nimm an einem Event teil.',
+    check: (u) => u.__eventParticipant === true
   },
   {
-    id: 'front_liner',
-    name: 'Frontkämpfer',
-    icon: '🛡️',
-    desc: 'Erreiche Etage/Floor 20.',
-    check: (u) => (u.floor || 1) >= 20
-  },
-  {
-    id: 'high_roller',
-    name: 'Hochstapler',
-    icon: '🎲',
-    desc: 'Verdiene netto 5.000 Coins allein durch Duelle.',
-    check: (u) => (u.duel?.earnings || 0) >= 5000
+    id: 'survivor_title',
+    name: 'Überlebenskünstler',
+    icon: '❤️',
+    desc: 'Überstehe ein Duell mit weniger als 10% HP.',
+    check: (u) => u.__survivedLowHp === true
   },
   {
     id: 'kayaba',
@@ -230,6 +463,34 @@ export const ACHIEVEMENTS = [
     icon: '❤️',
     desc: 'Überstehe ein Duell mit weniger als 10% HP.',
     check: (u) => u.__survivedLowHp === true
+  },
+  {
+    id: 'floor_20',
+    name: 'Aufsteiger der Etagen',
+    icon: '🏯',
+    desc: 'Erreiche Etage/Floor 20.',
+    check: (u) => (u.floor || 1) >= 20
+  },
+  {
+    id: 'floor_100',
+    name: 'Spiel gecleart',
+    icon: '🏁',
+    desc: 'Erreiche die letzte Etage — Floor 100.',
+    check: (u) => (u.floor || 1) >= 100
+  },
+  {
+    id: 'earnings_5000',
+    name: 'Cleverer Kämpfer',
+    icon: '🎲',
+    desc: 'Verdiene netto 5.000 Coins allein durch Duelle.',
+    check: (u) => (u.duel?.earnings || 0) >= 5000
+  },
+  {
+    id: 'flawless_10',
+    name: 'Makellose Serie',
+    icon: '💎',
+    desc: 'Gewinne 10 Duelle, ohne ein einziges zu verlieren.',
+    check: (u) => (u.duel?.wins || 0) >= 10 && (u.duel?.losses || 0) === 0
   }
 ];
 
