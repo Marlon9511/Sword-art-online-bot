@@ -10,6 +10,14 @@
      users[jid].unlockedAchievements -> { [achievementId]: timestamp }
      users[jid].showHpBar        -> boolean (Anzeige-Präferenz)
 
+   WICHTIG: Nutzt eure echten Stat-Felder aus dem Arena-System:
+     users[jid].duel.wins      -> Anzahl gewonnener Duelle
+     users[jid].duel.losses    -> Anzahl verlorener Duelle
+     users[jid].duel.fights    -> Gesamtanzahl Duelle
+     users[jid].duel.earnings  -> Netto-Coins aus Duellen
+     users[jid].coins          -> aktuelle Coins (statt "gold")
+     users[jid].level          -> Level
+
    Integration in andere Module:
      - Nach Duellen, Level-Ups, Gilden-Gründung etc. `checkProgress(ctx, jid)`
        aufrufen. Neu freigeschaltete Titel/Erfolge werden automatisch
@@ -40,8 +48,6 @@ export const TITLE_HELP_TEXT =
 /* ---------------------------------------------------------------------
    TITEL-DEFINITIONEN
    check(u) bekommt das users[jid]-Objekt und gibt true/false zurück.
-   Passe die Feldnamen (u.level, u.duelsWon, ...) an eure echten
-   Stat-Felder an, falls sie anders heißen.
 --------------------------------------------------------------------- */
 export const TITLES = [
   {
@@ -52,18 +58,46 @@ export const TITLES = [
     check: (u) => (u.level || 1) >= 15
   },
   {
+    id: 'first_blood',
+    name: 'Erstschlag',
+    icon: '🩸',
+    desc: 'Gewinne dein erstes Duell.',
+    check: (u) => (u.duel?.wins || 0) >= 1
+  },
+  {
+    id: 'duelist',
+    name: 'Duellant',
+    icon: '🤺',
+    desc: 'Gewinne 10 Duelle.',
+    check: (u) => (u.duel?.wins || 0) >= 10
+  },
+  {
+    id: 'veteran_fighter',
+    name: 'Kampferprobter Veteran',
+    icon: '🛡️',
+    desc: 'Gewinne 25 Duelle.',
+    check: (u) => (u.duel?.wins || 0) >= 25
+  },
+  {
     id: 'black_swordsman',
     name: 'The Black Swordsman',
     icon: '🗡️',
     desc: 'Gewinne 50 Duelle.',
-    check: (u) => (u.duelsWon || 0) >= 50
+    check: (u) => (u.duel?.wins || 0) >= 50
   },
   {
-    id: 'flash',
-    name: 'The Flash',
+    id: 'aincrad_legend',
+    name: 'Legende von Aincrad',
+    icon: '🐉',
+    desc: 'Gewinne 100 Duelle.',
+    check: (u) => (u.duel?.wins || 0) >= 100
+  },
+  {
+    id: 'undefeated',
+    name: 'Unbesiegt',
     icon: '⚡',
-    desc: 'Gewinne 10 Duelle in Folge, ohne zu verlieren.',
-    check: (u) => (u.duelWinStreak || 0) >= 10
+    desc: 'Gewinne 20 Duelle, ohne mehr als 5 zu verlieren.',
+    check: (u) => (u.duel?.wins || 0) >= 20 && (u.duel?.losses || 0) <= 5
   },
   {
     id: 'guildmaster',
@@ -83,8 +117,8 @@ export const TITLES = [
     id: 'gold_hoarder',
     name: 'Goldgräber',
     icon: '💰',
-    desc: 'Sammle insgesamt 10.000 Gold.',
-    check: (u) => (u.gold || 0) >= 10000
+    desc: 'Sammle insgesamt 10.000 Coins.',
+    check: (u) => (u.coins || 0) >= 10000
   },
   {
     id: 'front_liner',
@@ -92,6 +126,13 @@ export const TITLES = [
     icon: '🛡️',
     desc: 'Erreiche Etage/Floor 20.',
     check: (u) => (u.floor || 1) >= 20
+  },
+  {
+    id: 'high_roller',
+    name: 'Hochstapler',
+    icon: '🎲',
+    desc: 'Verdiene netto 5.000 Coins allein durch Duelle.',
+    check: (u) => (u.duel?.earnings || 0) >= 5000
   },
   {
     id: 'kayaba',
@@ -104,8 +145,6 @@ export const TITLES = [
 
 /* ---------------------------------------------------------------------
    ACHIEVEMENT-DEFINITIONEN
-   check(u) wie oben. Diese sind reine Meilensteine (kein aktiver
-   Titel, nur Sammlung im Profil).
 --------------------------------------------------------------------- */
 export const ACHIEVEMENTS = [
   {
@@ -113,7 +152,7 @@ export const ACHIEVEMENTS = [
     name: 'Erster Sieg',
     icon: '🥊',
     desc: 'Gewinne dein erstes Duell.',
-    check: (u) => (u.duelsWon || 0) >= 1
+    check: (u) => (u.duel?.wins || 0) >= 1
   },
   {
     id: 'level_10',
@@ -130,6 +169,13 @@ export const ACHIEVEMENTS = [
     check: (u) => (u.level || 1) >= 25
   },
   {
+    id: 'level_50',
+    name: 'Meister von Aincrad',
+    icon: '✨',
+    desc: 'Erreiche Level 50.',
+    check: (u) => (u.level || 1) >= 50
+  },
+  {
     id: 'guild_joined',
     name: 'Teamplayer',
     icon: '🤝',
@@ -141,21 +187,42 @@ export const ACHIEVEMENTS = [
     name: 'Kampferprobt',
     icon: '⚔️',
     desc: 'Gewinne 10 Duelle.',
-    check: (u) => (u.duelsWon || 0) >= 10
+    check: (u) => (u.duel?.wins || 0) >= 10
   },
   {
     id: 'duels_50',
     name: 'Klingenmeister',
     icon: '🗡️',
     desc: 'Gewinne 50 Duelle.',
-    check: (u) => (u.duelsWon || 0) >= 50
+    check: (u) => (u.duel?.wins || 0) >= 50
+  },
+  {
+    id: 'duels_100',
+    name: 'Klingengott',
+    icon: '🐉',
+    desc: 'Gewinne 100 Duelle.',
+    check: (u) => (u.duel?.wins || 0) >= 100
   },
   {
     id: 'rich_1000',
     name: 'Wohlhabend',
     icon: '💰',
-    desc: 'Besitze 1.000 Gold gleichzeitig.',
-    check: (u) => (u.gold || 0) >= 1000
+    desc: 'Besitze 1.000 Coins gleichzeitig.',
+    check: (u) => (u.coins || 0) >= 1000
+  },
+  {
+    id: 'rich_10000',
+    name: 'Goldgräber',
+    icon: '💎',
+    desc: 'Besitze 10.000 Coins gleichzeitig.',
+    check: (u) => (u.coins || 0) >= 10000
+  },
+  {
+    id: 'fights_25',
+    name: 'Erfahrener Kämpfer',
+    icon: '🥋',
+    desc: 'Bestreite insgesamt 25 Duelle.',
+    check: (u) => (u.duel?.fights || 0) >= 25
   },
   {
     id: 'survivor',
@@ -189,8 +256,7 @@ export function renderHpBar(current, max, length = 10) {
 
 /* ---------------------------------------------------------------------
    Extrahiert nur die reine Ziffernfolge aus einer JID, egal ob @lid,
-   @s.whatsapp.net oder mit :device-Suffix — analog zu extractRawNumber()
-   in index.js, damit der Vergleich unabhängig vom JID-Typ funktioniert.
+   @s.whatsapp.net oder mit :device-Suffix.
 --------------------------------------------------------------------- */
 function extractRawNumberTitle(jid) {
   if (!jid) return null;
@@ -216,10 +282,6 @@ export async function checkProgress(ctx, jid) {
   }
 
   // Hilfsflag für den exklusiven "Kayaba Akihiko"-Titel (Bot-Owner).
-  // Priorität 1: direkter Abgleich gegen ctx.ownerJids (Array aus index.js,
-  // z.B. [OWNER_LID, OWNER_LID2, OWNER_PRIV, OWNER_PRIV2, COOWNER_LID]).
-  // Vergleich läuft über die reine Rufnummer, damit @lid <-> @s.whatsapp.net
-  // keine Rolle spielt.
   if (Array.isArray(ctx.ownerJids) && ctx.ownerJids.length) {
     const rawNum = extractRawNumberTitle(jid);
     u.__isOwner = !!rawNum && ctx.ownerJids.some(o => extractRawNumberTitle(o) === rawNum);
@@ -232,7 +294,7 @@ export async function checkProgress(ctx, jid) {
     const num = extractRawNumberTitle(jid);
     u.__isOwner = ctx.OWNER_NUMBERS.some(o => extractRawNumberTitle(o) === num);
   } else {
-    u.__isOwner = u.__isOwner === true; // unverändert, falls das Flag manuell gesetzt wird
+    u.__isOwner = u.__isOwner === true;
   }
 
   const newTitles = [];
@@ -254,11 +316,13 @@ export async function checkProgress(ctx, jid) {
   if (newTitles.length || newAchievements.length) {
     save(FILES.users, users);
 
-    for (const a of newAchievements) {
-      await send(`🏆 *Erfolg freigeschaltet!*\n${a.icon} *${a.name}* — ${a.desc}`);
-    }
-    for (const t of newTitles) {
-      await send(`🎖️ *Neuer Titel freigeschaltet!*\n${t.icon} *"${t.name}"*\nSetze ihn mit ${ctx.activePrefix}title set ${t.name}`);
+    if (typeof send === 'function') {
+      for (const a of newAchievements) {
+        await send(`🏆 *Erfolg freigeschaltet!*\n${a.icon} *${a.name}* — ${a.desc}`);
+      }
+      for (const t of newTitles) {
+        await send(`🎖️ *Neuer Titel freigeschaltet!*\n${t.icon} *"${t.name}"*\nSetze ihn mit ${ctx.activePrefix}title set ${t.name}`);
+      }
     }
   }
 
