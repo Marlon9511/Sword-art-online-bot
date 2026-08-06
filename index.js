@@ -2231,12 +2231,21 @@ if (cmd === 'whoami' || cmd === 'me') {
     ? `🎖️ Titel: ${activeTitleObj.icon} "${activeTitleObj.name}"`
     : '🎖️ Titel: Keiner';
 
-  // ⚔️ Ausrüstung
+  // ⚔️ Ausrüstung — nur Name + Seltenheits-Icon, KEINE ID, KEINE Stärke
   arena.ensureArenaFields(users, normalizedSender);
   const weaponId = user.equipped?.weapon;
   const armorId = user.equipped?.armor;
-  const weaponLine = weaponId ? arena.formatItemLine(weaponId, 1) : '— (keine Waffe)';
-  const armorLine = armorId ? arena.formatItemLine(armorId, 1) : '— (keine Rüstung)';
+
+  const formatGearName = (itemId) => {
+    if (!itemId) return '— (nichts ausgerüstet)';
+    const item = ITEM_DB[itemId];
+    if (!item) return '— (unbekannt)';
+    const rarityIcon = RARITY_INFO[item.rarity]?.emoji || '';
+    return `${rarityIcon} ${item.name}`;
+  };
+
+  const weaponLine = formatGearName(weaponId);
+  const armorLine = formatGearName(armorId);
 
   const caption = `User: ${username}\n${titleLine}\nCoins: ${coins}\nRank: ${r}\nLevel: ${level}\nXP: ${xp} / ${neededXp}\nNoch ${remainingXp} XP bis Level ${level + 1}\n🗡️ Waffe: ${weaponLine}\n🛡️ Rüstung: ${armorLine}\n${marriageLine}${infoBlock}`;
 
