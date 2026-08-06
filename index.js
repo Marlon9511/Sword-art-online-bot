@@ -4040,3 +4040,479 @@ if (REACTION_COMMANDS[cmd]) {
   }
   return;
 }
+// ---- Sticker-Teil unverändert ----
+const STICKER_CACHE_DIR = path.join(__dirname, 'cache', 'stickers');
+
+function bufferToSticker(inputBuffer, ext, isAnimated) {
+  return new Promise((resolve, reject) => {
+    fs.mkdirSync(STICKER_CACHE_DIR, { recursive: true });
+    const stamp = Date.now();
+    const inPath = path.join(STICKER_CACHE_DIR, `${stamp}_in.${ext}`);
+    const outPath = path.join(STICKER_CACHE_DIR, `${stamp}_out.webp`);
+    fs.writeFileSync(inPath, inputBuffer);
+
+    const filter = "scale=512:512:force_original_aspect_ratio=increase,crop=512:512,fps=15";
+
+    const cmd = isAnimated
+      ? `ffmpeg -y -i "${inPath}" -vf "${filter}" -t 6 -loop 0 -an -vsync 0 -c:v libwebp -lossless 0 -qscale 60 -preset default "${outPath}"`
+      : `ffmpeg -y -i "${inPath}" -vf "${filter}" -vframes 1 -c:v libwebp -lossless 1 -qscale 75 "${outPath}"`;
+
+    exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
+      try { fs.unlinkSync(inPath); } catch (e) {}
+      if (err) return reject(err);
+      try {
+        const buf = fs.readFileSync(outPath);
+        fs.unlinkSync(outPath);
+        resolve(buf);
+      } catch (e) { reject(e); }
+    });
+  });
+}
+async function addStickerExif(webpBuffer, packName, authorName) {
+  const img = new webp.Image();
+  await img.load(webpBuffer);
+
+  const json = {
+    'sticker-pack-id': 'sao-bot-' + Date.now(),
+    'sticker-pack-name': packName,
+    'sticker-pack-publisher': authorName,
+    'emojis': ['⚔️']
+  };
+
+  const exifAttr = Buffer.from([
+    0x49, 0x49, 0x2A, 0x00, 0x08, 0x00, 0x00, 0x00, 0x01, 0x00, 0x41, 0x57,
+    0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x16, 0x00, 0x00, 0x00
+  ]);
+  const jsonBuffer = Buffer.from(JSON.stringify(json), 'utf-8');
+  const exif = Buffer.concat([exifAttr, jsonBuffer]);
+  exif.writeUIntLE(jsonBuffer.length, 14, 4);
+
+  img.exif = exif;
+  return await img.save(null);
+}
+if (cmd === 'add') {
+  if (!isGroup) return send('❌ Nur in Gruppen.');
+  if (!hasAdminPerms(sender)) return send('❌ Kein Zugriff.');
+
+  const rawTarget = args[0];
+  if (!rawTarget) return send(`❌ Nutzung: ${activePrefix}add <nummer>\nBeispiel: ${activePrefix}add 4915123456789`);
+
+  const numberToAdd = rawTarget.replace(/[^0-9]/g, '');
+  if (!numberToAdd || numberToAdd.length < 6) {
+    return send('❌ Ungültige Nummer. Bitte mit Ländervorwahl angeben, z.B. 4915123456789 (ohne "+" oder Leerzeichen).');
+  }
+  const jid = `${numberToAdd}@s.whatsapp.net`;
+
+  // Frische Metadaten holen, um sicherzugehen, dass der Admin-Status aktuell ist
+  const meta = await getGroupMetaSafe(from, true);
+  const allBotIds = [...getBotSelfIds(sock)];
+  const botPart = (meta?.participants || []).find(p => {
+    const pids = [p.id, p.id?.split('@')[0], `${p.id?.split('@')[0]}@s.whatsapp.net`].filter(Boolean).map(String);
+    return pids.some(pid => allBotIds.includes(pid));
+  });
+  const botIsAdmin = !!(botPart?.admin === 'admin' || botPart?.admin === 'superadmin' || botPart?.admin === true || botPart?.isAdmin === true);
+
+  if (!botIsAdmin) {
+    return send('❌ Ich bin kein Administrator in dieser Gruppe. Bitte mache mich zuerst zum Admin.');
+  }
+
+  // Bereits Mitglied?
+  const alreadyMember = (meta?.participants || []).some(p => {
+    const raw = (p.id || '').split('@')[0];
+    return raw === numberToAdd;
+  });
+  if (alreadyMember) return send(`ℹ️ ${numberToAdd} ist bereits Mitglied dieser Gruppe.`);
+
+  try {
+    const result = await sock.groupParticipantsUpdate(from, [jid], 'add');
+    const entry = Array.isArray(result) ? result[0] : result;
+    const status = String(entry?.status ?? '');
+
+    if (status === '200') {
+      return send(`✅ @${numberToAdd} wurde zur Gruppe hinzugefügt.`, { mentions: [jid] });
+    }
+
+    // Status 403 / 401 -> Nummer erlaubt kein direktes Hinzufügen (z.B. wegen Datenschutzeinstellungen).
+    // In diesem Fall bietet Baileys oft einen invite_code im content-Feld an.
+    let inviteCode = null;
+    try {
+      const content = entry?.content;
+      if (Array.isArray(content)) {
+        const inviteNode = content.find(c => c?.tag === 'add_request');
+        inviteCode = inviteNode?.attrs?.code || null;
+      }
+    } catch (e) {}
+
+    if (inviteCode) {
+      try {
+        const inviteLink = `https://chat.whatsapp.com/${inviteCode}`;
+        await sock.sendMessage(jid, {
+          text: `👋 Du wurdest eingeladen, der Gruppe "${meta?.subject || ''}" beizutreten:\n${inviteLink}`
+        });
+        return send(`ℹ️ ${numberToAdd} konnte nicht direkt hinzugefügt werden (Datenschutzeinstellung), aber ich habe eine private Einladung per Nachricht geschickt.`);
+      } catch (e) {
+        return send(`⚠️ ${numberToAdd} konnte nicht direkt hinzugefügt werden und die private Einladung ist fehlgeschlagen: ${e?.message || e}`);
+      }
+    }
+
+    const statusMessages = {
+      '403': 'Die Nummer erlaubt kein direktes Hinzufügen (Datenschutzeinstellungen) und akzeptiert auch keine automatische Einladung.',
+      '408': 'Zeitüberschreitung — die Nummer ist eventuell nicht (mehr) auf WhatsApp registriert.',
+      '409': 'Die Nummer ist bereits Mitglied.',
+      '401': 'Die Nummer/der Account lässt sich grundsätzlich nicht kontaktieren (z.B. gesperrte oder spezielle System-Accounts).',
+    };
+
+    return send(`⚠️ Hinzufügen von ${numberToAdd} fehlgeschlagen.\nGrund: ${statusMessages[status] || `Status-Code ${status}`}`);
+  } catch (e) {
+    console.error('[add] Fehler:', e);
+    const msg = e?.data === 463 || String(e?.message).includes('account_reachout_restricted')
+      ? 'Diese Nummer/dieser Account lässt sich grundsätzlich nicht per automatischem Hinzufügen kontaktieren (z.B. spezielle System-/Business-Accounts wie MetaAI).'
+      : (e?.message || 'Unbekannter Fehler');
+    return send(`❌ Hinzufügen fehlgeschlagen: ${msg}`);
+  }
+}
+// STICKER
+if (cmd === 'sticker' || cmd === 's' || cmd === 'stiker') {
+  const ctx = m.message?.extendedTextMessage?.contextInfo;
+
+  let targetMsg = null;
+  let mediaType = null;
+
+  // Fall 1: Antwort auf Bild/GIF/Video/Sticker
+  if (ctx?.quotedMessage) {
+    const q = ctx.quotedMessage;
+    const quotedKey = {
+      remoteJid: from,
+      id: ctx.stanzaId,
+      fromMe: false,
+      participant: ctx.participant
+    };
+    if (q.imageMessage) {
+      targetMsg = { key: quotedKey, message: q };
+      mediaType = 'image';
+    } else if (q.videoMessage) {
+      targetMsg = { key: quotedKey, message: q };
+      mediaType = 'video';
+    } else if (q.stickerMessage) {
+      targetMsg = { key: quotedKey, message: q };
+      mediaType = q.stickerMessage.isAnimated ? 'animatedSticker' : 'sticker';
+    }
+  }
+
+  // Fall 2: Bild/Video direkt mit Befehl als Bildunterschrift
+  if (!targetMsg && m.message.imageMessage) { targetMsg = m; mediaType = 'image'; }
+  if (!targetMsg && m.message.videoMessage) { targetMsg = m; mediaType = 'video'; }
+
+  if (!targetMsg) {
+    return send('❓ Schick ein Bild/GIF direkt mit "' + activePrefix + cmd + '" als Bildunterschrift, oder antworte mit "' + activePrefix + cmd + '" auf ein Bild/Video/GIF.');
+  }
+
+  await send('⏳ Erstelle Sticker...');
+
+  try {
+    const buffer = await downloadMediaMessage(
+      targetMsg,
+      'buffer',
+      {},
+      { logger: P({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
+    );
+
+    let webpBuffer;
+
+    if (mediaType === 'sticker' || mediaType === 'animatedSticker') {
+      // Ist bereits ein gültiger WhatsApp-Sticker (webp) -> keine ffmpeg-Konvertierung nötig,
+      // die scheitert bei animierten Stickern am ffmpeg-WebP-Demuxer.
+      webpBuffer = buffer;
+    } else {
+      const isAnimated = mediaType === 'video';
+      const ext = (mediaType === 'video') ? 'mp4' : 'jpg';
+      webpBuffer = await bufferToSticker(buffer, ext, isAnimated);
+    }
+
+    const customName = args.join(' ').trim();
+    const packName = 'Sword Art Online Bot';
+    const authorName = customName ? packName + ' | ' + customName : packName;
+
+    webpBuffer = await addStickerExif(webpBuffer, packName, authorName);
+
+    await sock.sendMessage(from, { sticker: webpBuffer }, { quoted: m });
+  } catch (e) {
+    console.error('[sticker] Fehler:', e);
+    return send('❌ Sticker-Erstellung fehlgeschlagen. (ffmpeg/node-webpmux installiert?)');
+  }
+  return;
+}
+// SHOWUSER — Profil eines Users anzeigen (inkl. Registrierungsdatum & Ausrüstung)
+if (cmd === 'showuser') {
+  // 🔒 Berechtigungsprüfung: Team-Ränge + VIP dürfen diesen Command nutzen
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD', 'VIP', 'SUPPORTER', 'TEST_SUPPORTER'])) {
+    return send('🚫 Dieser Befehl ist nur für Team-Mitglieder und VIPs verfügbar.');
+  }
+
+  const ctx = m.message?.extendedTextMessage?.contextInfo;
+  let target = args[0];
+  if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+  if (!target && ctx?.participant) target = ctx.participant;
+  if (!target) target = sender; // ohne Angabe -> eigenes Profil
+
+  const targetJid = normalizeJid(target);
+  ensureUser(targetJid);
+  arena.ensureArenaFields(users, targetJid); // stellt sicher, dass .equipped existiert
+  const u = users[targetJid];
+
+  const displayName = u.name || u.registrationName || targetJid.split('@')[0];
+  const rank = ranks[targetJid] || u.rank || 'USER';
+  const registriert = u.registered ? '✅ Ja' : '❌ Nein';
+  const regDatum = u.registrationDate
+    ? new Date(u.registrationDate).toLocaleString('de-DE', { dateStyle: 'long', timeStyle: 'short' })
+    : '—';
+
+  const infoLines = [];
+  if (u.alter) infoLines.push('🎂 Alter: ' + u.alter);
+  if (u.hobbys) infoLines.push('🎯 Hobbys: ' + u.hobbys);
+  if (u.sexualitaet) infoLines.push('💫 Sexualität: ' + u.sexualitaet);
+  const infoBlock = infoLines.length ? '\n' + infoLines.join('\n') : '';
+
+  const marriage = marriages[targetJid];
+  let marriageLine = '💍 Status: Single';
+  if (marriage) {
+    const partnerUser = users[marriage.partner] || {};
+    const partnerName = partnerUser.name || partnerUser.registrationName || marriage.partner.split('@')[0];
+    marriageLine = `💍 Verheiratet mit: ${partnerName}`;
+  }
+
+  // 🎖️ Titel
+  const activeTitleObj = TITLES.find(t => t.id === u.activeTitle);
+  const titleLine = activeTitleObj
+    ? `🎖️ Titel: ${activeTitleObj.icon} "${activeTitleObj.name}"`
+    : '🎖️ Titel: Keiner';
+
+  // ⚔️ Ausrüstung aus dem Arena-System
+  // Owner-exklusive / geheime Items (z.B. Excalibur) werden für alle
+  // außer dem Haupt-Owner selbst als "Unbekannt" angezeigt, egal wer
+  // das Profil ansieht oder wessen Profil es ist.
+  const viewerIsPrimaryOwner = isPrimaryOwner(sender);
+
+  const formatGearLineForShowuser = (itemId) => {
+    if (!itemId) return '— (keine Ausrüstung)';
+    const it = ITEM_DB[itemId];
+    if (!it) return '— (unbekannt)';
+    if ((it.ownerOnly || it.secret) && !viewerIsPrimaryOwner) {
+      return '❓ Unbekannt';
+    }
+    return arena.formatItemLine(itemId, 1);
+  };
+
+  const weaponId = u.equipped?.weapon;
+  const armorId = u.equipped?.armor;
+  const weaponLine = formatGearLineForShowuser(weaponId);
+  const armorLine = formatGearLineForShowuser(armorId);
+  const gearBlock = `\n⚔️ *Ausrüstung*\n🗡️ Waffe: ${weaponLine}\n🛡️ Rüstung: ${armorLine}`;
+
+  const caption =
+    `👤 *Profil von ${displayName}*\n` +
+    `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+    `🏅 Rang: ${prettyRank(rank)}\n` +
+    `${titleLine}\n` +
+    `⭐ Level: ${u.level || 1}\n` +
+    `✨ XP: ${u.xp || 0}\n` +
+    `💰 Coins: ${u.coins || 0}\n` +
+    `📨 Nachrichten: ${u.msgCount || 0}\n` +
+    `📝 Registriert: ${registriert}\n` +
+    `📅 Registrierungsdatum: ${regDatum}\n` +
+    `${marriageLine}${infoBlock}\n` +
+    `${gearBlock}`;
+
+  return send(caption, { mentions: [targetJid] });
+}
+// PARTNER (Gilden-Bündnisse anzeigen)
+if (cmd === 'partner' || cmd === 'partners' || cmd === 'buendnisse') {
+  if (!partners.list || partners.list.length === 0) {
+    return send('⚔️ *— GILDEN-BÜNDNISSE —* ⚔️\n\nAktuell bestehen keine Bündnisse mit anderen Gilden.');
+  }
+
+  const divider = '⚔️┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈⚔️';
+  let out = '⚔️ *— GILDEN-BÜNDNISSE —* ⚔️\n' + divider + '\n\n';
+  partners.list.forEach((p, i) => {
+    out += '🛡️ *' + p.name + '*\n🔗 ' + p.link + '\n\n';
+  });
+  out += divider + '\n_"Gemeinsam sind wir stärker." — Verbündete Gilden von AINCRAD_';
+  return send(out);
+}
+// ADDPARTNER
+if (cmd === 'addpartner') {
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) {
+    return send('❌ Nur der Gildenmeister darf neue Bündnisse eingehen.');
+  }
+
+  const input = args.join(' ');
+  const parts = input.split('|').map(s => s ? s.trim() : s);
+  const name = parts[0];
+  const link = parts[1];
+
+  if (!name || !link) {
+    return send(
+      '❌ Nutzung: ' + activePrefix + 'addpartner Bot-Name | Link\n' +
+      'Beispiel: ' + activePrefix + 'addpartner Elucidator-Bot | https://chat.whatsapp.com/XXXXXXXX'
+    );
+  }
+
+  if (!/^https?:\/\//i.test(link)) {
+    return send('❌ Bitte gib einen gültigen Link an (muss mit http:// oder https:// beginnen).');
+  }
+
+  partners.list.push({ name: name, link: link, addedBy: sender, at: Date.now() });
+  save(FILES.partners, partners);
+
+  return send('✅ Bündnis mit *' + name + '* wurde geschlossen und in die Gildenchronik eingetragen! ⚔️');
+}
+
+// DELPARTNER
+if (cmd === 'delpartner') {
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) {
+    return send('❌ Nur der Gildenmeister darf Bündnisse auflösen.');
+  }
+
+  const index = parseInt(args[0]) - 1;
+  if (isNaN(index) || index < 0 || index >= partners.list.length) {
+    return send('❌ Ungültige Nummer. Nutze ' + activePrefix + 'partner um die Liste mit Nummern zu sehen.');
+  }
+
+  const removed = partners.list.splice(index, 1)[0];
+  save(FILES.partners, partners);
+  return send('💔 Bündnis mit *' + removed.name + '* wurde aufgelöst.');
+}
+// NACHTSPERRE
+if (cmd === 'nachtsperre' || cmd === 'quiethours') {
+  if (!isGroup) return send('❌ Nur in Gruppen.');
+
+  const groupMetadata = await getGroupMetaSafe(from);
+  const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
+  if (!isGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) {
+    return send('❌ Du musst Admin in dieser Gruppe sein.');
+  }
+
+  const sub = (args[0] || '').toLowerCase();
+
+  if (sub === 'aus' || sub === 'off') {
+    delete groupLockSchedules[from];
+    save(FILES.groupLockSchedule, groupLockSchedules);
+    // Zur Sicherheit sofort wieder entsperren, falls sie gerade gesperrt ist
+    try { await sock.groupSettingUpdate(from, 'not_announcement'); } catch (e) {}
+    return send('✅ Nachtsperre deaktiviert. Die Gruppe ist dauerhaft offen.');
+  }
+
+  if (sub === 'status' || !sub) {
+    const entry = groupLockSchedules[from];
+    if (!entry) return send('ℹ️ Für diese Gruppe ist keine Nachtsperre aktiv.\n\nNutzung: ' + activePrefix + 'nachtsperre an 22:00 07:00');
+    return send('🌙 Nachtsperre aktiv:\nSperrt um ' + entry.start + ' Uhr\nÖffnet um ' + entry.end + ' Uhr');
+  }
+
+  if (sub === 'an' || sub === 'on') {
+    const start = args[1];
+    const end = args[2];
+    const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+    if (!start || !end || !timeRegex.test(start) || !timeRegex.test(end)) {
+      return send('❌ Nutzung: ' + activePrefix + 'nachtsperre an <start HH:MM> <ende HH:MM>\nBeispiel: ' + activePrefix + 'nachtsperre an 22:00 07:00');
+    }
+
+    groupLockSchedules[from] = { start: start, end: end, setBy: sender };
+    save(FILES.groupLockSchedule, groupLockSchedules);
+
+    return send('✅ Nachtsperre aktiviert.\nSperrt täglich um ' + start + ' Uhr\nÖffnet täglich um ' + end + ' Uhr\n\nNur Admins können während der Sperrzeit schreiben.');
+  }
+
+  return send('❌ Nutzung: ' + activePrefix + 'nachtsperre an/aus/status');
+}
+
+// ⚔️ Arena-System: Kisten, Ausrüstung, Duelle, Leaderboard
+const arenaHandled = await arena.handle({
+  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
+  users, save, FILES, ensureUser, normalizeJid, isSameJid,
+  getNumberMention, randInt, sleep, isPrimaryOwner
+});
+if (arenaHandled) {
+  // Nach jedem Arena-Command (inkl. Duellen) automatisch prüfen,
+  // ob der aufrufende Spieler neue Titel/Achievements freigeschaltet hat.
+  await checkProgress({
+    users, save, FILES, send, activePrefix,
+    guilds, ownerJids: [OWNER_LID, OWNER_LID2, OWNER_PRIV, OWNER_PRIV2]
+  }, sender);
+  return;
+}
+
+const guildHandled = await guildSystem.handle({
+  cmd, args, sender, send, sock,
+  users, guilds, save, FILES, ensureUser, normalizeJid, isSameJid,
+  getNumberMention, activePrefix, m
+});
+if (guildHandled) {
+  // Auch nach Gilden-Aktionen prüfen (z.B. Gilde gegründet -> Gildenmeister-Titel)
+  await checkProgress({
+    users, save, FILES, send, activePrefix,
+    guilds, ownerJids: [OWNER_LID, OWNER_LID2, OWNER_PRIV, OWNER_PRIV2]
+  }, sender);
+  return;
+}
+
+const titleHandled = await titleSystem.handle({
+  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
+  users, guilds, save, FILES, ensureUser, normalizeJid, isSameJid,
+  ownerJids: [OWNER_LID, OWNER_LID2, OWNER_PRIV, OWNER_PRIV2]
+});
+if (titleHandled) return;
+// Unbekannter Befehl
+const suggestion = findClosestCommand(cmd);
+if (suggestion) {
+  return send(
+    '⚠️ *SYSTEM-FEHLER* ⚠️\n' +
+    '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n' +
+    'Der Befehl "' + cmd + '" existiert nicht im Aincrad-System.\n\n' +
+    '🔍 *Ähnlichste Erkenntnis:*\n' +
+    '⌈ ' + activePrefix + suggestion.command + ' ⌋ — Übereinstimmung: ' + suggestion.similarity + '%\n\n' +
+    'Meintest du das, Schwertkämpfer?\n' +
+    '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n' +
+    '_Nutze ' + activePrefix + 'help für das vollständige Skill-Menü._'
+  );
+}
+return send(
+  '❓ *UNBEKANNTER BEFEHL* ❓\n' +
+  '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n' +
+  'Dieser Skill wurde noch nicht erlernt.\n' +
+  'Nutze ' + activePrefix + 'help oder ' + activePrefix + 'menu für das Command-Window.\n\n' +
+  'Falls du glaubst, dieser Skill sollte existieren, wende dich an Daddy Kirito unter ' + activePrefix + 'owner.'
+);
+    } catch (err) {
+      console.error('messages.upsert error:', err);
+      log('ERROR: ' + (err?.message || String(err)));
+    }
+  });
+
+  console.log('✅ Sword-art-online-bot Session "' + sessionName + '" gestartet.');
+  return sock;
+}
+// ========== MAIN ==========
+initTelegramConnect();
+
+(async () => {
+  let existingSessions = [];
+  try {
+    existingSessions = fs.readdirSync(SESSIONS_DIR, { withFileTypes: true })
+      .filter(d => d.isDirectory())
+      .map(d => d.name);
+  } catch (e) {
+    existingSessions = [];
+  }
+
+  if (existingSessions.length === 0) {
+    
+    await startBot('default');
+  } else {
+    
+    for (const sessionName of existingSessions) {
+      await startBot(sessionName);
+      await sleep(1000);
+    }
+  }
+})();
