@@ -2,7 +2,7 @@
    ⚔️ SAO ARENA-SYSTEM — Modul
    =====================================================================
    Eigenständiges, komplett fertiges Modul. Verwaltet:
-   - Item-Datenbank (Waffen & Rüstungen, 5 Seltenheitsstufen)
+   - Item-Datenbank (Waffen & Rüstungen, 5 Seltenheitsstufen + Secret)
    - Lootboxen ("kiste" im Shop)
    - Ausrüsten / Ablegen
    - PVP-Duelle mit Coin-Einsatz
@@ -25,7 +25,8 @@ export const RARITY_INFO = {
   uncommon:  { label: 'Ungewöhnlich', emoji: '🟢', weight: 30 },
   rare:      { label: 'Selten',       emoji: '🔵', weight: 15 },
   epic:      { label: 'Episch',       emoji: '🟣', weight: 8 },
-  legendary: { label: 'Legendär',     emoji: '🟡', weight: 2 }
+  legendary: { label: 'Legendär',     emoji: '🟡', weight: 2 },
+  secret:    { label: 'Geheim',       emoji: '⚫', weight: 0 } // nie zufällig ziehbar, nur exklusiv vergeben
 };
 
 // type: 'weapon' | 'armor'
@@ -72,10 +73,22 @@ export const ITEM_DB = {
     rarity: 'legendary',
     power: 150,
     secret: true
+  },
+
+  // ---- EXCALIBUR — ausschließlich für den Haupt-Owner, niemals via Kiste/Shop erhältlich ----
+  w_excalibur: {
+    name: 'Excalibur',
+    trueName: 'Das Schwert des Systemadministrators',
+    type: 'weapon',
+    rarity: 'secret',
+    power: 10000,
+    secret: true,
+    ownerOnly: true
   }
 };
 
 export const SECRET_ITEM_ID = 'w_secret_dualblades';
+export const EXCALIBUR_ITEM_ID = 'w_excalibur';
 
 export const ARENA_SHOP_ITEM = {
   id: 'kiste',
@@ -86,7 +99,7 @@ export const ARENA_SHOP_ITEM = {
 export const ARENA_COMMANDS = [
   'openkiste', 'kisteoeffnen', 'openbox', 'gear', 'ausruestung', 'equipment',
   'equip', 'unequip', 'duell', 'duel', 'arena', 'duelleaderboard', 'kampfrangliste',
-  'arenaitems', 'itemliste', 'floor', 'etage'
+  'arenaitems', 'itemliste', 'floor', 'etage', 'excalibur'
 ];
 
 export const ARENA_HELP_TEXT =
@@ -218,7 +231,7 @@ export function createArenaSystem() {
     const {
       cmd, args, sender, from, m, send, sock,
       users, save, FILES, ensureUser, normalizeJid, isSameJid,
-      getNumberMention, randInt, sleep, activePrefix
+      getNumberMention, randInt, sleep, activePrefix, isPrimaryOwner
     } = ctx;
 
     // ---------- FLOOR-SYSTEM ----------
@@ -278,7 +291,7 @@ export function createArenaSystem() {
       return true;
     }
 
-    // ---------- GEHEIMER OWNER-BEFEHL: Secret-Item verleihen ----------
+    // ---------- GEHEIMER OWNER-BEFEHL: Secret-Item verleihen (Dual Blades) ----------
     if (cmd === 'kiritossecret') {
       ensureUser(sender);
       const senderRank = users[sender]?.rank || 'USER';
@@ -313,6 +326,38 @@ export function createArenaSystem() {
         `Stärke: ${it.power}\n\n` +
         `Ausrüsten mit: ${activePrefix}equip ${SECRET_ITEM_ID}`,
         { mentions: [targetJid] }
+      );
+      return true;
+    }
+
+    // ---------- EXCALIBUR — exklusiv für den Haupt-Owner, keine Vergabe an andere ----------
+    if (cmd === 'excalibur') {
+      // Harte Sperre: nur der/die im Code hinterlegte(n) Haupt-Owner
+      // (isPrimaryOwner kommt aus index.js und prüft gegen OWNER_LID/OWNER_PRIV,
+      // NICHT gegen den vergebbaren "OWNER"-Rang, damit das niemand über
+      // ?setrole umgehen kann).
+      if (typeof isPrimaryOwner !== 'function' || !isPrimaryOwner(sender)) {
+        return false; // tut so, als gäbe es den Befehl nicht
+      }
+
+      ensureUser(sender);
+      ensureArenaFields(users, sender);
+
+      const it = ITEM_DB[EXCALIBUR_ITEM_ID];
+      const rarity = RARITY_INFO[it.rarity];
+
+      users[sender].items[EXCALIBUR_ITEM_ID] = 1;
+      users[sender].equipped.weapon = EXCALIBUR_ITEM_ID;
+      save(FILES.users, users);
+
+      await send(
+        `${rarity.emoji} *EXCALIBUR* wurde beschworen und ausgerüstet! ${rarity.emoji}\n` +
+        `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+        `_${it.trueName}_\n` +
+        `Seltenheit: ${rarity.label}\n` +
+        `⚔️ Schaden: ${it.power}\n` +
+        `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+        `_"Nur der Schöpfer selbst kann diese Klinge führen."_`
       );
       return true;
     }
@@ -407,6 +452,15 @@ export function createArenaSystem() {
         await send(`❌ Nutzung: ${activePrefix}equip <item-id>\nNutze ${activePrefix}gear um deine Item-IDs zu sehen.`);
         return true;
       }
+
+      // Excalibur darf niemand ausrüsten, der es nicht besitzt UND selbst
+      // wenn es (technisch) im Inventar landen würde, ist es weiterhin
+      // an den Haupt-Owner gebunden.
+      if (it.ownerOnly && (typeof isPrimaryOwner !== 'function' || !isPrimaryOwner(sender))) {
+        await send('❌ Diese Waffe kannst du nicht führen.');
+        return true;
+      }
+
       const owned = users[sender].items[itemId] || 0;
       if (owned < 1) {
         await send('❌ Du besitzt diesen Gegenstand nicht.');
