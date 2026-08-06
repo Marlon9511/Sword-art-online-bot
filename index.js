@@ -2198,97 +2198,112 @@ if (cmd === 'listroles') {
       }
 
 // WHOAMI / ME
-      if (cmd === 'whoami' || cmd === 'me') {
-        const normalizedSender = normalizeJid(sender);
-        const user = users[normalizedSender] || {};
-        const username = user.name || user.registrationName || sender.split('@')[0];
-        const coins = user.coins || 0;
-        const r = ranks[normalizedSender] || user.rank || '(none)';
-        const level = user.level || 1;
-        const xp = user.xp || 0;
-        const neededXp = 100 + (level * 50);
-        const remainingXp = Math.max(0, neededXp - xp);
+if (cmd === 'whoami' || cmd === 'me') {
+  const normalizedSender = normalizeJid(sender);
+  const user = users[normalizedSender] || {};
+  const username = user.name || user.registrationName || sender.split('@')[0];
+  const coins = user.coins || 0;
+  const r = ranks[normalizedSender] || user.rank || '(none)';
+  const level = user.level || 1;
+  const xp = user.xp || 0;
+  const neededXp = 100 + (level * 50);
+  const remainingXp = Math.max(0, neededXp - xp);
 
-        const marriage = marriages[normalizedSender];
-        let marriageLine = '💍 Status: Single';
-        const marriageMentions = [];
-        if (marriage) {
-          const partnerUser = users[marriage.partner] || {};
-          const partnerName = partnerUser.name || partnerUser.registrationName || marriage.partner.split('@')[0];
-          marriageLine = `💍 Verheiratet mit: ${partnerName} (seit ${new Date(marriage.since).toLocaleDateString('de-DE')})`;
-          marriageMentions.push(marriage.partner);
-        }
-
-        const infoLines = [];
-        if (user.alter) infoLines.push('Alter: ' + user.alter);
-        if (user.hobbys) infoLines.push('Hobbys: ' + user.hobbys);
-        if (user.sexualitaet) infoLines.push('Sexualitaet: ' + user.sexualitaet);
-        const infoBlock = infoLines.length ? '\n' + infoLines.join('\n') : '';
-
-        const caption = `User: ${username}\nCoins: ${coins}\nRank: ${r}\nLevel: ${level}\nXP: ${xp} / ${neededXp}\nNoch ${remainingXp} XP bis Level ${level + 1}\n${marriageLine}${infoBlock}`;
-        // Fallback-Bild, falls kein echtes Profilbild gefunden wird
-const FALLBACK_PP_URL = 'https://raw.githubusercontent.com/Marlon9511/Sword-art-online-bot/main/5d553cd8911378163e989839dff229f3.webp.jpg';
-
-        try {
-          const candidates = [];
-
-          // Echte Nummer über die offizielle LID->PN-Zuordnung auflösen (falls sender eine @lid ist)
-          const resolved = await resolvePhoneJid(normalizedSender, sock);
-          if (resolved) candidates.push(resolved);
-
-          candidates.push(normalizedSender);
-
-          if (isSameJid(normalizedSender, OWNER_LID) || isSameJid(normalizedSender, OWNER_PRIV)) {
-            if (OWNER_PRIV) candidates.push(OWNER_PRIV);
-            if (OWNER_LID) candidates.push(OWNER_LID);
-          }
-
-        const getPPUrl = async (jid) => {
-  const types = ['image', 'preview'];
-  for (const type of types) {
-    try {
-      const result = await Promise.race([
-        sock.profilePictureUrl(jid, type),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('pp timeout (15s)')), 15000))
-      ]);
-      if (result) return result;
-    } catch (e) {
-      console.error(`[whoami] PP-Fehler für ${jid} (${type}):`, e); // volles Error-Objekt statt nur .message
-    }
+  const marriage = marriages[normalizedSender];
+  let marriageLine = '💍 Status: Single';
+  const marriageMentions = [];
+  if (marriage) {
+    const partnerUser = users[marriage.partner] || {};
+    const partnerName = partnerUser.name || partnerUser.registrationName || marriage.partner.split('@')[0];
+    marriageLine = `💍 Verheiratet mit: ${partnerName} (seit ${new Date(marriage.since).toLocaleDateString('de-DE')})`;
+    marriageMentions.push(marriage.partner);
   }
-  return null;
-};
 
-          let ppUrl = null;
-          const tried = new Set();
-          for (const c of candidates) {
-            if (!c || tried.has(c)) continue;
-            tried.add(c);
-            ppUrl = await getPPUrl(c);
-            if (ppUrl) break;
-          }
-console.log('[whoami] Socket-Status:', sock.ws?.readyState, '| User:', !!sock.user);
-          // Kein echtes Profilbild gefunden -> Fallback nutzen
-          if (!ppUrl) {
-            console.error('[whoami] Kein Profilbild gefunden für Kandidaten:', [...tried]);
-            ppUrl = FALLBACK_PP_URL;
-          }
+  const infoLines = [];
+  if (user.alter) infoLines.push('Alter: ' + user.alter);
+  if (user.hobbys) infoLines.push('Hobbys: ' + user.hobbys);
+  if (user.sexualitaet) infoLines.push('Sexualitaet: ' + user.sexualitaet);
+  const infoBlock = infoLines.length ? '\n' + infoLines.join('\n') : '';
 
-          if (ppUrl) {
-            if (!isTeamMember) {
-              try { await sock.sendPresenceUpdate('composing', from); } catch (e) {}
-              await sleep(3000);
-              try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
-            }
-            await sock.sendMessage(from, { image: { url: ppUrl }, caption });
-            return;
-          }
+  // 🎖️ Titel
+  const activeTitleObj = TITLES.find(t => t.id === user.activeTitle);
+  const titleLine = activeTitleObj
+    ? `🎖️ Titel: ${activeTitleObj.icon} "${activeTitleObj.name}"`
+    : '🎖️ Titel: Keiner';
+
+  // ⚔️ Ausrüstung
+  arena.ensureArenaFields(users, normalizedSender);
+  const weaponId = user.equipped?.weapon;
+  const armorId = user.equipped?.armor;
+  const weaponLine = weaponId ? arena.formatItemLine(weaponId, 1) : '— (keine Waffe)';
+  const armorLine = armorId ? arena.formatItemLine(armorId, 1) : '— (keine Rüstung)';
+
+  const caption = `User: ${username}\n${titleLine}\nCoins: ${coins}\nRank: ${r}\nLevel: ${level}\nXP: ${xp} / ${neededXp}\nNoch ${remainingXp} XP bis Level ${level + 1}\n🗡️ Waffe: ${weaponLine}\n🛡️ Rüstung: ${armorLine}\n${marriageLine}${infoBlock}`;
+
+  // Fallback-Bild, falls kein echtes Profilbild gefunden wird
+  const FALLBACK_PP_URL = 'https://raw.githubusercontent.com/Marlon9511/Sword-art-online-bot/main/5d553cd8911378163e989839dff229f3.webp.jpg';
+
+  try {
+    const candidates = [];
+
+    // Echte Nummer über die offizielle LID->PN-Zuordnung auflösen (falls sender eine @lid ist)
+    const resolved = await resolvePhoneJid(normalizedSender, sock);
+    if (resolved) candidates.push(resolved);
+
+    candidates.push(normalizedSender);
+
+    if (isSameJid(normalizedSender, OWNER_LID) || isSameJid(normalizedSender, OWNER_PRIV)) {
+      if (OWNER_PRIV) candidates.push(OWNER_PRIV);
+      if (OWNER_LID) candidates.push(OWNER_LID);
+    }
+
+    const getPPUrl = async (jid) => {
+      const types = ['image', 'preview'];
+      for (const type of types) {
+        try {
+          const result = await Promise.race([
+            sock.profilePictureUrl(jid, type),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('pp timeout (15s)')), 15000))
+          ]);
+          if (result) return result;
         } catch (e) {
-          console.error('[whoami] Allgemeiner Fehler:', e?.message || e);
+          console.error(`[whoami] PP-Fehler für ${jid} (${type}):`, e);
         }
-
-        return send(caption);
       }
+      return null;
+    };
+
+    let ppUrl = null;
+    const tried = new Set();
+    for (const c of candidates) {
+      if (!c || tried.has(c)) continue;
+      tried.add(c);
+      ppUrl = await getPPUrl(c);
+      if (ppUrl) break;
+    }
+    console.log('[whoami] Socket-Status:', sock.ws?.readyState, '| User:', !!sock.user);
+
+    // Kein echtes Profilbild gefunden -> Fallback nutzen
+    if (!ppUrl) {
+      console.error('[whoami] Kein Profilbild gefunden für Kandidaten:', [...tried]);
+      ppUrl = FALLBACK_PP_URL;
+    }
+
+    if (ppUrl) {
+      if (!isTeamMember) {
+        try { await sock.sendPresenceUpdate('composing', from); } catch (e) {}
+        await sleep(3000);
+        try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
+      }
+      await sock.sendMessage(from, { image: { url: ppUrl }, caption });
+      return;
+    }
+  } catch (e) {
+    console.error('[whoami] Allgemeiner Fehler:', e?.message || e);
+  }
+
+  return send(caption);
+}
 
       // PING
       if (cmd === 'ping') {
@@ -4516,6 +4531,12 @@ if (cmd === 'showuser') {
     marriageLine = `💍 Verheiratet mit: ${partnerName}`;
   }
 
+  // 🎖️ Titel
+  const activeTitleObj = TITLES.find(t => t.id === u.activeTitle);
+  const titleLine = activeTitleObj
+    ? `🎖️ Titel: ${activeTitleObj.icon} "${activeTitleObj.name}"`
+    : '🎖️ Titel: Keiner';
+
   // ⚔️ Ausrüstung aus dem Arena-System
   const weaponId = u.equipped?.weapon;
   const armorId = u.equipped?.armor;
@@ -4527,6 +4548,7 @@ if (cmd === 'showuser') {
     `👤 *Profil von ${displayName}*\n` +
     `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
     `🏅 Rang: ${prettyRank(rank)}\n` +
+    `${titleLine}\n` +
     `⭐ Level: ${u.level || 1}\n` +
     `✨ XP: ${u.xp || 0}\n` +
     `💰 Coins: ${u.coins || 0}\n` +
