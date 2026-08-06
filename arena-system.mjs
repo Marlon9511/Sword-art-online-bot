@@ -65,7 +65,7 @@ export const ITEM_DB = {
   a_legendary_2: { name: 'Rune des Kobold-Königs',  type: 'armor',  rarity: 'legendary', power: 68 },
   a_legendary_3: { name: 'Himmlischer Panzer',      type: 'armor',  rarity: 'legendary', power: 66 },
 
-  // ---- SECRET (extrem selten via {P}openkiste, keine Anzeige in {P}arenaitems) ----
+  // ---- SECRET (via {P}openkiste mit 1:1000-Chance, keine Anzeige in {P}arenaitems) ----
   w_secret_dualblades: {
     name: 'Holzstab',
     trueName: 'Kiritos Doppelklingen (Dual Blades)',
@@ -374,7 +374,10 @@ export function createArenaSystem() {
       users[sender].items.kiste -= 1;
       if (users[sender].items.kiste <= 0) delete users[sender].items.kiste;
 
-      const SECRET_DROP_CHANCE_PERCENT = 0.0000001;
+      // Dual Blades: 1:1000-Chance (0,1%) bei jedem Kisten-Öffnen.
+      // Excalibur ist hiervon NICHT betroffen — es wird nie über die
+      // Kiste ausgegeben, nur exklusiv über ?excalibur an den Owner.
+      const SECRET_DROP_CHANCE_PERCENT = 0.1; // 1 zu 1000
       const isSecretDrop = Math.random() * 100 < SECRET_DROP_CHANCE_PERCENT;
 
       const itemId = isSecretDrop ? SECRET_ITEM_ID : rollBoxItem(randInt);
@@ -396,7 +399,7 @@ export function createArenaSystem() {
           `Seltenheit: ${rarity.label} (Secret)\n` +
           `Stärke: ${it.power}\n` +
           `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
-          `🍀 Chance war ${SECRET_DROP_CHANCE_PERCENT}% — du gehörst zu den glücklichsten Spielern in ganz Aincrad!\n` +
+          `🍀 Chance war 1:1000 (0,1%) — du gehörst zu den glücklichsten Spielern in ganz Aincrad!\n` +
           `Ausrüsten mit: ${activePrefix}equip ${itemId}`
         );
         return true;
