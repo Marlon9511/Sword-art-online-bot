@@ -4689,13 +4689,6 @@ if (cmd === 'nachtsperre' || cmd === 'quiethours') {
 const arenaHandled = await arena.handle({
   cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
   users, save, FILES, ensureUser, normalizeJid, isSameJid,
-  getNumberMention, randInt, sleep,
-  isPrimaryOwner   // NEU: für die Excalibur-Sperre
-});
-if (arenaHandled) return;
-const arenaHandled = await arena.handle({
-  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
-  users, save, FILES, ensureUser, normalizeJid, isSameJid,
   getNumberMention, randInt, sleep, isPrimaryOwner
 });
 if (arenaHandled) {
@@ -4707,7 +4700,21 @@ if (arenaHandled) {
   }, sender);
   return;
 }
-if (guildHandled) return;
+
+const guildHandled = await guildSystem.handle({
+  cmd, args, sender, send, sock,
+  users, guilds, save, FILES, ensureUser, normalizeJid, isSameJid,
+  getNumberMention, activePrefix, m
+});
+if (guildHandled) {
+  // Auch nach Gilden-Aktionen prüfen (z.B. Gilde gegründet -> Gildenmeister-Titel)
+  await checkProgress({
+    users, save, FILES, send, activePrefix,
+    guilds, ownerJids: [OWNER_LID, OWNER_LID2, OWNER_PRIV, OWNER_PRIV2]
+  }, sender);
+  return;
+}
+
 const titleHandled = await titleSystem.handle({
   cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
   users, guilds, save, FILES, ensureUser, normalizeJid, isSameJid,
