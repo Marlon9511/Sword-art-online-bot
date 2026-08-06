@@ -4652,7 +4652,12 @@ const guildHandled = await guildSystem.handle({
   getNumberMention, activePrefix, m
 });
 if (guildHandled) return;
-
+const titleHandled = await titleSystem.handle({
+  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
+  users, guilds, save, FILES, ensureUser, normalizeJid, isSameJid,
+  isOwner // wichtig für den "Kayaba Akihiko"-Titel
+});
+if (titleHandled) return;
 // Unbekannter Befehl
 const suggestion = findClosestCommand(cmd);
 if (suggestion) {
