@@ -2224,7 +2224,7 @@ if (cmd === 'whoami' || cmd === 'me') {
   }
 
   const infoLines = [];
-  if (u.alter) infoLines.push('Alter: ' + user.alter);
+  if (user.alter) infoLines.push('Alter: ' + user.alter);
   if (user.hobbys) infoLines.push('Hobbys: ' + user.hobbys);
   if (user.sexualitaet) infoLines.push('Sexualitaet: ' + user.sexualitaet);
   const infoBlock = infoLines.length ? '\n' + infoLines.join('\n') : '';
