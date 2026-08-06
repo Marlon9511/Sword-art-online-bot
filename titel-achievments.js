@@ -284,4 +284,118 @@ export function createTitleSystem() {
       }
       if (sub === 'preview' || sub === 'vorschau') {
         const cur = parseInt(args[1], 10);
-        const max = parseInt(args[2]
+        const max = parseInt(args[2], 10);
+        const example = renderHpBar(
+          Number.isFinite(cur) ? cur : 65,
+          Number.isFinite(max) ? max : 100
+        );
+        await send(`👁️ Vorschau:\n${example}`);
+        return true;
+      }
+
+      const status = u.showHpBar === false ? 'AUS ❌' : 'AN ✅';
+      await send(
+        `💠 *HP-Balken-Anzeige:* ${status}\n` +
+        `Beispiel: ${renderHpBar(u.hp ?? 100, u.maxHp ?? 100)}\n\n` +
+        `▸ ${activePrefix}hpbar on/off — umschalten\n` +
+        `▸ ${activePrefix}hpbar preview <hp> <maxhp> — Vorschau`
+      );
+      return true;
+    }
+
+    // ---------------- ?achievements ----------------
+    if (cmd === 'achievements' || cmd === 'erfolge') {
+      const total = ACHIEVEMENTS.length;
+      const unlockedCount = Object.keys(u.unlockedAchievements).length;
+
+      const lines = ACHIEVEMENTS.map(a => {
+        const unlockedAt = u.unlockedAchievements[a.id];
+        if (unlockedAt) {
+          const date = new Date(unlockedAt).toLocaleDateString('de-DE');
+          return `✅ ${a.icon} *${a.name}* — ${a.desc} _(${date})_`;
+        }
+        return `🔒 ${a.icon} *${a.name}* — ${a.desc}`;
+      });
+
+      await send(
+        `🏆 *— DEINE ERFOLGE —* 🏆\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+        `Fortschritt: ${unlockedCount}/${total}\n\n${lines.join('\n')}`
+      );
+      return true;
+    }
+
+    // ---------------- ?title / ?titel ----------------
+    const sub = (args[0] || '').toLowerCase();
+
+    if (!sub) {
+      if (!u.unlockedTitles.length) {
+        await send(`🎖️ Du hast noch keine Titel freigeschaltet.\nNutze ${activePrefix}title list, um zu sehen, was es gibt.`);
+        return true;
+      }
+      const lines = u.unlockedTitles.map(id => {
+        const t = TITLES.find(x => x.id === id);
+        if (!t) return null;
+        const active = u.activeTitle === id ? ' (aktiv)' : '';
+        return `${t.icon} *"${t.name}"*${active}`;
+      }).filter(Boolean);
+
+      await send(
+        `🎖️ *— DEINE TITEL —* 🎖️\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n${lines.join('\n')}\n\n` +
+        `Setze einen aktiven Titel mit ${activePrefix}title set <name>`
+      );
+      return true;
+    }
+
+    if (sub === 'list' || sub === 'liste') {
+      const lines = TITLES.map(t => {
+        const unlocked = u.unlockedTitles.includes(t.id);
+        return unlocked
+          ? `✅ ${t.icon} *"${t.name}"* — ${t.desc}`
+          : `🔒 ${t.icon} *"${t.name}"* — ${t.desc}`;
+      });
+      await send(`🎖️ *— ALLE TITEL —* 🎖️\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n${lines.join('\n')}`);
+      return true;
+    }
+
+    if (sub === 'info') {
+      const query = args.slice(1).join(' ').trim();
+      if (!query) { await send(`❌ Nutzung: ${activePrefix}title info <name>`); return true; }
+      const t = findTitleByName(query);
+      if (!t) { await send('❌ Diesen Titel gibt es nicht.'); return true; }
+      const unlocked = u.unlockedTitles.includes(t.id);
+      await send(
+        `${t.icon} *"${t.name}"*\n${t.desc}\n` +
+        `Status: ${unlocked ? '✅ Freigeschaltet' : '🔒 Gesperrt'}`
+      );
+      return true;
+    }
+
+    if (sub === 'set' || sub === 'setzen') {
+      const query = args.slice(1).join(' ').trim();
+      if (!query) { await send(`❌ Nutzung: ${activePrefix}title set <name>`); return true; }
+      const t = findTitleByName(query);
+      if (!t) { await send('❌ Diesen Titel gibt es nicht.'); return true; }
+      if (!u.unlockedTitles.includes(t.id)) { await send('❌ Diesen Titel hast du noch nicht freigeschaltet.'); return true; }
+
+      u.activeTitle = t.id;
+      save(FILES.users, users);
+      await send(`✅ Aktiver Titel gesetzt: ${t.icon} *"${t.name}"*`);
+      return true;
+    }
+
+    if (sub === 'clear' || sub === 'entfernen') {
+      u.activeTitle = null;
+      save(FILES.users, users);
+      await send('✅ Aktiver Titel entfernt.');
+      return true;
+    }
+
+    await send(
+      `❌ Nutzung:\n${activePrefix}title\n${activePrefix}title list\n` +
+      `${activePrefix}title set <name>\n${activePrefix}title info <name>\n${activePrefix}title clear`
+    );
+    return true;
+  }
+
+  return { handle };
+}
