@@ -1008,20 +1008,17 @@ async function updateBotProfile() {
     }
   });
 
-  sock.ev.on('creds.update', saveCreds);
-
   sock.ev.on('group-participants.update', async (update) => {
     try {
       const { id: groupId, participants, action } = update;
-function isSenderGroupAdmin(groupMetadata, senderJid) {
-  const rawSender = senderJid.split('@')[0];
-  const p = groupMetadata?.participants?.find(p =>
-    isSameJid(p.id, senderJid) || (p.id || '').split('@')[0] === rawSender
-  );
-  return p?.admin === 'admin' || p?.admin === 'superadmin';
-}
+      function isSenderGroupAdmin(groupMetadata, senderJid) {
+        const rawSender = senderJid.split('@')[0];
+        const p = groupMetadata?.participants?.find(p =>
+          isSameJid(p.id, senderJid) || (p.id || '').split('@')[0] === rawSender
+        );
+        return p?.admin === 'admin' || p?.admin === 'superadmin';
+      }
       // Cache invalidieren: Admin-Status/Mitgliederliste hat sich geändert
-      // (u.a. wichtig für promote/demote und den Antilink-Admin-Check)
       groupMetaCache.delete(groupId);
 
       if (!groupSettings[groupId]) {
@@ -1036,20 +1033,33 @@ function isSenderGroupAdmin(groupMetadata, senderJid) {
 
       if (action === 'add' && settings.welcome.enabled) {
         const welcomeMsg = settings.welcome.message || 'Willkommen in der Gruppe! 👋';
-        for (const participant of participants) {
-          const formattedMsg = welcomeMsg.replace('{user}', '@' + participant.split('@')[0]);
-          await sock.sendMessage(groupId, {
-            text: formattedMsg,
-            mentions: [participant]
-          });
+
+        for (const rawParticipant of participants) {
+          // Robust: participant kann ein String ODER ein Objekt { id, ... } sein
+          const participantJid = typeof rawParticipant === 'string'
+            ? rawParticipant
+            : (rawParticipant?.id || rawParticipant?.jid || null);
+
+          if (!participantJid || typeof participantJid !== 'string') {
+            console.error('[Welcome] Konnte keine gültige JID aus participant extrahieren:', rawParticipant);
+            continue;
+          }
+
+          const formattedMsg = welcomeMsg.replace('{user}', '@' + participantJid.split('@')[0]);
+          try {
+            await sock.sendMessage(groupId, {
+              text: formattedMsg,
+              mentions: [participantJid]
+            });
+          } catch (sendErr) {
+            console.error('[Welcome] Senden fehlgeschlagen für', participantJid, ':', sendErr?.message || sendErr);
+          }
         }
       }
     } catch (err) {
       console.error('[Welcome] Error:', err);
     }
   });
-
-  process.on('SIGINT', () => { persistAll(); process.exit(); });
 
   sock.ev.on('messages.upsert', async ({ messages }) => {
     try {
