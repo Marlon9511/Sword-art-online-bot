@@ -1081,6 +1081,12 @@ async function updateBotProfile() {
       const from = normalizeJid(rawFrom);
       const sender = normalizeJid(rawParticipant);
       const isGroup = typeof from === 'string' && from.endsWith('@g.us');
+const isGroup = typeof from === 'string' && from.endsWith('@g.us');
+
+      // 🔒 OWNER MODE — ignoriert wirklich ALLES von Nicht-Ownern (auch AFK, Antilink, XP etc.)
+      if (OWNER_MODE && !isAuthorized(sender, ['OWNER', 'COOWNER']) && !m.key.fromMe) {
+        return;
+      }
 
       const body = (m.message.conversation)
         || (m.message.extendedTextMessage && m.message.extendedTextMessage.text)
