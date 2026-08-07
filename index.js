@@ -1635,6 +1635,7 @@ function downloadShortIfNeeded() {
     });
   });
 }
+
 // HELP / MENU
 if (cmd === 'help' || cmd === 'menu') {
   const helpText = menuSystem.buildMenuText({
@@ -1656,7 +1657,6 @@ if (cmd === 'help' || cmd === 'menu') {
   }
   return;
 }
-        
 
    
  const GAME_COMMANDS = [
