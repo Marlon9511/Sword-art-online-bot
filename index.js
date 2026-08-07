@@ -272,21 +272,40 @@ async function createBackup() {
 }
 
 const vipExpiry = new Map();
-
 function addVip(jid, durationStr) {
   const duration = parseDuration(durationStr);
   if (!duration) return false;
 
+  const normalizedJid = normalizeJid(jid);
   const expiry = Date.now() + duration;
-  vipExpiry.set(jid, expiry);
+  vipExpiry.set(normalizedJid, expiry);
 
-  if (!ROLES.VIP.includes(jid)) {
-    ROLES.VIP.push(jid);
+  if (!ROLES.VIP.includes(normalizedJid)) {
+    ROLES.VIP.push(normalizedJid);
+  }
+
+  // Sichtbaren Rang setzen — aber nur, wenn die Person aktuell "nur" USER ist.
+  // Höhere Ränge (Owner/CoOwner/Admin/Mod) werden durch VIP nicht überschrieben.
+  const currentRank = ranks[normalizedJid] || users[normalizedJid]?.rank || 'USER';
+  if (currentRank === 'USER') {
+    ranks[normalizedJid] = 'VIP';
+    if (users[normalizedJid]) users[normalizedJid].rank = 'VIP';
+    save(FILES.ranks, ranks);
+    save(FILES.users, users);
   }
 
   setTimeout(() => {
-    ROLES.VIP = ROLES.VIP.filter(id => id !== jid);
-    vipExpiry.delete(jid);
+    ROLES.VIP = ROLES.VIP.filter(id => id !== normalizedJid);
+    vipExpiry.delete(normalizedJid);
+
+    // Rang nur zurücksetzen, wenn er zwischenzeitlich nicht manuell geändert wurde
+    const stillVip = (ranks[normalizedJid] || users[normalizedJid]?.rank) === 'VIP';
+    if (stillVip) {
+      ranks[normalizedJid] = 'USER';
+      if (users[normalizedJid]) users[normalizedJid].rank = 'USER';
+      save(FILES.ranks, ranks);
+      save(FILES.users, users);
+    }
   }, duration);
 
   return true;
