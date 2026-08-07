@@ -1103,10 +1103,11 @@ const m = messages[0];
         return;
       }
 
-      const body = (m.message.conversation)
+ const body = (m.message.conversation)
         || (m.message.extendedTextMessage && m.message.extendedTextMessage.text)
         || (m.message.imageMessage && m.message.imageMessage.caption)
         || '';
+
 
      if (body) {
         log(`[MSG] ${sender} in ${isGroup ? from : 'PM'}: ${body}`);
