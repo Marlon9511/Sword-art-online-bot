@@ -4732,6 +4732,12 @@ const titleHandled = await titleSystem.handle({
   ownerJids: [OWNER_LID, OWNER_LID2, OWNER_PRIV, OWNER_PRIV2]
 });
 if (titleHandled) return;
+const pokemonHandled = await pokemonSystem.handle({
+  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
+  users, save, FILES, ensureUser, normalizeJid, isSameJid,
+  getNumberMention, randInt, sleep, isPrimaryOwner
+});
+if (pokemonHandled) return;
 // Unbekannter Befehl
 const suggestion = findClosestCommand(cmd);
 if (suggestion) {
