@@ -3331,8 +3331,14 @@ if (cmd === 'ban') {
         }
       }
 
-      if (cmd === 'warn') {
-        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
+     if (cmd === 'warn') {
+        let permitted = isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD']);
+        if (!permitted && isGroup) {
+          const groupMetadata = await getGroupMetaSafe(from, true);
+          permitted = isGroupAdminJid(groupMetadata, sender);
+        }
+        if (!permitted) return send('❌ Du musst Admin/Mod/Gruppenadmin sein, um zu verwarnen.');
+
         const t = args[0]; const reason = args.slice(1).join(' ') || 'Kein Grund';
         if (!t) return send('Usage: $warn <num|jid> <grund>');
         const jid = normalizeJid(t);
@@ -3349,6 +3355,30 @@ if (cmd === 'ban') {
         if (users[jid]) users[jid].warns = [];
         save(FILES.users, users);
         return send(`✅ Warns entfernt für ${jid}`);
+      }
+if (cmd === 'warns') {
+        let permitted = isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD']);
+        if (!permitted && isGroup) {
+          const groupMetadata = await getGroupMetaSafe(from, true);
+          permitted = isGroupAdminJid(groupMetadata, sender);
+        }
+        if (!permitted) return send('❌ Du musst Admin/Mod/Gruppenadmin sein.');
+
+        const t = args[0];
+        if (!t) return send('Usage: $warns <num|jid>');
+        const jid = normalizeJid(t);
+        const warnList = users[jid]?.warns || [];
+
+        if (!warnList.length) return send(`✅ @${jid.split('@')[0]} hat keine Verwarnungen.`, { mentions: [jid] });
+
+        const lines = warnList.map((w, i) =>
+          `${i + 1}. ${w.reason} — von @${w.by.split('@')[0]} (${new Date(w.at).toLocaleString('de-DE')})`
+        );
+
+        return send(
+          `⚠️ *Verwarnungen von @${jid.split('@')[0]}* (${warnList.length}):\n\n${lines.join('\n')}\n\n_Entfernen mit ${activePrefix}unwarn @user <nummer>_`,
+          { mentions: [jid, ...warnList.map(w => w.by)] }
+        );
       }
 
 if (cmd === 'promote') {
