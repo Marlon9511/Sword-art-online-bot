@@ -4751,6 +4751,19 @@ const pokemonHandled = await pokemonSystem.handle({
   getNumberMention, randInt, sleep, isPrimaryOwner
 });
 if (pokemonHandled) return;
+
+
+
+// OWNERMODE
+      if (cmd === 'ownermode' || cmd === 'om') {
+        if (!isOwner) return send('❌ Nur der Inhaber/Co-Inhaber darf diesen Befehl nutzen.');
+        const action = (args[0] || '').toLowerCase();
+        if (!action || action === 'status') return send(`👑 Owner Mode: ${OWNER_MODE ? 'AKTIV ✅ (alle anderen werden ignoriert)' : 'INAKTIV ❌'}`);
+        if (['on', 'enable', 'true'].includes(action)) { OWNER_MODE = true; saveBotState(); return send('✅ Owner Mode AKTIVIERT — nur noch Owner/CoOwner werden beantwortet, alle anderen Nachrichten werden ignoriert.'); }
+        if (['off', 'disable', 'false'].includes(action)) { OWNER_MODE = false; saveBotState(); return send('✅ Owner Mode DEAKTIVIERT — der Bot reagiert wieder auf alle.'); }
+        if (action === 'toggle') { OWNER_MODE = !OWNER_MODE; saveBotState(); return send(`🔁 Owner Mode: ${OWNER_MODE ? 'AKTIV ✅' : 'INAKTIV ❌'}`); }
+        return send('❌ Nutzung: $ownermode on|off|toggle|status');
+      }
 // Unbekannter Befehl
 const suggestion = findClosestCommand(cmd);
 if (suggestion) {
