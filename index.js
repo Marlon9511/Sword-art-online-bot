@@ -316,7 +316,8 @@ function isVip(jid) {
 
 const COOLDOWN_TIME = 10 * 60 * 1000;
 const commandCooldowns = new Map();
-
+// Befehle, die TROTZ Zugehörigkeit zu Arena/Gilde/Pokemon KEINEN Cooldown bekommen sollen
+const COOLDOWN_EXCLUDED = ['pokeshop'];
 function checkCooldown(userId, command) {
   if (!commandCooldowns.has(userId)) {
     commandCooldowns.set(userId, new Map());
