@@ -3297,16 +3297,14 @@ if (cmd === 'ban') {
         if (!target) return send('Usage: $kick <num|jid|@user>');
         if (isPrimaryOwner(target)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gekickt werden.');
 
-        let permitted = isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD']);
+       let permitted = isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD']);
         let groupMetadata;
         if (!permitted && isGroup) {
-          groupMetadata = await getGroupMetaSafe(from);
+          groupMetadata = await getGroupMetaSafe(from, true); // frische Daten erzwingen
           const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
           permitted = !!isGroupAdmin;
         }
-        if (!permitted) return send('Kein Zugriff.');
-
-        if (!isGroup) return send('❌ Nur in Gruppen.');
+        if (!permitted) return send('❌ Du musst Admin/Mod/Gruppenadmin sein, um kicken zu können.');
 
         groupMetadata = groupMetadata || await getGroupMetaSafe(from);
         const normalizedTarget = normalizeJid(target);
