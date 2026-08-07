@@ -2926,26 +2926,39 @@ if (cmd === 'purge' || cmd === 'clearchat') {
         const out = Object.keys(inv).length ? Object.entries(inv).map(([k, v]) => `${k}: ${v}`).join('\n') : '(leer)';
         return send(`🎒 Inventar:\n${out}`);
       }
-      if (cmd === 'use') {
-        const it = args[0];
-        if (!it) return send('Nutzung: $use <item>');
-        if (!users[sender].items || !users[sender].items[it]) return send('Item nicht vorhanden');
-        if (it === 'potion') {
-          users[sender].items[it] -= 1;
-          users[sender].xp = (users[sender].xp || 0) + 10;
-          save(FILES.users, users);
-          return send('💊 Trank verwendet: +10 XP');
-        }
-        if (it === 'box') {
-          users[sender].items[it] -= 1;
-          const coins = randInt(50, 300);
-          users[sender].coins = (users[sender].coins || 0) + coins;
-          save(FILES.users, users);
-          return send(`🎁 Box geöffnet: +${coins} Coins`);
-        }
-        return send('Item verwendet.');
-      }
+     if (cmd === 'use') {
+  const it = (args[0] || '').toLowerCase();
+  if (!it) return send('Nutzung: $use <item>');
+  if (!users[sender].items || !users[sender].items[it]) return send('❌ Item nicht vorhanden. Prüfe mit $inventory die genaue Schreibweise.');
 
+  if (it === 'potion') {
+    users[sender].items[it] -= 1;
+    users[sender].xp = (users[sender].xp || 0) + 10;
+    save(FILES.users, users);
+    return send('💊 Trank verwendet: +10 XP');
+  }
+
+  if (it === 'box') {
+    users[sender].items[it] -= 1;
+    const coins = randInt(50, 300);
+    users[sender].coins = (users[sender].coins || 0) + coins;
+    save(FILES.users, users);
+    return send(`🎁 Box geöffnet: +${coins} Coins`);
+  }
+
+  if (it === 'vip') {
+    const VIP_DURATION = '7d'; // Dauer pro genutztem VIP-Item, z.B. 7 Tage
+    if (!addVip(sender, VIP_DURATION)) {
+      return send('❌ Fehler beim Aktivieren des VIP-Status.');
+    }
+    users[sender].items[it] -= 1;
+    save(FILES.users, users);
+    const expiry = new Date(vipExpiry.get(sender)).toLocaleString('de-DE');
+    return send(`💎 VIP aktiviert! Gültig bis: ${expiry}`);
+  }
+
+  return send('Item verwendet.');
+}
       // SLOTS
       if (cmd === 'slot') {
         const bet = parseInt(args[0]) || 50;
