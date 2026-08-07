@@ -4814,6 +4814,30 @@ if (pokemonHandled) return;
         if (action === 'toggle') { OWNER_MODE = !OWNER_MODE; saveBotState(); return send(`🔁 Owner Mode: ${OWNER_MODE ? 'AKTIV ✅' : 'INAKTIV ❌'}`); }
         return send('❌ Nutzung: $ownermode on|off|toggle|status');
       }
+// RESET LEVEL
+if (cmd === 'resetlevel') {
+  if (!isAuthorized(sender, ['OWNER'])) return send('❌ Nur der Inhaber darf diesen Befehl nutzen.');
+
+  const ctx = m.message?.extendedTextMessage?.contextInfo;
+  let target = args[0];
+  if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+  if (!target && ctx?.participant) target = ctx.participant;
+
+  if (!target) return send(`❌ Nutzung: ${PREFIX}resetlevel <@user|nummer>`);
+
+  const targetJid = normalizeJid(target);
+  ensureUser(targetJid);
+  const oldLevel = users[targetJid].level || 1;
+  const oldXp = users[targetJid].xp || 0;
+  users[targetJid].level = 1;
+  users[targetJid].xp = 0;
+  save(FILES.users, users);
+
+  return send(
+    `✅ Level von @${targetJid.split('@')[0]} wurde zurückgesetzt (vorher: Lv.${oldLevel}, ${oldXp} XP → jetzt: Lv.1, 0 XP).`,
+    { mentions: [targetJid] }
+  );
+}
 // Unbekannter Befehl
 const suggestion = findClosestCommand(cmd);
 if (suggestion) {
