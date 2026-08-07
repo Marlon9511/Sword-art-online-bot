@@ -1636,142 +1636,26 @@ function downloadShortIfNeeded() {
   });
 }
 // HELP / MENU
-      if (cmd === 'help' || cmd === 'menu') {
-        const divider = '⚔️┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈⚔️';
-        let helpText = `┏━━━━━━━━━━━━━━━┓\n┃  ▄▄▄▄▄▄▄▄▄▄▄▄▄  ┃\n┃  █ AINCRAD █  ┃\n┃  ▀▀▀▀▀▀▀▀▀▀▀▀▀  ┃\n┗━━━━━━━━━━━━━━━┛\n     🗡️ System Command Window 🗡️\n     ⌈ Floor: Main Menu ⌋\n\n`;
+if (cmd === 'help' || cmd === 'menu') {
+  const helpText = menuSystem.buildMenuText({
+    args, sender, activePrefix, PREFIX,
+    isAuthorized, hasAdminPerms,
+    ARENA_HELP_TEXT, GUILD_HELP_TEXT, TITLE_HELP_TEXT, POKEMON_HELP_TEXT
+  });
 
-        helpText += `🔷 *SYSTEM MENU*\n${divider}\n`;
-        helpText += `▸ ${PREFIX}help — Dieses Command-Window öffnen\n`;
-        helpText += `▸ ${PREFIX}ping — Verbindung zum Server prüfen\n`;
-        helpText += `▸ ${PREFIX}owner — Game Master kontaktieren\n`;
-        helpText += `▸ ${PREFIX}com — Link zur Gilden-Halle\n`;
-        helpText += `▸ ${PREFIX}whoami / ${PREFIX}me — Charakterbogen anzeigen\n`;
-        helpText += `▸ ${PREFIX}afk [grund] — Logout-Status setzen\n`;
-        helpText += `▸ ${PREFIX}usertodo add <text> — Skill vorschlagen\n`;
-        helpText += `▸ ${PREFIX}credits — Alle Beta-Tester des Systems\n\n`;
-helpText += `▸ ${PREFIX}marry @user — Verlobungsring überreichen\n`;
-helpText += `▸ ${PREFIX}divorce — Ring zurückgeben\n`;
-helpText += `▸ ${PREFIX}sticker — Bild/GIF antworten → Sticker craften\n`;
-helpText += `▸ ${PREFIX}bewerbung — Gildenbeitritt beantragen\n`;
-helpText += `▸ ${PREFIX}setinfo <feld> <wert> — Profilinfos setzen (name/alter/hobbys/sexualitaet)\n`;
-helpText += `▸ ${PREFIX}sao — Zufälligen Sword Art Online Edit abspielen\n`;
-        helpText += `⚔️ *ARENA & WIRTSCHAFT* (Cor & Kämpfe)\n${divider}\n`;
-        helpText += `▸ ${PREFIX}daily — Tägliche Quest-Belohnung\n`;
-        helpText += `▸ ${PREFIX}blackjack — Glücksspiel im Coliseum\n`;
-        helpText += `▸ ${PREFIX}slot — Spielautomat in der Taverne\n`;
-        helpText += `▸ ${PREFIX}fish — Angeln am Floor-See\n`;
-        helpText += `▸ ${PREFIX}pet — Begleiter-Status prüfen\n`;
-        helpText += `▸ ${PREFIX}adopt <name> — Begleiter zähmen\n`;
-        helpText += `▸ ${PREFIX}feed — Begleiter füttern\n\n`;
-        helpText += `⚔️ *ARENA-SYSTEM* (Ausrüstung & PVP)\n${divider}\n`;
-        helpText += ARENA_HELP_TEXT.split('\n').filter(Boolean).map(l => l.replace(/\{P\}/g, PREFIX)).join('\n') + '\n\n';
-helpText += `🏰 *GILDEN-SYSTEM* (Verbünde)\n${divider}\n`;
-        helpText += GUILD_HELP_TEXT.split('\n').filter(Boolean).map(l => l.replace(/\{P\}/g, PREFIX)).join('\n') + '\n\n';
-helpText += `🎖️ *TITEL & ERFOLGE*\n${divider}\n`;
-helpText += TITLE_HELP_TEXT.split('\n').filter(Boolean).map(l => l.replace(/\{P\}/g, PREFIX)).join('\n') + '\n\n';
-helpText += `🐾 *POKÉMON-SYSTEM*\n${divider}\n`;
-helpText += POKEMON_HELP_TEXT.split('\n').filter(Boolean).map(l => l.replace(/\{P\}/g, PREFIX)).join('\n') + '\n\n';
-helpText += `\n💞 *SOCIAL SKILLS* (Interaktion)\n${divider}\n`;
-helpText += `▸ ${PREFIX}slap @user — Ohrfeige verpassen\n`;
-helpText += `▸ ${PREFIX}hug @user — Umarmen\n`;
-helpText += `▸ ${PREFIX}kiss @user — Küssen\n`;
-helpText += `▸ ${PREFIX}pat @user — Tätscheln\n`;
-helpText += `▸ ${PREFIX}poke @user — Anpiksen\n`;
-helpText += `▸ ${PREFIX}cuddle @user — Kuscheln\n`;
-helpText += `▸ ${PREFIX}bite @user — Beißen\n`;
-helpText += `▸ ${PREFIX}punch @user — Schlagen\n`;
-helpText += `▸ ${PREFIX}love @user — Lieben\n`;
-helpText += `▸ ${PREFIX}blush @user — Erröten wegen jemandem\n`;
-helpText += `▸ ${PREFIX}handhold @user — Hand halten\n`;
-helpText += `▸ ${PREFIX}lick @user — Ablecken\n`;
-helpText += `▸ ${PREFIX}nervous @user — Nervös wegen jemandem sein\n`;
-helpText += `▸ ${PREFIX}throw @user — Werfen\n`;
-helpText += `▸ ${PREFIX}sleep @user — Einschlafen neben\n`;
-helpText += `▸ ${PREFIX}angrystare @user — Wütend anstarren\n`;
-helpText += `▸ ${PREFIX}bleh @user — Zunge rausstrecken\n`;
-helpText += `▸ ${PREFIX}confused @user — Verwirrt sein wegen\n`;
-helpText += `▸ ${PREFIX}cry @user — Weinen wegen\n`;
-helpText += `▸ ${PREFIX}evillaugh @user — Böse lachen\n`;
-helpText += `▸ ${PREFIX}facepalm @user — Facepalm machen\n`;
-helpText += `▸ ${PREFIX}happy @user — Glücklich sein wegen\n`;
-helpText += `▸ ${PREFIX}laugh @user — Lachen\n`;
-helpText += `▸ ${PREFIX}mad @user — Sauer sein wegen\n`;
-helpText += `▸ ${PREFIX}nuzzle @user — Anschmiegen\n`;
-helpText += `▸ ${PREFIX}no @user — Nein sagen zu\n`;
-helpText += `▸ ${PREFIX}nosebleed @user — Nasenbluten wegen\n`;
-helpText += `▸ ${PREFIX}sad @user — Traurig sein wegen\n`;
-helpText += `▸ ${PREFIX}scared @user — Angst haben wegen\n`;
-helpText += `▸ ${PREFIX}shout @user — Anschreien\n`;
-helpText += `▸ ${PREFIX}shy @user — Schüchtern sein wegen\n`;
-helpText += `▸ ${PREFIX}sneeze @user — Niesen\n`;
-helpText += `▸ ${PREFIX}surprised @user — Überrascht sein wegen\n`;
-helpText += `▸ ${PREFIX}tired @user — Müde sein wegen\n`;
-helpText += `▸ ${PREFIX}yes @user — Ja sagen zu\n\n`;
-
-helpText += `💀 *FUN & ACTION SKILLS* (Giphy-Reactions)\n${divider}\n`;
-helpText += `▸ ${PREFIX}kill @user — Erledigen\n`;
-helpText += `▸ ${PREFIX}yeet @user — Yeeten\n`;
-helpText += `▸ ${PREFIX}nuke @user — Nuken\n`;
-helpText += `▸ ${PREFIX}banish @user — Verbannen\n`;
-helpText += `▸ ${PREFIX}stab @user — Durchbohren\n`;
-helpText += `▸ ${PREFIX}smash @user — Zerschmettern\n`;
-helpText += `▸ ${PREFIX}vaporize @user — Pulverisieren\n`;
-helpText += `▸ ${PREFIX}choke @user — Würgen\n`;
-helpText += `▸ ${PREFIX}kick @user — Treten\n`;
-helpText += `▸ ${PREFIX}spin @user — Herumwirbeln\n`;
-helpText += `▸ ${PREFIX}glare @user — Böse anstarren\n`;
-helpText += `▸ ${PREFIX}smirk @user — Süffisant grinsen\n`;
-helpText += `▸ ${PREFIX}highfive @user — High Five geben\n`;
-helpText += `▸ ${PREFIX}dance @user — Zusammen tanzen\n\n`;
-        helpText += `💬 *GILDEN-CHAT* (Chat & Gruppen)\n${divider}\n`;
-        helpText += `▸ ${PREFIX}gi — Gildeneinstellungen anzeigen\n`;
-        helpText += `▸ ${PREFIX}welcome-an / -aus — Willkommens-Portal an/aus\n`;
-        helpText += `▸ ${PREFIX}welcome-set <text> — Willkommenstext setzen\n`;
-        helpText += `▸ ${PREFIX}antilink-an / -aus — Anti-Fremdportal-Bann an/aus\n`;
-        helpText += `▸ ${PREFIX}hidetag <text> — Nachricht mit verstecktem Tag\n`;
-        helpText += `▸ ${PREFIX}delete — Als Reply: Nachricht löschen\n`;
-        helpText += `▸ ${PREFIX}ytmp3 <link> — YouTube als MP3\n\n`;
-helpText += `▸ ${PREFIX}nachtsperre an <HH:MM> <HH:MM> — Zeitgesteuerte Gildensperre\n`;
-helpText += `▸ ${PREFIX}nachtsperre aus / status — Sperre verwalten\n`;
-
-        helpText += `⚙️ *Aktueller System-Befehl:* ${PREFIX}\n`;
-
-        if (isAuthorized(sender, ['OWNER', 'COOWNER', 'MOD', 'SUPPORTER', 'TEST_SUPPORTER'])) {
-          helpText += `\n🎫 *KNIGHTS OF THE BLOOD SUPPORT* (Ticket-System)\n${divider}\n`;
-          helpText += `▸ ${PREFIX}support <nachricht> — Notfall-Ticket erstellen\n`;
-          helpText += `▸ ${PREFIX}answer <id> <text> — Ticket beantworten\n`;
-          helpText += `▸ ${PREFIX}tickets [id|status] — Tickets anzeigen\n`;
-          helpText += `▸ ${PREFIX}cleartickets — Alle Tickets löschen\n`;
-        }
-
-        helpText += `\n🛡️ *GILDENMEISTER* (Admin)\n${divider}\n`;
-        helpText += `▸ ${PREFIX}warn @user — Verwarnen\n`;
-        helpText += `▸ ${PREFIX}kick @user — Aus der Gilde werfen\n`;
-        helpText += `▸ ${PREFIX}promote / ${PREFIX}demote @user — Gildenadmin-Rechte\n`;
-        helpText += `▸ ${PREFIX}addxp <@user> <menge> — EXP schenken\n`;
-        helpText += `▸ ${PREFIX}addcash <@user> <menge> — Cor schenken\n`;
-        helpText += `▸ ${PREFIX}addvip <@user> <zeit> — VIP-Rang geben\n`;
-        helpText += `▸ ${PREFIX}purge [anzahl] — Nachrichten löschen (alle oder letzte Nachrichten)\n`;
-
-        if (hasAdminPerms(sender)) {
-          helpText += `\n👑 *SYSTEM ADMINISTRATOR* (Kayaba-Rechte)\n${divider}\n`;
-          helpText += `▸ ${PREFIX}broadcast <text> — Serverweite Ansage an alle Gilden\n`;
-          helpText += `▸ ${PREFIX}restart — System neu starten\n`;
-          helpText += `▸ ${PREFIX}updateprofile — Avatar aktualisieren\n`;
-          helpText += `▸ ${PREFIX}bancmd <befehl> [ban|unban] — Skill sperren\n`;
-          helpText += `▸ ${PREFIX}setrole @user <rolle> — Rang setzen\n`;
-          helpText += `▸ ${PREFIX}listroles — Alle Ränge anzeigen\n`;
-          helpText += `▸ ${PREFIX}newsession <name> — Neuen Server starten\n`;
-          helpText += `▸ ${PREFIX}sessions — Aktive Server anzeigen\n`;
-          helpText += `▸ ${PREFIX}stopsession <name> — Server stoppen\n`;
-          helpText += `▸ ${PREFIX}deletesession <name> — Server löschen\n`;
-          helpText += `▸ ${PREFIX}addcredit Name | Rolle — Beta-Tester hinzufügen\n`;
-          helpText += `▸ ${PREFIX}delcredit <nummer> — Beta-Tester entfernen\n`;
-          helpText += `▸ ${PREFIX}com <link> — Gilden-Link ändern\n`;
-          helpText += `▸ ${PREFIX}usertodo — Von Spielern vorgeschlagene Skills ansehen\n`;
-        }
-
-        helpText += `\n${divider}\n_⚔️ "The days of my life... I'll cut through them all." — Nutze Befehle ohne Parameter für mehr Info_`;
+  try {
+    const videoPath = await downloadShortIfNeeded();
+    await sock.sendMessage(from, {
+      video: fs.readFileSync(videoPath),
+      caption: helpText,
+      mimetype: 'video/mp4'
+    }, { quoted: m });
+  } catch (e) {
+    console.error('Video send failed, fallback to text:', e);
+    await sock.sendMessage(from, { text: helpText }, { quoted: m });
+  }
+  return;
+}
         try {
           const videoPath = await downloadShortIfNeeded();
           await sock.sendMessage(from, {
