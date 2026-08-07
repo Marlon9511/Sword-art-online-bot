@@ -207,17 +207,24 @@ ROLES.COOWNER.push(COOWNER_LID);
 
 const BOT_STATE_FILE = path.join(DATA_PATH, 'bot-state.json');
 let BOT_OFFLINE = false;
+let OWNER_MODE = false;
 let PREFIX = '?';
 try {
   if (fs.existsSync(BOT_STATE_FILE)) {
     const st = JSON.parse(fs.readFileSync(BOT_STATE_FILE, 'utf8') || '{}');
     BOT_OFFLINE = !!st.offline;
+    OWNER_MODE = !!st.ownerMode;
     if (st.prefix && typeof st.prefix === 'string' && st.prefix.trim().length) {
       PREFIX = st.prefix.trim().slice(0, 1);
     }
   }
 } catch (e) { console.error('Failed to load bot state:', e); }
 
+const saveBotState = () => {
+  try {
+    fs.writeFileSync(BOT_STATE_FILE, JSON.stringify({ offline: !!BOT_OFFLINE, ownerMode: !!OWNER_MODE, prefix: PREFIX }, null, 2));
+  } catch (e) { console.error('Failed to save bot state:', e); }
+};
 const saveBotState = () => {
   try {
     fs.writeFileSync(BOT_STATE_FILE, JSON.stringify({ offline: !!BOT_OFFLINE, prefix: PREFIX }, null, 2));
