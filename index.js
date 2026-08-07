@@ -2452,22 +2452,40 @@ if (cmd === 'marry') {
   const sub = (args[0] || '').toLowerCase();
 
   if (sub === 'accept') {
-    const proposal = pendingMarriageProposals.get(sender);
-    if (!proposal) return send('❌ Du hast keinen offenen Heiratsantrag.');
-    if (marriages[sender] || marriages[proposal.from]) {
-      pendingMarriageProposals.delete(sender);
-      return send('❌ Einer von euch ist inzwischen bereits verheiratet.');
-    }
-    marriages[sender] = { partner: proposal.from, since: Date.now() };
-    marriages[proposal.from] = { partner: sender, since: Date.now() };
-    save(FILES.marriages, marriages);
+  const proposal = pendingMarriageProposals.get(sender);
+  if (!proposal) return send('❌ Du hast keinen offenen Heiratsantrag.');
+  if (marriages[sender] || marriages[proposal.from]) {
     pendingMarriageProposals.delete(sender);
-    return send(
-      `💍 Herzlichen Glückwunsch! @${proposal.from.split('@')[0]} und @${sender.split('@')[0]} sind jetzt verheiratet! 🎉`,
-      { mentions: [sender, proposal.from] }
-    );
+    return send('❌ Einer von euch ist inzwischen bereits verheiratet.');
   }
+  marriages[sender] = { partner: proposal.from, since: Date.now() };
+  marriages[proposal.from] = { partner: sender, since: Date.now() };
+  save(FILES.marriages, marriages);
+  pendingMarriageProposals.delete(sender);
 
+  // NEU: Flag für den Titel setzen + Fortschritt prüfen
+  ensureUser(sender);
+  ensureUser(proposal.from);
+  users[sender].__isMarried = true;
+  users[proposal.from].__isMarried = true;
+  save(FILES.users, users);
+
+  await checkProgress({
+    users, save, FILES, send, activePrefix,
+    guilds, ownerJids: [OWNER_LID, OWNER_LID2, OWNER_PRIV, OWNER_PRIV2]
+  }, sender);
+  await checkProgress({
+    users, save, FILES, send: async (text, opts) => {
+      try { await sock.sendMessage(proposal.from, { text, ...opts }); } catch (e) {}
+    }, activePrefix,
+    guilds, ownerJids: [OWNER_LID, OWNER_LID2, OWNER_PRIV, OWNER_PRIV2]
+  }, proposal.from);
+
+  return send(
+    `💍 Herzlichen Glückwunsch! @${proposal.from.split('@')[0]} und @${sender.split('@')[0]} sind jetzt verheiratet! 🎉`,
+    { mentions: [sender, proposal.from] }
+  );
+}
   if (sub === 'deny' || sub === 'decline') {
     const proposal = pendingMarriageProposals.get(sender);
     if (!proposal) return send('❌ Du hast keinen offenen Heiratsantrag.');
