@@ -240,6 +240,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const arena = createArenaSystem();
 const guildSystem = createGuildSystem();
 const titleSystem = createTitleSystem();
+const pokemonSystem = createPokemonSystem();
 
 async function createBackup() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -1640,6 +1641,8 @@ helpText += `🏰 *GILDEN-SYSTEM* (Verbünde)\n${divider}\n`;
         helpText += GUILD_HELP_TEXT.split('\n').filter(Boolean).map(l => l.replace(/\{P\}/g, PREFIX)).join('\n') + '\n\n';
 helpText += `🎖️ *TITEL & ERFOLGE*\n${divider}\n`;
 helpText += TITLE_HELP_TEXT.split('\n').filter(Boolean).map(l => l.replace(/\{P\}/g, PREFIX)).join('\n') + '\n\n';
+helpText += `🐾 *POKÉMON-SYSTEM*\n${divider}\n`;
+helpText += POKEMON_HELP_TEXT.split('\n').filter(Boolean).map(l => l.replace(/\{P\}/g, PREFIX)).join('\n') + '\n\n';
 helpText += `\n💞 *SOCIAL SKILLS* (Interaktion)\n${divider}\n`;
 helpText += `▸ ${PREFIX}slap @user — Ohrfeige verpassen\n`;
 helpText += `▸ ${PREFIX}hug @user — Umarmen\n`;
