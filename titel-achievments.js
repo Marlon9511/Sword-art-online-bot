@@ -28,17 +28,35 @@
      users[jid].__wonWithoutDamage   -> true, wenn ein Duell ohne Schaden gewonnen wurde
      users[jid].__eventParticipant   -> true für Event-Teilnahme
      users[jid].__isGuildLeader      -> true, wenn Gildenleiter (wird automatisch gesetzt)
-     users[jid].__perfectFloorClear  -> true, wenn eine Etage ohne Schaden gecleart wurde (NEU)
-     users[jid].__speedCleared       -> true, wenn das Spiel in Rekordzeit gecleart wurde (NEU)
-     users[jid].__defeatedRival      -> true, wenn ein festgelegter Rivale besiegt wurde (NEU)
-     users[jid].__firstToClearFloor  -> true, wenn ein Spieler als Erster eine Etage cleart (NEU)
-     users[jid].__allSkillsMaxed     -> true, wenn alle Skills maximiert wurden (NEU)
-     users[jid].__itemCollectorComplete -> true, wenn alle seltenen Items gesammelt wurden (NEU)
-     users[jid].__helpedNewbie       -> true, wenn einem neuen Spieler geholfen wurde (NEU)
-     users[jid].__isMarried          -> true, wenn im Spiel geheiratet wurde (NEU)
+     users[jid].__perfectFloorClear  -> true, wenn eine Etage ohne Schaden gecleart wurde
+     users[jid].__speedCleared       -> true, wenn das Spiel in Rekordzeit gecleart wurde
+     users[jid].__defeatedRival      -> true, wenn ein festgelegter Rivale besiegt wurde
+     users[jid].__firstToClearFloor  -> true, wenn ein Spieler als Erster eine Etage cleart
+     users[jid].__allSkillsMaxed     -> true, wenn alle Skills maximiert wurden
+     users[jid].__itemCollectorComplete -> true, wenn alle seltenen Items gesammelt wurden
+     users[jid].__helpedNewbie       -> true, wenn einem neuen Spieler geholfen wurde
+     users[jid].__isMarried          -> true, wenn im Spiel geheiratet wurde
+
+   POKÉMON-FELDER (aus pokemon-system.mjs, users[jid].poke):
+     users[jid].poke.starter      -> string | null (Starter-Spezies-ID)
+     users[jid].poke.team         -> [{ uid, species, level, xp, nickname }]
+     users[jid].poke.dex          -> { [speciesId]: true } (Pokédex)
+     users[jid].poke.pokeballs    -> { pokeball, superball, meisterball }
+     users[jid].poke.secretCodes  -> string[] (eingelöste Geheimcodes)
+
+   OPTIONALE POKÉMON-ZÄHLER (analog zu den __flags oben, in
+   pokemon-system.mjs an den passenden Stellen hochzählen):
+     users[jid].poke.battleWins   -> Siege in ?pokebattle
+     users[jid].poke.battleFights -> Gesamtanzahl ?pokebattle-Kämpfe
+     users[jid].poke.evolutions   -> Anzahl erfolgreicher ?pokevolve-Aufrufe
+     users[jid].poke.trainings    -> Anzahl erfolgreicher ?poketrain-Aufrufe
+     users[jid].poke.ballsBought  -> Anzahl gekaufter Pokébälle (gesamt)
+   Fehlen diese Zähler, bleiben nur die betroffenen Titel dauerhaft
+   gesperrt — es gibt dadurch keinen Fehler.
 
    Integration in andere Module:
-     - Nach Duellen, Level-Ups, Gilden-Gründung etc. `checkProgress(ctx, jid)`
+     - Nach Duellen, Level-Ups, Gilden-Gründung, Pokémon-Fängen,
+       -Kämpfen, -Entwicklungen etc. `checkProgress(ctx, jid)`
        aufrufen. Neu freigeschaltete Titel/Erfolge werden automatisch
        per ctx.send an den Spieler gemeldet.
      - Für die Profilanzeige: users[jid].activeTitle -> TITLES.find(...)
@@ -52,6 +70,8 @@
        @s.whatsapp.net ankommt.
    ===================================================================== */
 
+import { POKEMON_DB } from './pokemon-system.mjs'; // Pfad ggf. an euer Projekt anpassen
+
 export const TITLE_COMMANDS = [
   'title', 'titel', 'achievements', 'erfolge', 'hpbar'
 ];
@@ -63,6 +83,17 @@ export const TITLE_HELP_TEXT =
   `▸ {P}title info <name> — Freischaltbedingung eines Titels anzeigen\n` +
   `▸ {P}achievements — Deine Erfolge & Fortschritt anzeigen\n` +
   `▸ {P}hpbar — HP-Balken-Anzeige an/aus umschalten\n`;
+
+/* ---------------------------------------------------------------------
+   POKÉMON-HELFER — robust gegen fehlendes u.poke-Objekt
+--------------------------------------------------------------------- */
+const dexCount = (u) => Object.keys(u.poke?.dex || {}).length;
+const teamCount = (u) => (u.poke?.team || []).length;
+const maxTeamLevel = (u) => (u.poke?.team || []).reduce((m, pk) => Math.max(m, pk.level || 0), 0);
+const hasRarity = (u, rarity) =>
+  Object.keys(u.poke?.dex || {}).some((id) => POKEMON_DB[id]?.rarity === rarity);
+const hasAnyOfType = (u, type) =>
+  Object.keys(u.poke?.dex || {}).some((id) => POKEMON_DB[id]?.type === type);
 
 /* ---------------------------------------------------------------------
    TITEL-DEFINITIONEN
@@ -1038,6 +1069,335 @@ export const TITLES = [
     icon: '💍',
     desc: 'Heirate einen anderen Spieler im Spiel.',
     check: (u) => u.__isMarried === true
+  },
+
+  // =====================================================================
+  // ▼▼▼ POKÉMON-TITEL ▼▼▼
+  // =====================================================================
+
+  // ---------- Einstieg ----------
+  {
+    id: 'poke_trainer',
+    name: 'Taschenmonster-Trainer',
+    icon: '🐾',
+    desc: 'Wähle dein erstes Starter-Pokémon.',
+    check: (u) => !!u.poke?.starter
+  },
+  {
+    id: 'poke_fire_starter',
+    name: 'Kind der Flamme',
+    icon: '🔥',
+    desc: 'Wähle Glumanda als Starter.',
+    check: (u) => u.poke?.starter === 'glumanda'
+  },
+  {
+    id: 'poke_water_starter',
+    name: 'Kind der Wellen',
+    icon: '💧',
+    desc: 'Wähle Schiggy als Starter.',
+    check: (u) => u.poke?.starter === 'schiggy'
+  },
+  {
+    id: 'poke_grass_starter',
+    name: 'Kind der Wurzeln',
+    icon: '🌿',
+    desc: 'Wähle Bisasam als Starter.',
+    check: (u) => u.poke?.starter === 'bisasam'
+  },
+  {
+    id: 'poke_first_catch',
+    name: 'Erster Fang',
+    icon: '⚾',
+    desc: 'Fange dein erstes wildes Pokémon.',
+    check: (u) => teamCount(u) >= 2
+  },
+
+  // ---------- Team-Größe ----------
+  {
+    id: 'poke_team_3',
+    name: 'Kleines Team',
+    icon: '👥',
+    desc: 'Habe 3 Pokémon im Team.',
+    check: (u) => teamCount(u) >= 3
+  },
+  {
+    id: 'poke_team_6',
+    name: 'Volle Riege',
+    icon: '🎽',
+    desc: 'Habe 6 Pokémon im Team.',
+    check: (u) => teamCount(u) >= 6
+  },
+  {
+    id: 'poke_team_10',
+    name: 'Pokémon-Sammler',
+    icon: '🎒',
+    desc: 'Habe 10 Pokémon im Team.',
+    check: (u) => teamCount(u) >= 10
+  },
+  {
+    id: 'poke_team_15',
+    name: 'Wandelnde Pokéarena',
+    icon: '🏕️',
+    desc: 'Habe 15 Pokémon im Team.',
+    check: (u) => teamCount(u) >= 15
+  },
+
+  // ---------- Pokédex ----------
+  {
+    id: 'poke_dex_5',
+    name: 'Neugieriger Forscher',
+    icon: '🔍',
+    desc: 'Entdecke 5 verschiedene Pokémon-Arten.',
+    check: (u) => dexCount(u) >= 5
+  },
+  {
+    id: 'poke_dex_10',
+    name: 'Feld-Forscher',
+    icon: '🧭',
+    desc: 'Entdecke 10 verschiedene Pokémon-Arten.',
+    check: (u) => dexCount(u) >= 10
+  },
+  {
+    id: 'poke_dex_20',
+    name: 'Pokédex-Enthusiast',
+    icon: '📗',
+    desc: 'Entdecke 20 verschiedene Pokémon-Arten.',
+    check: (u) => dexCount(u) >= 20
+  },
+  {
+    id: 'poke_dex_30',
+    name: 'Renommierter Professor',
+    icon: '🎓',
+    desc: 'Entdecke 30 verschiedene Pokémon-Arten.',
+    check: (u) => dexCount(u) >= 30
+  },
+  {
+    id: 'poke_dex_complete',
+    name: 'Pokédex-Vollender',
+    icon: '📘',
+    desc: 'Entdecke alle Pokémon-Arten im Spiel.',
+    check: (u) => dexCount(u) >= Object.keys(POKEMON_DB).length
+  },
+
+  // ---------- Seltenheit ----------
+  {
+    id: 'poke_uncommon_catch',
+    name: 'Glückspilz',
+    icon: '🟢',
+    desc: 'Fange ein ungewöhnliches Pokémon.',
+    check: (u) => hasRarity(u, 'uncommon')
+  },
+  {
+    id: 'poke_rare_catch',
+    name: 'Schatzsucher',
+    icon: '🔵',
+    desc: 'Fange ein seltenes Pokémon.',
+    check: (u) => hasRarity(u, 'rare')
+  },
+  {
+    id: 'poke_legendary_catch',
+    name: 'Legendenjäger',
+    icon: '🟡',
+    desc: 'Fange ein legendäres Pokémon.',
+    check: (u) => hasRarity(u, 'legendary')
+  },
+  {
+    id: 'poke_secret_catch',
+    name: 'Hüter des Geheimnisses',
+    icon: '🟣',
+    desc: 'Fange oder erhalte ein geheimes Pokémon.',
+    check: (u) => hasRarity(u, 'secret')
+  },
+  {
+    id: 'poke_all_secrets',
+    name: 'Meister der Legenden',
+    icon: '🌌',
+    desc: 'Besitze alle 4 geheimen Pokémon (Mew, Zapdos, Arktos, Lavados).',
+    check: (u) =>
+      ['mew', 'zapdos', 'arktos', 'lavados'].every((id) => !!u.poke?.dex?.[id])
+  },
+  {
+    id: 'poke_secret_code',
+    name: 'Codeknacker',
+    icon: '🔑',
+    desc: 'Löse einen Geheimcode ein.',
+    check: (u) => (u.poke?.secretCodes || []).length >= 1
+  },
+  {
+    id: 'poke_all_codes',
+    name: 'Vollständiger Sammler',
+    icon: '🗝️',
+    desc: 'Löse alle 4 bekannten Geheimcodes ein.',
+    check: (u) => (u.poke?.secretCodes || []).length >= 4
+  },
+
+  // ---------- Level ----------
+  {
+    id: 'poke_level_20',
+    name: 'Vielversprechendes Talent',
+    icon: '⭐',
+    desc: 'Habe ein Pokémon mit Level 20.',
+    check: (u) => maxTeamLevel(u) >= 20
+  },
+  {
+    id: 'poke_level_40',
+    name: 'Erfahrener Kämpfer',
+    icon: '🌟',
+    desc: 'Habe ein Pokémon mit Level 40.',
+    check: (u) => maxTeamLevel(u) >= 40
+  },
+  {
+    id: 'poke_level_60',
+    name: 'Elite-Trainer',
+    icon: '✨',
+    desc: 'Habe ein Pokémon mit Level 60.',
+    check: (u) => maxTeamLevel(u) >= 60
+  },
+  {
+    id: 'poke_level_100',
+    name: 'Champion-Trainer',
+    icon: '🏆',
+    desc: 'Habe ein Pokémon mit Level 100.',
+    check: (u) => maxTeamLevel(u) >= 100
+  },
+
+  // ---------- Entwicklung ----------
+  {
+    id: 'poke_fully_evolved_starter',
+    name: 'Vollendeter Weggefährte',
+    icon: '🌠',
+    desc: 'Entwickle deinen Starter zur finalen Form.',
+    check: (u) => {
+      const finals = ['bisaflor', 'glurak', 'turtok'];
+      return (u.poke?.team || []).some((pk) => finals.includes(pk.species));
+    }
+  },
+  {
+    id: 'poke_first_evolution',
+    name: 'Wandlung',
+    icon: '🌀',
+    desc: 'Entwickle zum ersten Mal ein Pokémon.',
+    check: (u) => (u.poke?.evolutions || 0) >= 1
+  },
+  {
+    id: 'poke_evolution_master',
+    name: 'Wandlungsmeister',
+    icon: '🔮',
+    desc: 'Entwickle insgesamt 10 Pokémon.',
+    check: (u) => (u.poke?.evolutions || 0) >= 10
+  },
+
+  // ---------- Bälle & Wirtschaft ----------
+  {
+    id: 'poke_master_ball',
+    name: 'Meisterhafter Fänger',
+    icon: '⚫',
+    desc: 'Besitze einen Meisterball.',
+    check: (u) => (u.poke?.pokeballs?.meisterball || 0) >= 1
+  },
+  {
+    id: 'poke_ball_hoarder',
+    name: 'Ballsammler',
+    icon: '🧺',
+    desc: 'Besitze insgesamt 20 Pokébälle (alle Typen zusammen).',
+    check: (u) => {
+      const b = u.poke?.pokeballs || {};
+      return (b.pokeball || 0) + (b.superball || 0) + (b.meisterball || 0) >= 20;
+    }
+  },
+  {
+    id: 'poke_big_spender',
+    name: 'Großzügiger Käufer',
+    icon: '🛍️',
+    desc: 'Kaufe insgesamt 50 Pokébälle.',
+    check: (u) => (u.poke?.ballsBought || 0) >= 50
+  },
+
+  // ---------- Training ----------
+  {
+    id: 'poke_dedicated_trainer',
+    name: 'Fleißiger Trainer',
+    icon: '🏋️',
+    desc: 'Trainiere 10 Mal erfolgreich.',
+    check: (u) => (u.poke?.trainings || 0) >= 10
+  },
+  {
+    id: 'poke_iron_will_trainer',
+    name: 'Eiserner Wille',
+    icon: '🦾',
+    desc: 'Trainiere 50 Mal erfolgreich.',
+    check: (u) => (u.poke?.trainings || 0) >= 50
+  },
+
+  // ---------- PVP (?pokebattle) ----------
+  {
+    id: 'poke_first_battle_win',
+    name: 'Erster Ringsieg',
+    icon: '🥇',
+    desc: 'Gewinne dein erstes Pokémon-PVP.',
+    check: (u) => (u.poke?.battleWins || 0) >= 1
+  },
+  {
+    id: 'poke_battle_veteran',
+    name: 'Arena-erprobter Trainer',
+    icon: '⚔️',
+    desc: 'Gewinne 20 Pokémon-PVPs.',
+    check: (u) => (u.poke?.battleWins || 0) >= 20
+  },
+  {
+    id: 'poke_battle_champion',
+    name: 'Ligameister',
+    icon: '👑',
+    desc: 'Gewinne 50 Pokémon-PVPs.',
+    check: (u) => (u.poke?.battleWins || 0) >= 50
+  },
+  {
+    id: 'poke_battle_active',
+    name: 'Kampflustig',
+    icon: '🤺',
+    desc: 'Bestreite 30 Pokémon-PVPs, egal ob Sieg oder Niederlage.',
+    check: (u) => (u.poke?.battleFights || 0) >= 30
+  },
+
+  // ---------- Typ-Sammlungen ----------
+  {
+    id: 'poke_dragon_tamer',
+    name: 'Drachenbändiger',
+    icon: '🐉',
+    desc: 'Entdecke ein Pokémon vom Typ Drache.',
+    check: (u) => hasAnyOfType(u, 'drache')
+  },
+  {
+    id: 'poke_psychic_seeker',
+    name: 'Geistessucher',
+    icon: '🔮',
+    desc: 'Entdecke ein Pokémon vom Typ Psycho.',
+    check: (u) => hasAnyOfType(u, 'psycho')
+  },
+  {
+    id: 'poke_electric_soul',
+    name: 'Blitzgeist',
+    icon: '⚡',
+    desc: 'Entdecke ein Pokémon vom Typ Elektro.',
+    check: (u) => hasAnyOfType(u, 'elektro')
+  },
+
+  // ---------- Kombinierte / seltene Pokémon-Titel ----------
+  {
+    id: 'poke_true_champion',
+    name: 'Wahrer Pokémon-Champion',
+    icon: '🏆',
+    desc: 'Habe ein Team von 6 Pokémon und mindestens ein legendäres darunter.',
+    check: (u) => teamCount(u) >= 6 && hasRarity(u, 'legendary')
+  },
+  {
+    id: 'poke_ultimate_master',
+    name: 'Ultimativer Pokémon-Meister',
+    icon: '🌌',
+    desc: 'Vervollständige den Pokédex und besitze alle 4 geheimen Pokémon.',
+    check: (u) =>
+      dexCount(u) >= Object.keys(POKEMON_DB).length &&
+      ['mew', 'zapdos', 'arktos', 'lavados'].every((id) => !!u.poke?.dex?.[id])
   }
 ];
 
@@ -1156,6 +1516,36 @@ export const ACHIEVEMENTS = [
     icon: '💎',
     desc: 'Gewinne 10 Duelle, ohne ein einziges zu verlieren.',
     check: (u) => (u.duel?.wins || 0) >= 10 && (u.duel?.losses || 0) === 0
+  },
+
+  // ---------- Pokémon-Erfolge ----------
+  {
+    id: 'poke_starter_chosen',
+    name: 'Neuer Weggefährte',
+    icon: '🐾',
+    desc: 'Wähle dein erstes Starter-Pokémon.',
+    check: (u) => !!u.poke?.starter
+  },
+  {
+    id: 'poke_dex_10',
+    name: 'Angehender Forscher',
+    icon: '🔍',
+    desc: 'Entdecke 10 verschiedene Pokémon-Arten.',
+    check: (u) => dexCount(u) >= 10
+  },
+  {
+    id: 'poke_legendary_found',
+    name: 'Legendenjäger',
+    icon: '🟡',
+    desc: 'Fange ein legendäres Pokémon.',
+    check: (u) => hasRarity(u, 'legendary')
+  },
+  {
+    id: 'poke_secret_found',
+    name: 'Geheimnisvolle Begegnung',
+    icon: '🟣',
+    desc: 'Fange oder erhalte ein geheimes Pokémon.',
+    check: (u) => hasRarity(u, 'secret')
   }
 ];
 
@@ -1191,7 +1581,8 @@ function extractRawNumberTitle(jid) {
 
 /* ---------------------------------------------------------------------
    FORTSCHRITTS-CHECK — von anderen Modulen nach relevanten Events
-   aufrufen (Duell gewonnen, Level-Up, Gilde beigetreten, ...).
+   aufrufen (Duell gewonnen, Level-Up, Gilde beigetreten, Pokémon
+   gefangen, entwickelt, PVP gekämpft, ...).
    Schaltet automatisch neue Titel/Achievements frei und meldet sie.
 --------------------------------------------------------------------- */
 export async function checkProgress(ctx, jid) {
