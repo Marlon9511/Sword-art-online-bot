@@ -1656,19 +1656,7 @@ if (cmd === 'help' || cmd === 'menu') {
   }
   return;
 }
-        try {
-          const videoPath = await downloadShortIfNeeded();
-          await sock.sendMessage(from, {
-            video: fs.readFileSync(videoPath),
-            caption: helpText,
-            mimetype: 'video/mp4'
-          }, { quoted: m });
-        } catch (e) {
-          console.error('Video send failed, fallback to text:', e);
-          await sock.sendMessage(from, { text: helpText }, { quoted: m });
-        }
-        return;
-      }
+        
 
    
  const GAME_COMMANDS = [
