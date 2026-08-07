@@ -1779,16 +1779,29 @@ if (isGroup && GAME_COMMANDS.includes(cmd)) {
       // Cooldown
       if (!isOwner && cmd !== 'help' && cmd !== 'menu') {
         const cooldownCommands = [
+          // ---- Basis (bereits vorhanden) ----
           'work', 'fish', 'slot', 'hunt', 'dig', 'crime', 'rob', 'daily', 'weekly', 'monthly',
           'collect', 'open', 'mine', 'farm', 'adventure', 'explore', 'quest', 'raid', 'train',
-          'duel', 'gamble', 'casino', 'blackjack', 'rps', 'lottery', 'spin', 'loot'
+          'duel', 'gamble', 'casino', 'blackjack', 'rps', 'lottery', 'spin', 'loot',
+
+          // ---- Arena-System (alle) ----
+          'openkiste', 'kisteoeffnen', 'openbox', 'gear', 'ausruestung', 'equipment',
+          'equip', 'unequip', 'sell', 'verkaufen', 'duell', 'arena', 'duelleaderboard',
+          'kampfrangliste', 'arenaitems', 'itemliste', 'floor', 'etage', 'excalibur', 'aegis',
+
+          // ---- Gilden-System (alle) ----
+          'gilde', 'guild', 'gildenrang', 'guildrank',
+
+          // ---- Pokemon-System (alle) ----
+          'pokestarter', 'wild', 'catch', 'pokemon', 'p', 'pokeinfo',
+          'pokeactive', 'pokename', 'pokerelease', 'pokedex', 'pokeshop',
+          'pokebuy', 'poketrain', 'pokevolve', 'pokebattle', 'pokehelp'
         ];
-        if (cooldownCommands.includes(cmd)) {
+        if (cooldownCommands.includes(cmd) && !COOLDOWN_EXCLUDED.includes(cmd)) {
           const cooldownMessage = checkCooldown(sender, cmd);
           if (cooldownMessage) return send(cooldownMessage);
         }
       }
-
       // Group Settings (gi)
       if (cmd === 'gi' && isGroup) {
         const groupMetadata = await getGroupMetaSafe(from);
