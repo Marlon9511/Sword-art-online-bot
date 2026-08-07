@@ -4793,6 +4793,46 @@ if (cmd === 'bancmds' || cmd === 'bannedcmds' || cmd === 'listbancmd') {
   const mentions = entries.map(([, info]) => info.by).filter(Boolean);
   return send(`📋 *Gesperrte Befehle* (${entries.length}):\n\n${lines.join('\n')}`, { mentions });
 }
+// RESETCOOLDOWN
+if (cmd === 'resetcooldown' || cmd === 'resetcd') {
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Nur der Inhaber/Co-Inhaber darf diesen Befehl nutzen.');
+
+  const ctx = m.message?.extendedTextMessage?.contextInfo;
+  let target = args[0];
+  if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+  if (!target && ctx?.participant) target = ctx.participant;
+
+  if (!target) {
+    return send(`❌ Nutzung: ${activePrefix}resetcooldown <@user|nummer> [befehl]\nBeispiel: ${activePrefix}resetcooldown @user\n${activePrefix}resetcooldown @user fish`);
+  }
+
+  const targetJid = normalizeJid(target);
+  ensureUser(targetJid);
+
+  // Optionaler zweiter Parameter: ein einzelner Befehl statt aller Cooldowns.
+  // Falls target per @mention kam, ist args[0] die Mention selbst -> der
+  // Befehlsname steht dann in args[1]. Falls target per Nummer/JID kam,
+  // ebenfalls args[1]. Kurz: alles nach dem ersten Argument ist der Befehl.
+  const specificCmd = args.slice(1).join(' ').trim().toLowerCase().replace(new RegExp(`^\\${activePrefix}`), '');
+
+  if (!commandCooldowns.has(targetJid)) {
+    return send(`ℹ️ @${targetJid.split('@')[0]} hat aktuell keine aktiven Cooldowns.`, { mentions: [targetJid] });
+  }
+
+  const userCooldowns = commandCooldowns.get(targetJid);
+
+  if (specificCmd) {
+    if (!userCooldowns.has(specificCmd)) {
+      return send(`ℹ️ @${targetJid.split('@')[0]} hat aktuell keinen Cooldown für "${specificCmd}".`, { mentions: [targetJid] });
+    }
+    userCooldowns.delete(specificCmd);
+    return send(`✅ Cooldown für "${specificCmd}" von @${targetJid.split('@')[0]} wurde zurückgesetzt.`, { mentions: [targetJid] });
+  }
+
+  const count = userCooldowns.size;
+  commandCooldowns.delete(targetJid);
+  return send(`✅ Alle ${count} Cooldown(s) von @${targetJid.split('@')[0]} wurden zurückgesetzt.`, { mentions: [targetJid] });
+}
 // Unbekannter Befehl
 const suggestion = findClosestCommand(cmd);
 if (suggestion) {
