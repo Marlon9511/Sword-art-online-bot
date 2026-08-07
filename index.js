@@ -1765,7 +1765,7 @@ helpText += `▸ ${PREFIX}nachtsperre aus / status — Sperre verwalten\n`;
         return;
       }
 
-   const GAME_COMMANDS = [
+   
  const GAME_COMMANDS = [
   // ---- Basis (bereits vorhanden) ----
   'daily', 'work', 'blackjack', 'bj', 'bjstart', 'hit', 'stand',
