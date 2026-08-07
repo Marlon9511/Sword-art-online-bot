@@ -4287,6 +4287,21 @@ if (cmd === 'add') {
   }
   const jid = `${numberToAdd}@s.whatsapp.net`;
 
+  // NEU: Vorab prüfen, ob die Nummer überhaupt bei WhatsApp registriert ist.
+  // Das erkennt man NICHT anhand der Datenschutzeinstellung (die lässt sich
+  // technisch nicht vorab abfragen), sondern nur ob der Account existiert.
+  try {
+    const check = await sock.onWhatsApp(jid);
+    const exists = Array.isArray(check) && check.length > 0 && check[0]?.exists;
+    if (!exists) {
+      return send(`❌ Die Nummer ${numberToAdd} ist nicht bei WhatsApp registriert.`);
+    }
+  } catch (e) {
+    console.error('[add] onWhatsApp-Check fehlgeschlagen:', e?.message || e);
+    // Wenn der Check selbst fehlschlägt, trotzdem weitermachen und den
+    // eigentlichen Hinzufügen-Versuch starten.
+  }
+
   // Frische Metadaten holen, um sicherzugehen, dass der Admin-Status aktuell ist
   const meta = await getGroupMetaSafe(from, true);
   const allBotIds = [...getBotSelfIds(sock)];
@@ -4316,8 +4331,8 @@ if (cmd === 'add') {
       return send(`✅ @${numberToAdd} wurde zur Gruppe hinzugefügt.`, { mentions: [jid] });
     }
 
-    // Status 403 / 401 -> Nummer erlaubt kein direktes Hinzufügen (z.B. wegen Datenschutzeinstellungen).
-    // In diesem Fall bietet Baileys oft einen invite_code im content-Feld an.
+    // Status 403/401 -> Datenschutzeinstellung der Nummer verhindert direktes
+    // Hinzufügen. In diesem Fall bietet Baileys oft einen invite_code an.
     let inviteCode = null;
     try {
       const content = entry?.content;
@@ -4333,15 +4348,15 @@ if (cmd === 'add') {
         await sock.sendMessage(jid, {
           text: `👋 Du wurdest eingeladen, der Gruppe "${meta?.subject || ''}" beizutreten:\n${inviteLink}`
         });
-        return send(`ℹ️ ${numberToAdd} konnte nicht direkt hinzugefügt werden (Datenschutzeinstellung), aber ich habe eine private Einladung per Nachricht geschickt.`);
+        return send(`ℹ️ ${numberToAdd} konnte wegen der Datenschutzeinstellung ("Wer kann mich hinzufügen") nicht direkt hinzugefügt werden — ich habe stattdessen eine private Einladung per Nachricht geschickt.`);
       } catch (e) {
-        return send(`⚠️ ${numberToAdd} konnte nicht direkt hinzugefügt werden und die private Einladung ist fehlgeschlagen: ${e?.message || e}`);
+        return send(`⚠️ ${numberToAdd} konnte nicht direkt hinzugefügt werden (Datenschutzeinstellung) und die private Einladung ist fehlgeschlagen: ${e?.message || e}`);
       }
     }
 
     const statusMessages = {
-      '403': 'Die Nummer erlaubt kein direktes Hinzufügen (Datenschutzeinstellungen) und akzeptiert auch keine automatische Einladung.',
-      '408': 'Zeitüberschreitung — die Nummer ist eventuell nicht (mehr) auf WhatsApp registriert.',
+      '403': 'Die Nummer erlaubt kein direktes Hinzufügen (Datenschutzeinstellung "Wer kann mich zu Gruppen hinzufügen") und akzeptiert auch keine automatische Einladung.',
+      '408': 'Zeitüberschreitung — die Nummer hat evtl. gerade WhatsApp Web/Mobile Probleme.',
       '409': 'Die Nummer ist bereits Mitglied.',
       '401': 'Die Nummer/der Account lässt sich grundsätzlich nicht kontaktieren (z.B. gesperrte oder spezielle System-Accounts).',
     };
