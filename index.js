@@ -1800,15 +1800,14 @@ if (isGroup && GAME_COMMANDS.includes(cmd)) {
           'duel', 'gamble', 'casino', 'blackjack', 'rps', 'lottery', 'spin', 'loot',
 
           // ---- Arena-System (alle) ----
-          'openkiste', 'kisteoeffnen', 'openbox', 'gear', 'ausruestung', 'equipment',
-          'equip', 'unequip', 'sell', 'verkaufen', 'duell', 'arena', 'duelleaderboard',
-          'kampfrangliste', 'arenaitems', 'itemliste', 'floor', 'etage', 'excalibur', 'aegis',
+  'duell', 'arena', 'duelleaderboard',
+          'kampfrangliste', 
 
           // ---- Gilden-System (alle) ----
           'gilde', 'guild', 'gildenrang', 'guildrank',
 
           // ---- Pokemon-System (alle) ----
-          'pokestarter', 'wild', 'catch', 'pokemon', 'p', 'pokeinfo',
+          'pokestarter', 'wild',  'pokemon', 'p', 'pokeinfo',
           'pokeactive', 'pokename', 'pokerelease', 'pokedex', 'pokeshop',
           'pokebuy', 'poketrain', 'pokevolve', 'pokebattle', 'pokehelp'
         ];
