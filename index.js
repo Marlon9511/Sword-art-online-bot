@@ -18,6 +18,7 @@ import { createArenaSystem, ARENA_SHOP_ITEM, ARENA_HELP_TEXT, ARENA_COMMANDS } f
 import { createGuildSystem, GUILD_COMMANDS, GUILD_HELP_TEXT } from './guild-system.mjs';
 import { createTitleSystem, TITLE_COMMANDS, TITLE_HELP_TEXT, checkProgress, TITLES } from './titel-achievments.js';
 import { createPokemonSystem, POKEMON_COMMANDS, POKEMON_HELP_TEXT } from './pokemon-system.mjs';
+import { createMenuSystem, MENU_COMMANDS } from './menu-system.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -242,6 +243,7 @@ const arena = createArenaSystem();
 const guildSystem = createGuildSystem();
 const titleSystem = createTitleSystem();
 const pokemonSystem = createPokemonSystem();
+const menuSystem = createMenuSystem();
 
 async function createBackup() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
