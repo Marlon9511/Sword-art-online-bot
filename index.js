@@ -4869,6 +4869,22 @@ if (cmd === 'resetlevel') {
     { mentions: [targetJid] }
   );
 }
+// BANCMDS — Liste aller aktuell gesperrten Befehle anzeigen
+if (cmd === 'bancmds' || cmd === 'bannedcmds' || cmd === 'listbancmd') {
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Nur Owner/CoOwner.');
+
+  const entries = Object.entries(commandBans || {});
+  if (!entries.length) return send('✅ Aktuell sind keine Befehle gesperrt.');
+
+  const lines = await Promise.all(entries.map(async ([cmdName, info]) => {
+    const who = await getNumberMention(info.by, sock);
+    const when = info.at ? new Date(info.at).toLocaleString('de-DE') : '(unbekannt)';
+    return `⛔ ${activePrefix}${cmdName} — gesperrt von ${who} am ${when}`;
+  }));
+
+  const mentions = entries.map(([, info]) => info.by).filter(Boolean);
+  return send(`📋 *Gesperrte Befehle* (${entries.length}):\n\n${lines.join('\n')}`, { mentions });
+}
 // Unbekannter Befehl
 const suggestion = findClosestCommand(cmd);
 if (suggestion) {
