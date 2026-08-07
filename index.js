@@ -1067,7 +1067,7 @@ async function updateBotProfile() {
   sock.ev.on('messages.upsert', async ({ messages }) => {
     try {
       if (!messages || !Array.isArray(messages) || messages.length === 0) return;
-      const m = messages[0];
+const m = messages[0];
       if (!m || !m.message) return;
 
       const rawFrom = m.key.remoteJid;
@@ -1075,7 +1075,6 @@ async function updateBotProfile() {
       const from = normalizeJid(rawFrom);
       const sender = normalizeJid(rawParticipant);
       const isGroup = typeof from === 'string' && from.endsWith('@g.us');
-const isGroup = typeof from === 'string' && from.endsWith('@g.us');
 
       // 🔒 OWNER MODE — ignoriert wirklich ALLES von Nicht-Ownern (auch AFK, Antilink, XP etc.)
       if (OWNER_MODE && !isAuthorized(sender, ['OWNER', 'COOWNER']) && !m.key.fromMe) {
