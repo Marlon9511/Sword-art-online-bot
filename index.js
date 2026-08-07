@@ -225,12 +225,6 @@ const saveBotState = () => {
     fs.writeFileSync(BOT_STATE_FILE, JSON.stringify({ offline: !!BOT_OFFLINE, ownerMode: !!OWNER_MODE, prefix: PREFIX }, null, 2));
   } catch (e) { console.error('Failed to save bot state:', e); }
 };
-const saveBotState = () => {
-  try {
-    fs.writeFileSync(BOT_STATE_FILE, JSON.stringify({ offline: !!BOT_OFFLINE, prefix: PREFIX }, null, 2));
-  } catch (e) { console.error('Failed to save bot state:', e); }
-};
-
 const _teamTodosPath = path.join(DATA_PATH, FILES.teamTodos.file);
 if (!fs.existsSync(_teamTodosPath)) fs.writeFileSync(_teamTodosPath, '{}');
 
