@@ -1,11 +1,12 @@
 // ============================================================
-// POKEMON-SYSTEM.MJS — Fangen, Leveln, Entwickeln, Pokédex, PVP
+// POKEMON-SYSTEM.MJS — Fangen, Leveln, Entwickeln, Pokédex, PVP, Geheime Pokémon
 // ============================================================
 
 export const POKEMON_COMMANDS = [
   'pokestarter', 'wild', 'catch', 'pokemon', 'p', 'pokeinfo',
   'pokeactive', 'pokename', 'pokerelease', 'pokedex',
-  'pokeshop', 'pokebuy', 'poketrain', 'pokevolve', 'pokebattle', 'pokehelp'
+  'pokeshop', 'pokebuy', 'poketrain', 'pokevolve', 'pokebattle',
+  'pokesecret', 'pokehelp'
 ];
 
 export const POKEMON_HELP_TEXT = `
@@ -23,6 +24,7 @@ export const POKEMON_HELP_TEXT = `
 ▸ {P}poketrain <nr> — Pokémon trainieren (kostet Coins)
 ▸ {P}pokevolve <nr> — Pokémon entwickeln (falls bereit)
 ▸ {P}pokebattle @user — PVP-Kampf mit deinem aktiven Pokémon
+▸ {P}pokesecret <code> — Geheimcode einlösen für ein geheimes Pokémon
 `;
 
 const TYPE_EMOJI = {
@@ -32,16 +34,18 @@ const TYPE_EMOJI = {
 };
 
 const RARITY_INFO = {
-  starter:   { label: 'Starter',   emoji: '🌟' },
+  starter:   { label: 'Starter',    emoji: '🌟' },
   common:    { label: 'Gewöhnlich', emoji: '⚪' },
   uncommon:  { label: 'Ungewöhnlich', emoji: '🟢' },
-  rare:      { label: 'Selten',    emoji: '🔵' },
-  legendary: { label: 'Legendär',  emoji: '🟡' }
+  rare:      { label: 'Selten',     emoji: '🔵' },
+  legendary: { label: 'Legendär',   emoji: '🟡' },
+  secret:    { label: 'Geheim',     emoji: '🟣' }
 };
 
-const RARITY_WEIGHTS = { starter: 0, common: 55, uncommon: 30, rare: 12, legendary: 3 };
+const RARITY_WEIGHTS = { starter: 0, common: 55, uncommon: 30, rare: 12, legendary: 3, secret: 0 };
 
 const POKEMON_DB = {
+  // ---- Starter-Linien ----
   bisasam:    { name: 'Bisasam',    type: 'pflanze', catchRate: 60, evolvesAt: 12, evolvesTo: 'bisaknosp', hp: 45, power: 12, rarity: 'starter' },
   bisaknosp:  { name: 'Bisaknosp',  type: 'pflanze', catchRate: 40, evolvesAt: 28, evolvesTo: 'bisaflor',  hp: 65, power: 22, rarity: 'starter' },
   bisaflor:   { name: 'Bisaflor',   type: 'pflanze', catchRate: 15, evolvesAt: null, evolvesTo: null,      hp: 90, power: 38, rarity: 'starter' },
@@ -54,6 +58,7 @@ const POKEMON_DB = {
   schillok:   { name: 'Schillok',   type: 'wasser', catchRate: 40, evolvesAt: 30, evolvesTo: 'turtok',   hp: 66, power: 22, rarity: 'starter' },
   turtok:     { name: 'Turtok',     type: 'wasser', catchRate: 14, evolvesAt: null, evolvesTo: null,     hp: 92, power: 36, rarity: 'starter' },
 
+  // ---- Normale Wildpokémon ----
   rattfratz:  { name: 'Rattfratz',  type: 'normal', catchRate: 85, evolvesAt: 10, evolvesTo: 'rattikarl', hp: 30, power: 8,  rarity: 'common' },
   rattikarl:  { name: 'Rattikarl',  type: 'normal', catchRate: 55, evolvesAt: null, evolvesTo: null,      hp: 55, power: 18, rarity: 'common' },
 
@@ -88,7 +93,48 @@ const POKEMON_DB = {
   dragonair:  { name: 'Dragonair',  type: 'drache', catchRate: 10, evolvesAt: 55, evolvesTo: 'dragoran',  hp: 70, power: 36, rarity: 'legendary' },
   dragoran:   { name: 'Dragoran',   type: 'drache', catchRate: 3,  evolvesAt: null, evolvesTo: null,      hp: 100, power: 60, rarity: 'legendary' },
 
-  mewtu:      { name: 'Mewtu',      type: 'psycho', catchRate: 1, evolvesAt: null, evolvesTo: null, hp: 106, power: 80, rarity: 'legendary' }
+  mewtu:      { name: 'Mewtu',      type: 'psycho', catchRate: 1, evolvesAt: null, evolvesTo: null, hp: 106, power: 80, rarity: 'legendary' },
+
+  // ---- Neu hinzugefügte Pokémon ----
+  zubat:      { name: 'Zubat',      type: 'gift', catchRate: 75, evolvesAt: 22, evolvesTo: 'golbat', hp: 32, power: 12, rarity: 'common' },
+  golbat:     { name: 'Golbat',     type: 'gift', catchRate: 30, evolvesAt: null, evolvesTo: null,    hp: 68, power: 28, rarity: 'uncommon' },
+
+  enton:      { name: 'Enton',      type: 'wasser', catchRate: 70, evolvesAt: 24, evolvesTo: 'entoron', hp: 40, power: 12, rarity: 'common' },
+  entoron:    { name: 'Entoron',    type: 'wasser', catchRate: 30, evolvesAt: null, evolvesTo: null,     hp: 70, power: 30, rarity: 'uncommon' },
+
+  tentacha:   { name: 'Tentacha',   type: 'wasser', catchRate: 55, evolvesAt: 30, evolvesTo: 'tentoxa', hp: 38, power: 16, rarity: 'uncommon' },
+  tentoxa:    { name: 'Tentoxa',    type: 'wasser', catchRate: 20, evolvesAt: null, evolvesTo: null,     hp: 72, power: 32, rarity: 'rare' },
+
+  krabby:     { name: 'Krabby',     type: 'wasser', catchRate: 65, evolvesAt: 28, evolvesTo: 'kingler', hp: 36, power: 16, rarity: 'common' },
+  kingler:    { name: 'Kingler',    type: 'wasser', catchRate: 22, evolvesAt: null, evolvesTo: null,     hp: 66, power: 34, rarity: 'uncommon' },
+
+  mauzi:      { name: 'Mauzi',      type: 'normal', catchRate: 75, evolvesAt: 28, evolvesTo: 'snobilikat', hp: 32, power: 10, rarity: 'common' },
+  snobilikat: { name: 'Snobilikat', type: 'normal', catchRate: 35, evolvesAt: null, evolvesTo: null,       hp: 58, power: 24, rarity: 'uncommon' },
+
+  ponita:     { name: 'Ponita',     type: 'feuer', catchRate: 50, evolvesAt: 40, evolvesTo: 'gallopa', hp: 44, power: 22, rarity: 'uncommon' },
+  gallopa:    { name: 'Gallopa',    type: 'feuer', catchRate: 18, evolvesAt: null, evolvesTo: null,     hp: 78, power: 40, rarity: 'rare' },
+
+  machollo:   { name: 'Machollo',   type: 'normal', catchRate: 55, evolvesAt: 26, evolvesTo: 'maschock', hp: 48, power: 20, rarity: 'uncommon' },
+  maschock:   { name: 'Maschock',   type: 'normal', catchRate: 28, evolvesAt: 48, evolvesTo: 'machomei', hp: 72, power: 34, rarity: 'rare' },
+  machomei:   { name: 'Machomei',   type: 'normal', catchRate: 10, evolvesAt: null, evolvesTo: null,      hp: 98, power: 52, rarity: 'legendary' },
+
+  rettan:     { name: 'Rettan',     type: 'gift', catchRate: 65, evolvesAt: 22, evolvesTo: 'arbok', hp: 38, power: 16, rarity: 'common' },
+  arbok:      { name: 'Arbok',      type: 'gift', catchRate: 25, evolvesAt: null, evolvesTo: null,   hp: 66, power: 32, rarity: 'uncommon' },
+
+  smogon:     { name: 'Smogon',     type: 'gift', catchRate: 50, evolvesAt: 35, evolvesTo: 'smogmog', hp: 40, power: 18, rarity: 'uncommon' },
+  smogmog:    { name: 'Smogmog',    type: 'gift', catchRate: 20, evolvesAt: null, evolvesTo: null,     hp: 70, power: 34, rarity: 'rare' },
+
+  rihorn:     { name: 'Rihorn',     type: 'boden', catchRate: 55, evolvesAt: 42, evolvesTo: 'rizeros', hp: 52, power: 20, rarity: 'uncommon' },
+  rizeros:    { name: 'Rizeros',    type: 'boden', catchRate: 15, evolvesAt: null, evolvesTo: null,     hp: 92, power: 44, rarity: 'rare' },
+
+  flegmon:    { name: 'Flegmon',    type: 'wasser', catchRate: 45, evolvesAt: 38, evolvesTo: 'lahmus', hp: 60, power: 14, rarity: 'uncommon' },
+  lahmus:     { name: 'Lahmus',     type: 'wasser', catchRate: 12, evolvesAt: null, evolvesTo: null,    hp: 110, power: 38, rarity: 'rare' },
+
+  // ---- Geheime Pokémon (nicht in der normalen Wildsuche) ----
+  mew:        { name: 'Mew',        type: 'psycho', catchRate: 3, evolvesAt: null, evolvesTo: null, hp: 100, power: 70, rarity: 'secret' },
+  zapdos:     { name: 'Zapdos',     type: 'elektro', catchRate: 2, evolvesAt: null, evolvesTo: null, hp: 108, power: 75, rarity: 'secret' },
+  arktos:     { name: 'Arktos',     type: 'eis', catchRate: 2, evolvesAt: null, evolvesTo: null,     hp: 106, power: 74, rarity: 'secret' },
+  lavados:    { name: 'Lavados',    type: 'feuer', catchRate: 2, evolvesAt: null, evolvesTo: null,   hp: 104, power: 76, rarity: 'secret' }
 };
 
 const BALL_TYPES = {
@@ -97,8 +143,17 @@ const BALL_TYPES = {
   meisterball: { name: 'Meisterball', bonus: null, price: 5000 } // fängt immer
 };
 
+// Geheimcodes: einmal pro Spieler einlösbar, geben ein garantiertes geheimes Pokémon
+const SECRET_CODES = {
+  'MEWCODE2026':  'mew',
+  'ZAPCODE2026':  'zapdos',
+  'ICECODE2026':  'arktos',
+  'FIRECODE2026': 'lavados'
+};
+
 const ENCOUNTER_COOLDOWN_MS = 3 * 60 * 1000; // 3 Minuten
 const WILD_EXPIRES_MS = 5 * 60 * 1000;       // 5 Minuten Zeit zum Fangen
+const SECRET_ENCOUNTER_CHANCE = 0.015;       // 1.5% Chance auf ein geheimes Pokémon bei {P}wild
 
 function xpNeeded(level) {
   return 30 + level * 15;
@@ -114,13 +169,15 @@ function ensurePoke(users, jid) {
       dex: {},
       lastEncounter: 0,
       wild: null,
-      pokeballs: { pokeball: 5, superball: 0, meisterball: 0 }
+      pokeballs: { pokeball: 5, superball: 0, meisterball: 0 },
+      secretCodes: []
     };
   }
   const p = users[jid].poke;
   if (!p.team) p.team = [];
   if (!p.dex) p.dex = {};
   if (!p.pokeballs) p.pokeballs = { pokeball: 5, superball: 0, meisterball: 0 };
+  if (!p.secretCodes) p.secretCodes = [];
 }
 
 function pickWildSpecies() {
@@ -132,6 +189,11 @@ function pickWildSpecies() {
     if (roll <= 0) return id;
   }
   return pool[0][0];
+}
+
+function pickSecretSpecies() {
+  const pool = Object.entries(POKEMON_DB).filter(([, d]) => d.rarity === 'secret').map(([id]) => id);
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 function formatPoke(species, level, nickname) {
@@ -165,6 +227,32 @@ export function createPokemonSystem() {
     // ---- HILFE ----
     if (cmd === 'pokehelp') {
       await send('🐾 *Pokémon-Hilfe*\n' + POKEMON_HELP_TEXT.split('\n').filter(Boolean).map(l => l.replace(/\{P\}/g, activePrefix)).join('\n'));
+      return true;
+    }
+
+    // ---- SECRET CODE (funktioniert auch ohne Starter) ----
+    if (cmd === 'pokesecret') {
+      const code = (args[0] || '').toUpperCase();
+      if (!code) {
+        await send(`❌ Nutzung: ${activePrefix}pokesecret <code>`);
+        return true;
+      }
+      const speciesId = SECRET_CODES[code];
+      if (!speciesId) {
+        await send('❌ Ungültiger Geheimcode.');
+        return true;
+      }
+      if (p.secretCodes.includes(code)) {
+        await send('❌ Dieser Code wurde bereits eingelöst.');
+        return true;
+      }
+      p.secretCodes.push(code);
+      const uid = 'PK' + Date.now().toString(36) + randInt(100, 999);
+      p.team.push({ uid, species: speciesId, level: 15, xp: 0, nickname: null });
+      p.dex[speciesId] = true;
+      if (!p.active) p.active = uid;
+      persist();
+      await send(`🌟✨ Geheimcode akzeptiert! *${POKEMON_DB[speciesId].name}* schließt sich deinem Team an!\n${formatPoke(speciesId, 15, null)}`);
       return true;
     }
 
@@ -204,17 +292,30 @@ export function createPokemonSystem() {
         await send(`⏰ Warte noch ${remaining}s bis zum nächsten wilden Pokémon.`);
         return true;
       }
+
+      const isSecret = Math.random() < SECRET_ENCOUNTER_CHANCE;
       const avgLevel = p.team.length ? Math.round(p.team.reduce((s, x) => s + x.level, 0) / p.team.length) : 5;
-      const speciesId = pickWildSpecies();
-      const level = Math.max(1, randInt(Math.max(1, avgLevel - 3), avgLevel + 5));
-      p.wild = { species: speciesId, level, expiresAt: now + WILD_EXPIRES_MS };
+      const speciesId = isSecret ? pickSecretSpecies() : pickWildSpecies();
+      const level = isSecret
+        ? Math.max(20, avgLevel + randInt(5, 15))
+        : Math.max(1, randInt(Math.max(1, avgLevel - 3), avgLevel + 5));
+
+      p.wild = { species: speciesId, level, expiresAt: now + WILD_EXPIRES_MS, secret: isSecret };
       p.lastEncounter = now;
       persist();
       const d = POKEMON_DB[speciesId];
-      await send(
-        `🌿 Ein wildes Pokémon erscheint!\n${formatPoke(speciesId, level, null)}\nTyp: ${TYPE_EMOJI[d.type] || ''} ${d.type}\n\n` +
-        `Fange es mit ${activePrefix}catch [pokeball|superball|meisterball]\n(Du hast 5 Minuten Zeit, sonst flieht es.)`
-      );
+
+      if (isSecret) {
+        await send(
+          `✨🌌 *Du spürst eine geheimnisvolle Aura...*\nEin geheimes Pokémon erscheint!\n${formatPoke(speciesId, level, null)}\nTyp: ${TYPE_EMOJI[d.type] || ''} ${d.type}\n\n` +
+          `Es ist extrem schwer zu fangen! Fange es mit ${activePrefix}catch [pokeball|superball|meisterball]\n(Du hast 5 Minuten Zeit, sonst flieht es.)`
+        );
+      } else {
+        await send(
+          `🌿 Ein wildes Pokémon erscheint!\n${formatPoke(speciesId, level, null)}\nTyp: ${TYPE_EMOJI[d.type] || ''} ${d.type}\n\n` +
+          `Fange es mit ${activePrefix}catch [pokeball|superball|meisterball]\n(Du hast 5 Minuten Zeit, sonst flieht es.)`
+        );
+      }
       return true;
     }
 
@@ -238,6 +339,7 @@ export function createPokemonSystem() {
 
       const species = p.wild.species;
       const level = p.wild.level;
+      const wasSecret = !!p.wild.secret;
       const d = POKEMON_DB[species];
 
       let chance;
@@ -257,7 +359,8 @@ export function createPokemonSystem() {
         p.dex[species] = true;
         p.wild = null;
         persist();
-        await send(`✅ Gefangen! ${formatPoke(species, level, null)} wurde deinem Team hinzugefügt! (${BALL_TYPES[ballKey].name}, Chance war ${Math.round(chance)}%)`);
+        const prefix = wasSecret ? '🌟✨ UNGLAUBLICH! Ein geheimes Pokémon wurde gefangen!' : '✅ Gefangen!';
+        await send(`${prefix} ${formatPoke(species, level, null)} wurde deinem Team hinzugefügt! (${BALL_TYPES[ballKey].name}, Chance war ${Math.round(chance)}%)`);
       } else {
         persist();
         await send(`💨 Das Pokémon ist ausgebrochen! (Chance war ${Math.round(chance)}%) Versuch es nochmal mit ${activePrefix}catch.`);
@@ -294,7 +397,7 @@ export function createPokemonSystem() {
         : 'Keine weitere Entwicklung';
       await send(
         `📋 *${pk.nickname || d.name}*\n` +
-        `Spezies: ${d.name}\nTyp: ${TYPE_EMOJI[d.type] || ''} ${d.type}\n` +
+        `Spezies: ${d.name}\nTyp: ${TYPE_EMOJI[d.type] || ''} ${d.type}\nSeltenheit: ${RARITY_INFO[d.rarity]?.emoji || ''} ${RARITY_INFO[d.rarity]?.label || ''}\n` +
         `Level: ${pk.level}\nXP: ${pk.xp} / ${needed}\n` +
         `Stärke: ${effectivePower(pk.species, pk.level)}\nHP: ${d.hp + pk.level * 3}\n` +
         `Entwicklung: ${evolveInfo}`
