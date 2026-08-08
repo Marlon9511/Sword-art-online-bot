@@ -20,6 +20,8 @@ import { createTitleSystem, TITLE_COMMANDS, TITLE_HELP_TEXT, checkProgress, TITL
 import { createPokemonSystem, POKEMON_COMMANDS, POKEMON_HELP_TEXT } from './pokemon-system.mjs';
 import { createMenuSystem, MENU_COMMANDS } from './menu-system.mjs';
 import crypto from 'crypto';
+import { createAuthTools } from './web-auth.js';
+import { createGameRoutes } from './web-games.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
