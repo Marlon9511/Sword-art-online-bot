@@ -22,6 +22,7 @@ import { createMenuSystem, MENU_COMMANDS } from './menu-system.mjs';
 import crypto from 'crypto';
 import { createAuthTools } from './web-auth.js';
 import { createGameRoutes } from './web-games.js';
+import { createGuildBossSystem } from './guildboss-event.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -247,6 +248,7 @@ const guildSystem = createGuildSystem();
 const titleSystem = createTitleSystem();
 const pokemonSystem = createPokemonSystem();
 const menuSystem = createMenuSystem();
+const guildBoss = createGuildBossSystem(DATA_PATH);
 
 async function createBackup() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -1056,6 +1058,14 @@ const pendingApplications = new Map(); // sender -> { step, answers }
       console.error('[nachtsperre] Scheduler-Fehler:', e);
     }
   }, 60 * 1000); // jede Minute prüfen
+setInterval(async () => {
+  try {
+    await guildBoss.checkExpiry({
+      send: async (text, opts) => { try { await sock.sendMessage(OWNER_PRIV, { text, ...opts }); } catch (e) {} },
+      sock, users, guilds, save, FILES, getNumberMention
+    });
+  } catch (e) { console.error('[guildboss] Expiry-Check Fehler:', e); }
+}, 60 * 1000);
 async function updateBotProfile() {
     try {
       const profileName = `Sword-art-online-bot (${sessionName})`;
