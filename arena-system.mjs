@@ -195,7 +195,7 @@ export const RAGNAROK_ITEM_ID = 'w_ragnarok';
 // Pool aller Secret-Items, die per Kiste (1:1000) fallen können.
 // ownerOnly-Items (Excalibur) sind hiervon immer ausgeschlossen.
 export const SECRET_POOL = Object.keys(ITEM_DB).filter(
-  (id) => ITEM_DB[id].secret && !ITEM_DB[id].ownerOnly
+  (id) => ITEM_DB[id].secret && !ITEM_DB[id].ownerOnly && !ITEM_DB[id].eventOnly
 );
 
 export const ARENA_SHOP_ITEM = {
