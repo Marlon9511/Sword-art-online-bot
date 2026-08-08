@@ -32,18 +32,37 @@
     font-family:var(--font-body);
     line-height:1.6;
     overflow-x:hidden;
-    background-image:
-      radial-gradient(ellipse 90% 60% at 50% 0%, rgba(111,224,255,0.10), transparent 60%),
-      radial-gradient(ellipse 70% 50% at 100% 100%, rgba(63,214,255,0.06), transparent 60%);
   }
   @media (prefers-reduced-motion: reduce){
     *{animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition-duration:0.01ms !important; scroll-behavior:auto !important;}
   }
 
-  /* ---------- Aincrad backdrop ---------- */
-  .aincrad-backdrop{
-    position:fixed;inset:0;z-index:-1;
+  /* ---------- Video background layer ---------- */
+  .video-bg{
+    position:fixed;inset:0;z-index:-3;
+    overflow:hidden;
     background:var(--void);
+  }
+  .video-bg video{
+    position:absolute;top:50%;left:50%;
+    min-width:100%;min-height:100%;
+    width:auto;height:auto;
+    transform:translate(-50%,-50%);
+    object-fit:cover;
+    opacity:0;
+    transition:opacity 1.5s ease;
+  }
+  .video-bg video.loaded{opacity:0.35;}
+  .video-bg .scrim{
+    position:absolute;inset:0;
+    background:
+      radial-gradient(ellipse 90% 60% at 50% 0%, rgba(4,7,12,0.55), rgba(4,7,12,0.85) 70%),
+      linear-gradient(180deg, rgba(4,7,12,0.4) 0%, rgba(4,7,12,0.7) 60%, rgba(4,7,12,0.92) 100%);
+  }
+
+  /* ---------- Aincrad backdrop (fallback / overlay effect) ---------- */
+  .aincrad-backdrop{
+    position:fixed;inset:0;z-index:-2;
     overflow:hidden;
     opacity:0;
     transition:opacity 1.2s ease;
@@ -69,6 +88,97 @@
       radial-gradient(ellipse 60% 50% at 50% 100%, rgba(244,201,75,0.10), transparent 60%),
       radial-gradient(ellipse 50% 40% at 70% 60%, rgba(87,214,141,0.10), transparent 60%);
   }
+
+  /* ---------- Notice banner (only shows if no video source configured) ---------- */
+  .video-notice{
+    position:fixed;bottom:16px;right:16px;z-index:50;
+    max-width:280px;
+    background:rgba(4,7,12,0.9);
+    border:1px solid var(--cyan-soft);
+    padding:12px 14px;
+    font-family:var(--font-body);
+    font-size:12px;
+    color:var(--dim);
+    display:none;
+  }
+  .video-notice.show{display:block;}
+  .video-notice strong{color:var(--cyan);}
+  .video-notice button{
+    margin-top:8px;
+    font-family:var(--font-display);
+    font-size:11px;
+    letter-spacing:0.05em;
+    text-transform:uppercase;
+    background:none;border:1px solid var(--cyan-soft);color:var(--cyan);
+    padding:4px 10px;cursor:pointer;
+  }
+
+  /* ---------- Auth: nav status + modal ---------- */
+  .auth-slot{display:flex;align-items:center;gap:10px;}
+  .auth-status{
+    font-family:var(--font-display);font-size:12px;color:var(--dim);
+    display:none;align-items:center;gap:8px;
+  }
+  .auth-status.show{display:flex;}
+  .auth-status .dot{width:7px;height:7px;border-radius:50%;background:#57d68d;box-shadow:0 0 8px #57d68d;}
+  .btn.ghost{background:transparent;border-color:rgba(111,224,255,0.4);color:var(--dim);}
+  .btn.ghost:hover{color:var(--cyan);border-color:var(--cyan);background:var(--cyan-dim);}
+
+  .modal-overlay{
+    position:fixed;inset:0;z-index:200;
+    background:rgba(4,7,12,0.82);
+    backdrop-filter:blur(4px);
+    display:none;align-items:center;justify-content:center;
+    padding:20px;
+  }
+  .modal-overlay.show{display:flex;}
+  .modal{
+    position:relative;
+    width:100%;max-width:400px;
+    padding:36px 30px;
+  }
+  .modal h2{font-size:24px;margin-bottom:6px;text-align:center;}
+  .modal .sub{color:var(--dim);font-size:13px;text-align:center;margin-bottom:24px;font-family:var(--font-body);}
+  .auth-tabs{display:flex;border:1px solid var(--cyan-soft);margin-bottom:22px;}
+  .auth-tab{
+    flex:1;text-align:center;padding:10px;cursor:pointer;
+    font-family:var(--font-display);font-size:13px;letter-spacing:0.08em;text-transform:uppercase;
+    color:var(--dim);transition:all .2s ease;
+  }
+  .auth-tab.active{background:var(--cyan-dim);color:var(--cyan);}
+  .field{margin-bottom:16px;}
+  .field label{
+    display:block;font-family:var(--font-display);font-size:12px;letter-spacing:0.08em;
+    text-transform:uppercase;color:var(--dim);margin-bottom:6px;
+  }
+  .field input{
+    width:100%;padding:11px 12px;
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(111,224,255,0.3);
+    color:var(--white);font-family:var(--font-body);font-size:14px;
+    outline:none;transition:border-color .2s ease;
+  }
+  .field input:focus{border-color:var(--cyan);}
+  .auth-submit{width:100%;text-align:center;margin-top:6px;cursor:pointer;border:1px solid var(--cyan);}
+  .auth-msg{
+    margin-top:14px;font-size:13px;text-align:center;font-family:var(--font-body);
+    min-height:18px;
+  }
+  .auth-msg.error{color:var(--hp);}
+  .auth-msg.ok{color:#57d68d;}
+  .modal-close{
+    position:absolute;top:14px;right:16px;
+    background:none;border:none;color:var(--dim);font-size:20px;cursor:pointer;
+    line-height:1;padding:4px;
+  }
+  .modal-close:hover{color:var(--cyan);}
+  .modal-loading{text-align:center;color:var(--dim);font-size:13px;display:none;margin-top:10px;}
+  .modal-loading.show{display:block;}
+  .security-note{
+    margin-top:20px;padding-top:16px;border-top:1px solid rgba(111,224,255,0.15);
+    font-size:11px;color:var(--dim);text-align:center;line-height:1.5;
+  }
+
   a{color:inherit;text-decoration:none;}
   .wrap{max-width:1100px;margin:0 auto;padding:0 24px;}
   h1,h2,h3{font-family:var(--font-display);font-weight:700;letter-spacing:0.01em;}
@@ -230,10 +340,24 @@
 </head>
 <body>
 
+<!--
+  VIDEO-HINTERGRUND:
+  Trage hier den Pfad/die URL zu deinem EIGENEN Clip ein (z.B. eigene Aufnahmen,
+  selbst erstelltes Fan-Footage oder lizenzfreies Material). Ich kann keine
+  Original-Ausschnitte aus Sword Art Online einbinden, da diese urheberrechtlich
+  geschützt sind. Ohne gültige Quelle läuft automatisch der animierte
+  Aincrad-Fallback (Sterne + Aincrad-Silhouette) weiter unten.
+-->
+<div class="video-bg">
+  <video id="bgVideo" autoplay muted loop playsinline>
+    <!-- <source src="DEIN-EIGENER-CLIP.mp4" type="video/mp4"> -->
+  </video>
+  <div class="scrim"></div>
+</div>
+
 <div class="aincrad-backdrop" id="aincradBg">
   <div class="starfield" id="starfield"></div>
   <svg class="aincrad-svg" viewBox="0 0 800 620" preserveAspectRatio="xMidYMax meet">
-    <!-- Aincrad: stacked conical floors, widest at base, narrowing upward -->
     <g>
       <polygon class="tier" points="400,0 430,40 370,40" />
       <polygon class="tier" points="400,30 460,90 340,90" />
@@ -254,6 +378,12 @@
   <div class="color-wash"></div>
 </div>
 
+<div class="video-notice" id="videoNotice">
+  <strong>Kein Video hinterlegt.</strong><br>
+  Füge im HTML bei <code>#bgVideo</code> eine eigene Videoquelle (mp4) ein, um dort dein Hintergrundvideo abzuspielen. Aktuell läuft der animierte Aincrad-Fallback.
+  <br><button onclick="document.getElementById('videoNotice').classList.remove('show')">Verstanden</button>
+</div>
+
 <nav>
   <div class="wrap">
     <div class="brand"><span class="hex"></span>AINCRAD // PLAYER MENU</div>
@@ -261,9 +391,43 @@
       <a href="#features">Fähigkeiten</a>
       <a href="#team">Team</a>
     </div>
-    <a class="btn filled" href="https://chat.whatsapp.com/DBiDcF2s16FEWiGKyZA7Nl" target="_blank" rel="noopener">Community</a>
+    <div class="auth-slot">
+      <span class="auth-status" id="authStatus"><span class="dot"></span><span id="authStatusText"></span></span>
+      <button class="btn ghost" id="loginBtn">Anmelden</button>
+      <a class="btn filled" href="https://chat.whatsapp.com/DBiDcF2s16FEWiGKyZA7Nl" target="_blank" rel="noopener">Community</a>
+    </div>
   </div>
 </nav>
+
+<div class="modal-overlay" id="authOverlay">
+  <div class="window modal">
+    <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+    <button class="modal-close" id="authClose" aria-label="Schließen">&times;</button>
+    <h2 id="authTitle">Willkommen zurück</h2>
+    <p class="sub" id="authSub">Melde dich mit deiner ID an</p>
+
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="tabLogin">Anmelden</div>
+      <div class="auth-tab" id="tabRegister">Registrieren</div>
+    </div>
+
+    <form id="authForm">
+      <div class="field">
+        <label for="authId">ID</label>
+        <input type="text" id="authId" autocomplete="username" placeholder="z.B. Kirito92" required maxlength="40">
+      </div>
+      <div class="field">
+        <label for="authPass">Passwort</label>
+        <input type="password" id="authPass" autocomplete="current-password" placeholder="••••••••" required minlength="4" maxlength="100">
+      </div>
+      <button type="submit" class="btn filled auth-submit" id="authSubmitBtn">Anmelden</button>
+      <div class="modal-loading" id="authLoading">Verbinde mit Aincrad-Server...</div>
+      <div class="auth-msg" id="authMsg"></div>
+    </form>
+
+    <p class="security-note">Demo-System ohne echtes Backend: Zugangsdaten werden unverschlüsselt gespeichert. Bitte kein echtes/wiederverwendetes Passwort nutzen.</p>
+  </div>
+</div>
 
 <header class="hero">
   <div class="wrap hero-inner">
@@ -423,20 +587,191 @@
     starfield.appendChild(s);
   }
 
-  // Aincrad-Hintergrund erst ab den Befehlen/Features einblenden
+  // Video-Hintergrund prüfen: läuft ein eigener Clip? Sonst Aincrad-Fallback zeigen.
+  const bgVideo = document.getElementById('bgVideo');
+  const videoNotice = document.getElementById('videoNotice');
   const aincradBg = document.getElementById('aincradBg');
-  const featuresSection = document.getElementById('features');
-  const bgObserver = new IntersectionObserver((entries)=>{
-    entries.forEach(e=>{
-      if(e.isIntersecting){ aincradBg.classList.add('show'); }
+
+  const hasSource = bgVideo.querySelector('source') !== null;
+
+  if (!hasSource) {
+    // Kein Clip hinterlegt -> Hinweis zeigen, Fallback läuft weiter
+    videoNotice.classList.add('show');
+    aincradBg.classList.add('show');
+  } else {
+    bgVideo.addEventListener('canplay', () => {
+      bgVideo.classList.add('loaded');
     });
-  }, {threshold:0, rootMargin:'0px 0px -60% 0px'});
-  bgObserver.observe(featuresSection);
+    bgVideo.addEventListener('error', () => {
+      videoNotice.classList.add('show');
+      aincradBg.classList.add('show');
+    });
+    // Aincrad-Effekt trotzdem ab den Features leicht einblenden (subtiler Layer über Video)
+    const featuresSection = document.getElementById('features');
+    const bgObserver = new IntersectionObserver((entries)=>{
+      entries.forEach(e=>{
+        if(e.isIntersecting){ aincradBg.style.opacity = '0.25'; aincradBg.classList.add('show'); }
+      });
+    }, {threshold:0, rootMargin:'0px 0px -60% 0px'});
+    bgObserver.observe(featuresSection);
+  }
 
   const io = new IntersectionObserver((entries)=>{
     entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
   }, {threshold:0.12});
   document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+
+  // ---------- Auth-System (Demo, ohne echtes Backend) ----------
+  // Nutzerliste wird geteilt gespeichert (shared=true), damit sich Registrierungen
+  // über verschiedene Sitzungen/Geräte hinweg wiederfinden. Passwörter liegen dabei
+  // im Klartext im geteilten Speicher -> NICHT für echte/sensible Passwörter geeignet.
+  const USERS_KEY = 'registered_users';
+  let currentUser = null; // nur für die Dauer dieser Seiten-Sitzung im Speicher (kein localStorage)
+
+  const overlay = document.getElementById('authOverlay');
+  const loginBtn = document.getElementById('loginBtn');
+  const authClose = document.getElementById('authClose');
+  const tabLogin = document.getElementById('tabLogin');
+  const tabRegister = document.getElementById('tabRegister');
+  const authForm = document.getElementById('authForm');
+  const authId = document.getElementById('authId');
+  const authPass = document.getElementById('authPass');
+  const authMsg = document.getElementById('authMsg');
+  const authTitle = document.getElementById('authTitle');
+  const authSub = document.getElementById('authSub');
+  const authSubmitBtn = document.getElementById('authSubmitBtn');
+  const authLoading = document.getElementById('authLoading');
+  const authStatus = document.getElementById('authStatus');
+  const authStatusText = document.getElementById('authStatusText');
+
+  let mode = 'login'; // 'login' | 'register'
+
+  function setMode(newMode){
+    mode = newMode;
+    authMsg.textContent = '';
+    authMsg.className = 'auth-msg';
+    if(mode === 'login'){
+      tabLogin.classList.add('active'); tabRegister.classList.remove('active');
+      authTitle.textContent = 'Willkommen zurück';
+      authSub.textContent = 'Melde dich mit deiner ID an';
+      authSubmitBtn.textContent = 'Anmelden';
+      authPass.autocomplete = 'current-password';
+    } else {
+      tabRegister.classList.add('active'); tabLogin.classList.remove('active');
+      authTitle.textContent = 'Charakter erstellen';
+      authSub.textContent = 'Wähle eine ID und ein Passwort';
+      authSubmitBtn.textContent = 'Registrieren';
+      authPass.autocomplete = 'new-password';
+    }
+  }
+
+  function openModal(){ overlay.classList.add('show'); authId.focus(); }
+  function closeModal(){ overlay.classList.remove('show'); authForm.reset(); authMsg.textContent=''; authMsg.className='auth-msg'; }
+
+  loginBtn.addEventListener('click', () => {
+    if(currentUser){
+      // eingeloggt -> Klick loggt aus
+      currentUser = null;
+      updateAuthUI();
+      return;
+    }
+    setMode('login');
+    openModal();
+  });
+  authClose.addEventListener('click', closeModal);
+  overlay.addEventListener('click', (e)=>{ if(e.target === overlay) closeModal(); });
+  tabLogin.addEventListener('click', ()=> setMode('login'));
+  tabRegister.addEventListener('click', ()=> setMode('register'));
+
+  function updateAuthUI(){
+    if(currentUser){
+      authStatus.classList.add('show');
+      authStatusText.textContent = currentUser;
+      loginBtn.textContent = 'Abmelden';
+    } else {
+      authStatus.classList.remove('show');
+      loginBtn.textContent = 'Anmelden';
+    }
+  }
+
+  async function getUsers(){
+    try{
+      const res = await window.storage.get(USERS_KEY, true);
+      return res ? JSON.parse(res.value) : {};
+    }catch(err){
+      return {};
+    }
+  }
+
+  async function saveUsers(users){
+    try{
+      const res = await window.storage.set(USERS_KEY, JSON.stringify(users), true);
+      return !!res;
+    }catch(err){
+      return false;
+    }
+  }
+
+  authForm.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const id = authId.value.trim();
+    const pass = authPass.value;
+    authMsg.textContent = '';
+    authMsg.className = 'auth-msg';
+
+    if(!id || !pass){
+      authMsg.textContent = 'Bitte ID und Passwort ausfüllen.';
+      authMsg.className = 'auth-msg error';
+      return;
+    }
+
+    authSubmitBtn.disabled = true;
+    authLoading.classList.add('show');
+
+    try{
+      const users = await getUsers();
+
+      if(mode === 'register'){
+        if(users[id]){
+          authMsg.textContent = 'Diese ID ist bereits vergeben.';
+          authMsg.className = 'auth-msg error';
+        } else {
+          users[id] = pass;
+          const ok = await saveUsers(users);
+          if(ok){
+            authMsg.textContent = 'Registrierung erfolgreich! Du bist jetzt angemeldet.';
+            authMsg.className = 'auth-msg ok';
+            currentUser = id;
+            updateAuthUI();
+            setTimeout(closeModal, 900);
+          } else {
+            authMsg.textContent = 'Speichern fehlgeschlagen. Bitte erneut versuchen.';
+            authMsg.className = 'auth-msg error';
+          }
+        }
+      } else {
+        if(!users[id]){
+          authMsg.textContent = 'Diese ID ist nicht registriert.';
+          authMsg.className = 'auth-msg error';
+        } else if(users[id] !== pass){
+          authMsg.textContent = 'Falsches Passwort.';
+          authMsg.className = 'auth-msg error';
+        } else {
+          authMsg.textContent = 'Anmeldung erfolgreich!';
+          authMsg.className = 'auth-msg ok';
+          currentUser = id;
+          updateAuthUI();
+          setTimeout(closeModal, 700);
+        }
+      }
+    } catch(err){
+      authMsg.textContent = 'Verbindung zum Server fehlgeschlagen.';
+      authMsg.className = 'auth-msg error';
+    } finally {
+      authSubmitBtn.disabled = false;
+      authLoading.classList.remove('show');
+    }
+  });
 </script>
 
 </body>
