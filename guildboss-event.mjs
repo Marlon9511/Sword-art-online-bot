@@ -1,0 +1,345 @@
+import fs from 'fs';
+import path from 'path';
+
+// ⚠️ Passe diese beiden Zeilen an dein Gilden-Datenmodell an, falls es anders
+// aufgebaut ist als angenommen (guilds[guildId] = { name, members: [jid,...] }).
+function findUserGuildId(users, guilds, userJid) {
+  // Variante A: User speichert seine Gilden-ID direkt
+  if (users[userJid]?.guildId && guilds[users[userJid].guildId]) {
+    return users[userJid].guildId;
+  }
+  // Variante B: Gilde hat ein members[]-Array mit JIDs
+  for (const [gid, g] of Object.entries(guilds)) {
+    if (Array.isArray(g.members) && g.members.includes(userJid)) return gid;
+  }
+  return null;
+}
+
+export function createGuildBossSystem(DATA_PATH) {
+  const BOSS_FILE = path.join(DATA_PATH, 'guildboss.json');
+
+  const defaultState = {
+    active: false,
+    name: null,
+    maxHp: 0,
+    hp: 0,
+    startedAt: null,
+    endsAt: null,
+    startedBy: null,
+    originChat: null,        // Gruppe, in der gestartet wurde (für Status-Updates)
+    damageByGuild: {},       // { guildId: totalDamage }
+    damageByUser: {},        // { userJid: totalDamage }
+    lastAttack: {}           // { userJid: timestamp } für Cooldown
+  };
+
+  let state = loadState();
+
+  function loadState() {
+    try {
+      if (!fs.existsSync(BOSS_FILE)) {
+        fs.writeFileSync(BOSS_FILE, JSON.stringify(defaultState, null, 2));
+        return { ...defaultState };
+      }
+      const raw = JSON.parse(fs.readFileSync(BOSS_FILE, 'utf8'));
+      return { ...defaultState, ...raw };
+    } catch (e) {
+      console.error('[guildboss] Fehler beim Laden:', e);
+      return { ...defaultState };
+    }
+  }
+
+  function saveState() {
+    try {
+      fs.writeFileSync(BOSS_FILE, JSON.stringify(state, null, 2));
+    } catch (e) {
+      console.error('[guildboss] Fehler beim Speichern:', e);
+    }
+  }
+
+  const ATTACK_COOLDOWN_MS = 3 * 60 * 1000; // 3 Minuten pro Spieler
+  const BOSS_NAMES = [
+    'Der Skelettreaper von Floor 74', 'Heathcliffs Schatten', 'Der Sturmdrache Kayaba',
+    'Der Kristallgolem von Floor 22', 'Der Verzerrte Wächter'
+  ];
+
+  function hpBar(hp, maxHp, len = 20) {
+    const filled = Math.max(0, Math.min(len, Math.round((hp / maxHp) * len)));
+    return '🟥'.repeat(filled) + '⬜'.repeat(len - filled);
+  }
+
+  function formatTimeLeft(ms) {
+    if (ms <= 0) return '0m';
+    const totalMin = Math.ceil(ms / 60000);
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  }
+
+  function getTopGuilds(limit = 5) {
+    return Object.entries(state.damageByGuild)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit);
+  }
+
+  async function endEvent({ send, sock, users, guilds, save, FILES, getNumberMention }, reason = 'time') {
+    if (!state.active) return;
+
+    const topGuilds = getTopGuilds(1);
+    const totalDamage = Object.values(state.damageByGuild).reduce((a, b) => a + b, 0);
+
+    if (!topGuilds.length || totalDamage === 0) {
+      state = { ...defaultState };
+      saveState();
+      try {
+        await sock.sendMessage(state.originChat || (await send('ℹ️ Boss-Event beendet — es wurde kein Schaden verursacht, keine Belohnung vergeben.')), {});
+      } catch (e) {}
+      return;
+    }
+
+    const [winningGuildId, winningDamage] = topGuilds[0];
+    const winningGuild = guilds[winningGuildId];
+    const guildName = winningGuild?.name || winningGuildId;
+    const members = Array.isArray(winningGuild?.members) ? winningGuild.members : [];
+
+    // Belohnung: Coins + XP für alle Mitglieder der siegreichen Gilde
+    const REWARD_COINS_PER_MEMBER = 300;
+    const REWARD_XP_PER_MEMBER = 100;
+    const mentions = [];
+
+    for (const jid of members) {
+      if (!users[jid]) continue;
+      users[jid].coins = (users[jid].coins || 0) + REWARD_COINS_PER_MEMBER;
+      users[jid].xp = (users[jid].xp || 0) + REWARD_XP_PER_MEMBER;
+      mentions.push(jid);
+    }
+
+    // Bonus für den Top-Damage-Dealer (unabhängig von der Gilde)
+    const topPlayerEntry = Object.entries(state.damageByUser).sort((a, b) => b[1] - a[1])[0];
+    let topPlayerLine = '';
+    if (topPlayerEntry) {
+      const [topJid, topDmg] = topPlayerEntry;
+      if (users[topJid]) {
+        users[topJid].coins = (users[topJid].coins || 0) + 150;
+        users[topJid].xp = (users[topJid].xp || 0) + 50;
+        mentions.push(topJid);
+        const mention = await getNumberMention(topJid, sock);
+        topPlayerLine = `\n⚔️ Höchster Einzelschaden: ${mention} (${topDmg} DMG) — Bonus: +150 Coins, +50 XP`;
+      }
+    }
+
+    save(FILES.users, users);
+
+    const guildRanking = getTopGuilds(5)
+      .map(([gid, dmg], i) => `${i + 1}. ${guilds[gid]?.name || gid} — ${dmg} DMG`)
+      .join('\n');
+
+    const reasonText = reason === 'dead' ? '💀 Der Boss wurde besiegt!' : '⏳ Die Zeit ist abgelaufen.';
+
+    const summary =
+      `⚔️ *— CLAN-BOSS EVENT BEENDET —* ⚔️\n` +
+      `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+      `${reasonText}\n\n` +
+      `🏆 *Siegreiche Gilde:* ${guildName}\n` +
+      `💥 Gesamtschaden: ${winningDamage} DMG\n` +
+      `🎁 Belohnung pro Mitglied: +${REWARD_COINS_PER_MEMBER} Coins, +${REWARD_XP_PER_MEMBER} XP` +
+      topPlayerLine +
+      `\n\n📊 *Schadensrangliste (Gilden):*\n${guildRanking}\n` +
+      `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈`;
+
+    try {
+      if (state.originChat) {
+        await sock.sendMessage(state.originChat, { text: summary, mentions });
+      } else {
+        await send(summary, { mentions });
+      }
+    } catch (e) {
+      await send(summary, { mentions });
+    }
+
+    state = { ...defaultState };
+    saveState();
+  }
+
+  // Wird vom Hauptscript regelmäßig aufgerufen (z.B. im 60s-Interval), um
+  // abgelaufene Events automatisch zu beenden.
+  async function checkExpiry(ctx) {
+    if (!state.active) return;
+    if (state.endsAt && Date.now() >= state.endsAt) {
+      await endEvent(ctx, 'time');
+    }
+  }
+
+  async function handle(ctx) {
+    const {
+      cmd, args, sender, from, isGroup, activePrefix, send, sock,
+      users, guilds, save, FILES, ensureUser, normalizeJid,
+      getNumberMention, randInt, isAuthorized
+    } = ctx;
+
+    // ---- START ----
+    if (cmd === 'bossevent') {
+      const sub = (args[0] || '').toLowerCase();
+
+      if (sub === 'start') {
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) {
+          await send('❌ Nur Owner/CoOwner dürfen ein Boss-Event starten.');
+          return true;
+        }
+        if (state.active) {
+          await send('❌ Es läuft bereits ein Boss-Event. Beende es zuerst mit ?bossevent end.');
+          return true;
+        }
+
+        const hp = parseInt(args[1]);
+        const minutes = parseInt(args[2]) || 60;
+        if (!hp || hp < 100) {
+          await send(`❌ Nutzung: ${activePrefix}bossevent start <hp> [minuten]\nBeispiel: ${activePrefix}bossevent start 5000 60`);
+          return true;
+        }
+
+        const bossName = BOSS_NAMES[randInt(0, BOSS_NAMES.length - 1)];
+
+        state = {
+          ...defaultState,
+          active: true,
+          name: bossName,
+          maxHp: hp,
+          hp,
+          startedAt: Date.now(),
+          endsAt: Date.now() + minutes * 60 * 1000,
+          startedBy: sender,
+          originChat: from,
+          damageByGuild: {},
+          damageByUser: {},
+          lastAttack: {}
+        };
+        saveState();
+
+        await send(
+          `⚔️ *— CLAN-BOSS ERSCHEINT —* ⚔️\n` +
+          `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+          `👹 *${bossName}*\n` +
+          `❤️ HP: ${hp} / ${hp}\n` +
+          `${hpBar(hp, hp)}\n` +
+          `⏳ Dauer: ${minutes} Minuten\n\n` +
+          `Kämpft mit euren Gilden gemeinsam! Nutzt:\n` +
+          `➡️ ${activePrefix}bossattack — Schaden zufügen\n` +
+          `➡️ ${activePrefix}bossevent status — Status anzeigen\n\n` +
+          `🏆 Die Gilde mit dem meisten Gesamtschaden gewinnt die Belohnung!\n` +
+          `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈`
+        );
+        return true;
+      }
+
+      if (sub === 'end') {
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) {
+          await send('❌ Nur Owner/CoOwner dürfen das Event abbrechen.');
+          return true;
+        }
+        if (!state.active) {
+          await send('ℹ️ Es läuft aktuell kein Boss-Event.');
+          return true;
+        }
+        await endEvent(ctx, 'manual');
+        return true;
+      }
+
+      if (sub === 'status' || !sub) {
+        if (!state.active) {
+          await send('ℹ️ Aktuell erscheint kein Clan-Boss. Der Owner kann eins mit ?bossevent start <hp> [minuten] aktivieren.');
+          return true;
+        }
+        const timeLeft = formatTimeLeft(state.endsAt - Date.now());
+        const guildRanking = getTopGuilds(5)
+          .map(([gid, dmg], i) => `${i + 1}. ${guilds[gid]?.name || gid} — ${dmg} DMG`)
+          .join('\n') || '(noch kein Schaden)';
+
+        await send(
+          `👹 *${state.name}*\n` +
+          `❤️ HP: ${Math.max(0, state.hp)} / ${state.maxHp}\n` +
+          `${hpBar(state.hp, state.maxHp)}\n` +
+          `⏳ Verbleibend: ${timeLeft}\n\n` +
+          `📊 *Aktuelle Gilden-Rangliste:*\n${guildRanking}\n\n` +
+          `Nutze ${activePrefix}bossattack, um mitzukämpfen!`
+        );
+        return true;
+      }
+
+      await send(`Nutzung: ${activePrefix}bossevent start <hp> [minuten] | status | end`);
+      return true;
+    }
+
+    // ---- ATTACK ----
+    if (cmd === 'bossattack' || cmd === 'bossangriff') {
+      if (!state.active) {
+        await send('ℹ️ Aktuell erscheint kein Clan-Boss zum Angreifen.');
+        return true;
+      }
+
+      ensureUser(sender);
+      const normalizedSender = normalizeJid(sender);
+      const guildId = findUserGuildId(users, guilds, normalizedSender);
+
+      if (!guildId) {
+        await send('❌ Du musst Mitglied einer Gilde sein, um am Clan-Boss-Event teilzunehmen.');
+        return true;
+      }
+
+      const now = Date.now();
+      const last = state.lastAttack[normalizedSender] || 0;
+      if (now - last < ATTACK_COOLDOWN_MS) {
+        const remaining = Math.ceil((ATTACK_COOLDOWN_MS - (now - last)) / 1000);
+        const mins = Math.floor(remaining / 60);
+        const secs = remaining % 60;
+        await send(`⏰ Du musst noch ${mins}:${secs.toString().padStart(2, '0')} warten, bevor du erneut angreifen kannst.`);
+        return true;
+      }
+
+      // Schaden: Basis + Zufall, optional durch ausgerüstete Waffe beeinflussbar
+      // (falls du arena.ITEM_DB verfügbar hast, kannst du hier die "power" einbauen)
+      const baseDamage = randInt(20, 80);
+      const critChance = randInt(1, 100) <= 10; // 10% Crit-Chance
+      const damage = critChance ? baseDamage * 2 : baseDamage;
+
+      state.hp = Math.max(0, state.hp - damage);
+      state.damageByGuild[guildId] = (state.damageByGuild[guildId] || 0) + damage;
+      state.damageByUser[normalizedSender] = (state.damageByUser[normalizedSender] || 0) + damage;
+      state.lastAttack[normalizedSender] = now;
+
+      // Kleiner XP-Bonus fürs Mitmachen
+      users[normalizedSender].xp = (users[normalizedSender].xp || 0) + 5;
+      save(FILES.users, users);
+      saveState();
+
+      const guildName = guilds[guildId]?.name || guildId;
+      const critText = critChance ? '💥 KRITISCHER TREFFER! ' : '';
+
+      await send(
+        `⚔️ ${critText}Du hast dem Boss *${damage}* Schaden zugefügt!\n` +
+        `👹 ${state.name}: ${Math.max(0, state.hp)} / ${state.maxHp} HP\n` +
+        `${hpBar(state.hp, state.maxHp)}\n` +
+        `🛡️ Für Gilde: ${guildName}`
+      );
+
+      if (state.hp <= 0) {
+        await endEvent(ctx, 'dead');
+      }
+
+      return true;
+    }
+
+    return false;
+  }
+
+  return {
+    handle,
+    checkExpiry,
+    COMMANDS: ['bossevent', 'bossattack', 'bossangriff'],
+    HELP_TEXT:
+`⚔️ *Clan-Boss-Event*
+${'{P}'}bossevent start <hp> [min] — Boss starten (Owner)
+${'{P}'}bossevent status — Boss-Status ansehen
+${'{P}'}bossevent end — Event abbrechen (Owner)
+${'{P}'}bossattack — Dem Boss Schaden zufügen`
+  };
+}
