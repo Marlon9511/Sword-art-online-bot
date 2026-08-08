@@ -803,7 +803,8 @@ const RARITY_INFO = {
   uncommon:  { label: 'Ungewöhnlich', emoji: '🟢', weight: 30 },
   rare:      { label: 'Selten', emoji: '🔵', weight: 15 },
   epic:      { label: 'Episch', emoji: '🟣', weight: 8 },
-  legendary: { label: 'Legendär', emoji: '🟡', weight: 2 }
+  legendary: { label: 'Legendär', emoji: '🟡', weight: 2 },
+  secret:    { label: 'Geheim', emoji: '⚫', weight: 0 }
 };
 const ITEM_DB = {
   // ---- WAFFEN ----
