@@ -160,6 +160,19 @@ export const ITEM_DB = {
     ownerOnly: true
   },
 
+// ---- RAGNAROK — Event-exklusive Waffe, NUR über Clan-Boss-Events erhältlich ----
+  // Kann nicht gekauft, gefunden oder über Kisten erhalten werden.
+  // Wird ausschließlich vom Boss-Event-System vergeben (siehe guildboss-event.mjs).
+  w_ragnarok: {
+    name: 'Ragnarok',
+    trueName: 'Ragnarok — Die Klinge der Götterdämmerung',
+    type: 'weapon',
+    rarity: 'secret',
+    power: 200,
+    secret: true,
+    eventOnly: true,      // kann nicht via Kiste/Shop/Duell-Gegner erhalten werden
+    bossBonus: 0.75        // +75% ZUSÄTZLICHER Bonus, aber NUR im Clan-Boss-Kampf
+  },
   // ---- AEGIS DES SYSTEMADMINISTRATORS — Rüstungs-Pendant zu Excalibur,
   // ausschließlich für den Haupt-Owner, niemals via Kiste/Shop erhältlich ----
   a_aegis: {
@@ -177,6 +190,7 @@ export const ITEM_DB = {
 export const SECRET_ITEM_ID = 'w_secret_dualblades';
 export const EXCALIBUR_ITEM_ID = 'w_excalibur';
 export const AEGIS_ITEM_ID = 'a_aegis';
+export const RAGNAROK_ITEM_ID = 'w_ragnarok';
 
 // Pool aller Secret-Items, die per Kiste (1:1000) fallen können.
 // ownerOnly-Items (Excalibur) sind hiervon immer ausgeschlossen.
