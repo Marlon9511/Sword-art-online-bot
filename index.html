@@ -3,220 +3,226 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sword Art Online Bot — Aincrad System</title>
+<title>Sword Art Online Bot — Player Menu</title>
 <meta name="description" content="Ein WhatsApp-Bot im Sword Art Online-Universum: Level, Arena-Duelle, Gilden, Pokémon und mehr.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg-deep:#060a14;
-    --bg-panel:#0c1424;
-    --bg-panel-2:#101b30;
-    --border-glow:#1f3a5f55;
-    --border:#1e3559;
-    --cyan:#4dd8ff;
-    --cyan-dim:#1c6f8c;
-    --gold:#ffd166;
-    --danger:#ff4d6d;
-    --text:#eaf2ff;
-    --text-dim:#7288ab;
-    --rare-common:#9fb3cc;
-    --rare-uncommon:#57d68d;
-    --rare-rare:#4dabff;
-    --rare-epic:#b47bff;
-    --rare-legendary:#ffd166;
+    --void:#04070c;
+    --void-2:#070c15;
+    --glass:rgba(60,140,190,0.08);
+    --glass-strong:rgba(60,160,210,0.14);
+    --cyan:#6fe0ff;
+    --cyan-soft:rgba(111,224,255,0.4);
+    --cyan-dim:rgba(111,224,255,0.16);
+    --white:#eef8ff;
+    --dim:#7fa0b8;
+    --hp:#ff3f5e;
+    --sp:#3fd6ff;
+    --xp:#f4c94b;
     --font-display:'Rajdhani',sans-serif;
     --font-body:'Inter',sans-serif;
-    --font-mono:'Share Tech Mono',monospace;
   }
   *{margin:0;padding:0;box-sizing:border-box;}
   html{scroll-behavior:smooth;}
   body{
-    background:var(--bg-deep);
-    color:var(--text);
+    background:var(--void);
+    color:var(--white);
     font-family:var(--font-body);
     line-height:1.6;
     overflow-x:hidden;
     background-image:
-      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(77,216,255,0.12), transparent),
-      linear-gradient(rgba(77,216,255,0.035) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(77,216,255,0.035) 1px, transparent 1px);
-    background-size:auto, 44px 44px, 44px 44px;
+      radial-gradient(ellipse 90% 60% at 50% 0%, rgba(111,224,255,0.10), transparent 60%),
+      radial-gradient(ellipse 70% 50% at 100% 100%, rgba(63,214,255,0.06), transparent 60%);
   }
   @media (prefers-reduced-motion: reduce){
     *{animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition-duration:0.01ms !important; scroll-behavior:auto !important;}
   }
+
+  /* ---------- Aincrad backdrop ---------- */
+  .aincrad-backdrop{
+    position:fixed;inset:0;z-index:-1;
+    background:var(--void);
+    overflow:hidden;
+    opacity:0;
+    transition:opacity 1.2s ease;
+    pointer-events:none;
+  }
+  .aincrad-backdrop.show{opacity:1;}
+  .starfield{position:absolute;inset:0;}
+  .star{position:absolute;background:#cfeeff;border-radius:50%;opacity:0.5;animation:twinkle 4s ease-in-out infinite;}
+  @keyframes twinkle{0%,100%{opacity:0.15;}50%{opacity:0.75;}}
+  .aincrad-svg{
+    position:absolute;bottom:-6%;left:50%;transform:translateX(-50%);
+    width:min(140vw,1400px);height:auto;opacity:0.5;
+    filter:drop-shadow(0 0 40px rgba(111,224,255,0.15));
+  }
+  .aincrad-svg .ring{stroke:rgba(111,224,255,0.35);}
+  .aincrad-svg .tier{fill:#070f1a;stroke:rgba(111,224,255,0.28);stroke-width:1;}
+  .aincrad-svg .glow-line{stroke:rgba(111,224,255,0.5);stroke-width:0.6;}
+  .color-wash{
+    position:absolute;left:0;right:0;bottom:0;height:70%;
+    background:
+      radial-gradient(ellipse 60% 50% at 15% 100%, rgba(180,123,255,0.16), transparent 60%),
+      radial-gradient(ellipse 55% 45% at 85% 90%, rgba(63,214,255,0.14), transparent 60%),
+      radial-gradient(ellipse 60% 50% at 50% 100%, rgba(244,201,75,0.10), transparent 60%),
+      radial-gradient(ellipse 50% 40% at 70% 60%, rgba(87,214,141,0.10), transparent 60%);
+  }
   a{color:inherit;text-decoration:none;}
-  .wrap{max-width:1120px;margin:0 auto;padding:0 24px;}
-  h1,h2,h3{font-family:var(--font-display);font-weight:700;letter-spacing:0.02em;}
+  .wrap{max-width:1100px;margin:0 auto;padding:0 24px;}
+  h1,h2,h3{font-family:var(--font-display);font-weight:700;letter-spacing:0.01em;}
+
   .eyebrow{
-    font-family:var(--font-mono);
-    font-size:12px;
-    letter-spacing:0.25em;
+    font-family:var(--font-display);
+    font-size:13px;
+    letter-spacing:0.32em;
     text-transform:uppercase;
     color:var(--cyan);
-    display:flex;align-items:center;gap:10px;
-    margin-bottom:14px;
+    display:flex;align-items:center;gap:12px;
+    margin-bottom:16px;
   }
-  .eyebrow::before{content:'';width:22px;height:1px;background:var(--cyan);display:inline-block;}
+  .eyebrow::before,.eyebrow::after{content:'';width:26px;height:1px;background:var(--cyan-soft);display:inline-block;}
 
-  /* ---------- corner-cut HUD panel ---------- */
-  .panel{
+  /* ---------- SAO glass system window ---------- */
+  .window{
     position:relative;
-    background:linear-gradient(180deg, var(--bg-panel), var(--bg-panel-2));
-    border:1px solid var(--border);
-    clip-path:polygon(0 14px, 14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
+    background:linear-gradient(155deg, var(--glass-strong), var(--glass) 60%, transparent);
+    backdrop-filter:blur(2px);
+    border:1px solid var(--cyan-soft);
+    box-shadow:0 0 0 1px rgba(111,224,255,0.06), 0 0 40px rgba(111,224,255,0.06) inset;
   }
-  .panel::before{
-    content:'';position:absolute;inset:0;pointer-events:none;
-    border:1px solid transparent;
-    box-shadow:inset 0 0 0 1px rgba(77,216,255,0.06);
-  }
-  .panel-corner{position:absolute;width:14px;height:14px;pointer-events:none;}
-  .panel-corner.tr{top:0;right:0;border-top:1px solid var(--cyan-dim);border-right:1px solid var(--cyan-dim);}
-  .panel-corner.bl{bottom:0;left:0;border-bottom:1px solid var(--cyan-dim);border-left:1px solid var(--cyan-dim);}
+  .window .corner{position:absolute;width:20px;height:20px;pointer-events:none;}
+  .window .corner.tl{top:-1px;left:-1px;border-top:2px solid var(--cyan);border-left:2px solid var(--cyan);}
+  .window .corner.tr{top:-1px;right:-1px;border-top:2px solid var(--cyan);border-right:2px solid var(--cyan);}
+  .window .corner.bl{bottom:-1px;left:-1px;border-bottom:2px solid var(--cyan);border-left:2px solid var(--cyan);}
+  .window .corner.br{bottom:-1px;right:-1px;border-bottom:2px solid var(--cyan);border-right:2px solid var(--cyan);}
 
   /* ---------- nav ---------- */
   nav{
     position:fixed;top:0;left:0;right:0;z-index:100;
-    background:rgba(6,10,20,0.82);
+    background:rgba(4,7,12,0.78);
     backdrop-filter:blur(10px);
-    border-bottom:1px solid var(--border);
+    border-bottom:1px solid rgba(111,224,255,0.2);
   }
-  nav .wrap{display:flex;align-items:center;justify-content:space-between;height:64px;}
-  .brand{display:flex;align-items:center;gap:10px;font-family:var(--font-display);font-weight:700;font-size:18px;letter-spacing:0.03em;}
-  .brand .dot{width:8px;height:8px;background:var(--cyan);box-shadow:0 0 10px var(--cyan);border-radius:1px;transform:rotate(45deg);}
-  .navlinks{display:flex;gap:32px;font-size:14px;color:var(--text-dim);}
+  nav .wrap{display:flex;align-items:center;justify-content:space-between;height:66px;}
+  .brand{display:flex;align-items:center;gap:10px;font-family:var(--font-display);font-weight:700;font-size:19px;letter-spacing:0.05em;color:var(--white);}
+  .brand .hex{
+    width:20px;height:20px;position:relative;display:inline-block;
+    background:var(--cyan);
+    clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);
+    box-shadow:0 0 10px var(--cyan);
+  }
+  .navlinks{display:none;gap:34px;font-size:14px;color:var(--dim);font-family:var(--font-display);letter-spacing:0.05em;text-transform:uppercase;}
   .navlinks a:hover{color:var(--cyan);}
-  .navlinks{display:none;}
   @media(min-width:760px){.navlinks{display:flex;}}
   .btn{
-    font-family:var(--font-mono);
+    font-family:var(--font-display);
     font-size:13px;
-    letter-spacing:0.05em;
-    padding:9px 18px;
-    border:1px solid var(--cyan-dim);
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    padding:10px 20px;
+    border:1px solid var(--cyan);
     color:var(--cyan);
-    background:rgba(77,216,255,0.06);
-    clip-path:polygon(0 8px, 8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%);
+    background:var(--cyan-dim);
     transition:all .2s ease;
     display:inline-block;
+    clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);
   }
-  .btn:hover{background:rgba(77,216,255,0.16);box-shadow:0 0 18px rgba(77,216,255,0.25);}
-  .btn.gold{border-color:#8a6d1f;color:var(--gold);background:rgba(255,209,102,0.06);}
-  .btn.gold:hover{background:rgba(255,209,102,0.14);box-shadow:0 0 18px rgba(255,209,102,0.2);}
+  .btn:hover{background:rgba(111,224,255,0.28);box-shadow:0 0 18px rgba(111,224,255,0.35);}
+  .btn.filled{background:var(--cyan);color:var(--void);font-weight:600;}
+  .btn.filled:hover{background:#8fe8ff;box-shadow:0 0 22px rgba(111,224,255,0.55);}
 
   /* ---------- hero ---------- */
-  .hero{min-height:100vh;display:flex;align-items:center;padding-top:64px;position:relative;}
-  .hero-inner{width:100%;padding:80px 0;}
+  .hero{min-height:100vh;display:flex;align-items:center;padding-top:66px;position:relative;}
+  .hero-inner{width:100%;padding:70px 0;}
   .hero .eyebrow{justify-content:center;}
-  .hero-panel{padding:52px 40px;text-align:center;max-width:760px;margin:0 auto;}
-  .hp-bar{
-    width:220px;height:6px;margin:0 auto 28px;
-    background:rgba(255,255,255,0.06);
-    border:1px solid var(--border);
-    position:relative;overflow:hidden;
+
+  .cursor-ring{
+    width:120px;height:120px;margin:0 auto 26px;position:relative;
   }
-  .hp-bar::after{
-    content:'';position:absolute;left:0;top:0;bottom:0;width:100%;
-    background:linear-gradient(90deg,var(--cyan),var(--rare-uncommon));
-    animation:hpfill 2.4s ease-out forwards;
+  .cursor-ring svg{width:100%;height:100%;animation:spin 18s linear infinite;}
+  .cursor-ring .core{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:10px;height:10px;background:var(--cyan);border-radius:50%;
+    box-shadow:0 0 16px 4px var(--cyan-soft);
   }
-  @keyframes hpfill{from{width:0}to{width:100%}}
+  @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+
+  .hero-panel{padding:48px 40px;text-align:center;max-width:760px;margin:0 auto;}
   .hero h1{
-    font-size:clamp(34px,6vw,58px);
-    line-height:1.05;
+    font-size:clamp(32px,6vw,56px);
+    line-height:1.08;
     margin-bottom:18px;
   }
-  .hero h1 span{color:var(--cyan);text-shadow:0 0 24px rgba(77,216,255,0.5);}
-  .hero p.lead{color:var(--text-dim);font-size:17px;max-width:520px;margin:0 auto 34px;}
-  .hero-ctas{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;}
-  .stat-strip{
-    display:flex;justify-content:center;gap:0;margin-top:48px;flex-wrap:wrap;
-  }
-  .stat{
-    font-family:var(--font-mono);
-    padding:0 28px;border-right:1px solid var(--border);
-    text-align:center;
-  }
-  .stat:last-child{border-right:none;}
-  .stat .n{font-size:26px;color:var(--cyan);display:block;}
-  .stat .l{font-size:11px;color:var(--text-dim);letter-spacing:0.1em;text-transform:uppercase;}
+  .hero h1 span{color:var(--cyan);text-shadow:0 0 26px rgba(111,224,255,0.55);}
+  .hero p.lead{color:var(--dim);font-size:17px;max-width:520px;margin:0 auto 34px;font-family:var(--font-body);}
+  .hero-ctas{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-bottom:44px;}
+
+  .bar-row{max-width:420px;margin:0 auto 10px;text-align:left;}
+  .bar-label{display:flex;justify-content:space-between;font-family:var(--font-display);font-size:12px;letter-spacing:0.1em;color:var(--dim);margin-bottom:4px;}
+  .bar-track{height:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);position:relative;overflow:hidden;}
+  .bar-fill{height:100%;position:relative;}
+  .bar-fill.hp{background:linear-gradient(90deg,var(--hp),#ff7a92);width:0;animation:fillbar 1.4s ease-out .2s forwards;}
+  .bar-fill.sp{background:linear-gradient(90deg,var(--sp),#8fe8ff);width:0;animation:fillbar 1.4s ease-out .5s forwards;}
+  @keyframes fillbar{to{width:100%;}}
 
   /* ---------- sections ---------- */
-  section{padding:110px 0;position:relative;}
-  .section-head{max-width:640px;margin-bottom:56px;}
-  .section-head h2{font-size:clamp(28px,4vw,38px);margin-bottom:14px;}
-  .section-head p{color:var(--text-dim);font-size:16px;}
-  .floor-tag{font-family:var(--font-mono);color:var(--gold);font-size:13px;}
+  section{padding:100px 0;position:relative;}
+  .section-head{max-width:640px;margin-bottom:52px;}
+  .section-head h2{font-size:clamp(26px,4vw,36px);margin-bottom:14px;}
+  .section-head p{color:var(--dim);font-size:16px;font-family:var(--font-body);}
+  .tab-label{font-family:var(--font-display);color:var(--cyan);font-size:13px;letter-spacing:0.16em;text-transform:uppercase;margin-bottom:8px;display:block;}
 
   /* ---------- features ---------- */
-  .feature-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);}
+  .feature-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;}
   .feature-card{
-    background:var(--bg-panel);
-    padding:28px 26px;
     position:relative;
-    border-left:3px solid var(--rc);
+    background:linear-gradient(160deg, var(--glass-strong), transparent);
+    border:1px solid rgba(111,224,255,0.22);
+    padding:26px 24px;
   }
+  .feature-card .corner{position:absolute;width:14px;height:14px;}
+  .feature-card .corner.tl{top:-1px;left:-1px;border-top:1px solid var(--cyan);border-left:1px solid var(--cyan);}
+  .feature-card .corner.br{bottom:-1px;right:-1px;border-bottom:1px solid var(--cyan);border-right:1px solid var(--cyan);}
   .feature-card .tag{
-    font-family:var(--font-mono);font-size:10px;letter-spacing:0.15em;text-transform:uppercase;
-    color:var(--rc);margin-bottom:10px;display:block;
+    font-family:var(--font-display);font-size:11px;letter-spacing:0.15em;text-transform:uppercase;
+    color:var(--cyan);margin-bottom:10px;display:block;
   }
   .feature-card h3{font-size:19px;margin-bottom:8px;font-weight:600;}
-  .feature-card p{color:var(--text-dim);font-size:14px;}
+  .feature-card p{color:var(--dim);font-size:14px;font-family:var(--font-body);}
 
   /* ---------- team ---------- */
-  .role-tier{margin-bottom:44px;}
-  .role-tier-head{display:flex;align-items:baseline;gap:12px;margin-bottom:18px;padding-bottom:10px;border-bottom:1px solid var(--border);}
-  .role-tier-head h3{font-size:20px;color:var(--rc);}
-  .role-tier-head .count{font-family:var(--font-mono);font-size:12px;color:var(--text-dim);}
+  .role-tier{margin-bottom:42px;}
+  .role-tier-head{display:flex;align-items:baseline;gap:12px;margin-bottom:18px;padding-bottom:10px;border-bottom:1px solid var(--rc,rgba(111,224,255,0.2));}
+  .role-tier-head h3{font-size:20px;color:var(--rc,var(--cyan));}
+  .role-tier-head .count{font-family:var(--font-body);font-size:13px;color:var(--dim);}
   .team-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;}
   .player-card{
-    background:var(--bg-panel);
-    border:1px solid var(--border);
+    background:var(--glass);
+    border:1px solid color-mix(in srgb, var(--rc,var(--cyan)) 45%, transparent);
     padding:16px 18px;
     display:flex;align-items:center;gap:12px;
-    clip-path:polygon(0 10px, 10px 0, 100% 0, 100% 100%, 0 100%);
-    transition:border-color .2s ease, transform .2s ease;
+    transition:border-color .2s ease, background .2s ease, transform .2s ease;
+    clip-path:polygon(0 10px,10px 0,100% 0,100% 100%,0 100%);
   }
-  .player-card:hover{border-color:var(--rc);transform:translateX(2px);}
+  .player-card:hover{border-color:var(--rc,var(--cyan));background:color-mix(in srgb, var(--rc,var(--cyan)) 14%, var(--glass-strong));transform:translateY(-2px);}
   .avatar{
     width:40px;height:40px;flex:0 0 40px;
-    border:1px solid var(--rc);
-    background:linear-gradient(135deg, rgba(255,255,255,0.04), transparent);
+    background:color-mix(in srgb, var(--rc,var(--cyan)) 18%, transparent);
+    border:1px solid var(--rc,var(--cyan));
     display:flex;align-items:center;justify-content:center;
-    font-family:var(--font-display);font-weight:700;color:var(--rc);
-    clip-path:polygon(0 8px, 8px 0, 100% 0, 100% 100%, 0 100%);
+    font-family:var(--font-display);font-weight:700;color:var(--rc,var(--cyan));
+    clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);
   }
-  .player-name{font-weight:600;font-size:15px;}
-  .player-role{font-family:var(--font-mono);font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.06em;}
-
-  /* ---------- setup ---------- */
-  .setup-grid{display:grid;grid-template-columns:1fr;gap:20px;}
-  @media(min-width:820px){.setup-grid{grid-template-columns:1fr 1fr;}}
-  .terminal{
-    background:#050810;border:1px solid var(--border);padding:22px 22px 26px;
-    font-family:var(--font-mono);font-size:13px;color:var(--rare-uncommon);
-    clip-path:polygon(0 12px, 12px 0, 100% 0, 100% 100%, 0 100%);
-  }
-  .terminal .tbar{display:flex;gap:6px;margin-bottom:16px;}
-  .terminal .tbar span{width:9px;height:9px;border-radius:50%;background:var(--border);}
-  .terminal .line{margin-bottom:8px;white-space:pre-wrap;word-break:break-word;}
-  .terminal .line .prompt{color:var(--text-dim);}
-  .terminal .line .comment{color:var(--text-dim);}
-  .setup-note{padding:26px;}
-  .setup-note h3{font-size:19px;margin-bottom:10px;}
-  .setup-note p{color:var(--text-dim);font-size:14px;margin-bottom:10px;}
-  .setup-note ul{list-style:none;padding:0;}
-  .setup-note li{color:var(--text-dim);font-size:14px;padding:6px 0 6px 20px;position:relative;}
-  .setup-note li::before{content:'⌈';position:absolute;left:0;color:var(--cyan);}
+  .player-name{font-weight:600;font-size:15px;font-family:var(--font-body);}
+  .player-role{font-family:var(--font-display);font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:0.06em;}
 
   /* ---------- footer ---------- */
-  footer{border-top:1px solid var(--border);padding:44px 0;}
+  footer{border-top:1px solid rgba(111,224,255,0.2);padding:44px 0;}
   .footer-inner{display:flex;flex-direction:column;gap:16px;align-items:center;text-align:center;}
-  .divider{font-family:var(--font-mono);color:var(--border);letter-spacing:2px;font-size:10px;}
-  footer p{color:var(--text-dim);font-size:13px;}
-  footer .brand{justify-content:center;margin-bottom:6px;}
+  footer .brand{justify-content:center;}
+  footer p{color:var(--dim);font-size:13px;font-family:var(--font-body);}
 
   .reveal{opacity:0;transform:translateY(18px);transition:opacity .6s ease, transform .6s ease;}
   .reveal.in{opacity:1;transform:translateY(0);}
@@ -224,33 +230,68 @@
 </head>
 <body>
 
+<div class="aincrad-backdrop" id="aincradBg">
+  <div class="starfield" id="starfield"></div>
+  <svg class="aincrad-svg" viewBox="0 0 800 620" preserveAspectRatio="xMidYMax meet">
+    <!-- Aincrad: stacked conical floors, widest at base, narrowing upward -->
+    <g>
+      <polygon class="tier" points="400,0 430,40 370,40" />
+      <polygon class="tier" points="400,30 460,90 340,90" />
+      <polygon class="tier" points="360,80 480,80 520,150 280,150" />
+      <polygon class="tier" points="320,140 540,140 590,220 250,220" />
+      <polygon class="tier" points="280,210 580,210 640,300 220,300" />
+      <polygon class="tier" points="240,290 620,290 690,390 190,390" />
+      <polygon class="tier" points="200,380 660,380 740,490 140,490" />
+      <polygon class="tier" points="160,480 720,480 800,610 80,610" />
+      <line class="glow-line" x1="80" y1="610" x2="800" y2="610" />
+      <line class="glow-line" x1="140" y1="490" x2="740" y2="490" />
+      <line class="glow-line" x1="190" y1="390" x2="690" y2="390" />
+      <line class="glow-line" x1="220" y1="300" x2="640" y2="300" />
+      <line class="glow-line" x1="250" y1="220" x2="590" y2="220" />
+      <line class="glow-line" x1="280" y1="150" x2="520" y2="150" />
+    </g>
+  </svg>
+  <div class="color-wash"></div>
+</div>
+
 <nav>
   <div class="wrap">
-    <div class="brand"><span class="dot"></span>AINCRAD // BOT.SYS</div>
+    <div class="brand"><span class="hex"></span>AINCRAD // PLAYER MENU</div>
     <div class="navlinks">
-      <a href="#features">Features</a>
+      <a href="#features">Fähigkeiten</a>
       <a href="#team">Team</a>
     </div>
-    <a class="btn gold" href="https://chat.whatsapp.com/DBiDcF2s16FEWiGKyZA7Nl" target="_blank" rel="noopener">Community beitreten</a>
+    <a class="btn filled" href="https://chat.whatsapp.com/DBiDcF2s16FEWiGKyZA7Nl" target="_blank" rel="noopener">Community</a>
   </div>
 </nav>
 
 <header class="hero">
   <div class="wrap hero-inner">
-    <div class="panel hero-panel">
-      <span class="panel-corner tr"></span><span class="panel-corner bl"></span>
-      <div class="eyebrow">System Login // Aincrad Server</div>
-      <div class="hp-bar"></div>
-      <h1>Der <span>Sword Art Online</span><br>WhatsApp-Bot</h1>
-      <p class="lead">Level, Ausrüstung, Gilden-Duelle und ein ganzes Aincrad voller Spiele — direkt in deiner WhatsApp-Gruppe. Open Source, selbst gehostet.</p>
-      <div class="hero-ctas">
-        <a class="btn gold" href="https://chat.whatsapp.com/DBiDcF2s16FEWiGKyZA7Nl" target="_blank" rel="noopener">⌈ Zur offiziellen Community ⌋</a>
-        <a class="btn" href="#features">Features durchsuchen</a>
+    <div class="window hero-panel">
+      <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+      <div class="cursor-ring">
+        <svg viewBox="0 0 100 100" fill="none">
+          <circle cx="50" cy="50" r="46" stroke="#6fe0ff" stroke-width="1" stroke-opacity="0.35"/>
+          <circle cx="50" cy="50" r="38" stroke="#6fe0ff" stroke-width="1" stroke-dasharray="4 6" stroke-opacity="0.6"/>
+          <path d="M50 4 L54 14 L46 14 Z" fill="#6fe0ff"/>
+          <path d="M50 96 L54 86 L46 86 Z" fill="#6fe0ff" opacity="0.6"/>
+        </svg>
+        <div class="core"></div>
       </div>
-      <div class="stat-strip">
-        <div class="stat"><span class="n">100+</span><span class="l">Befehle</span></div>
-        <div class="stat"><span class="n">5</span><span class="l">Seltenheitsstufen</span></div>
-        <div class="stat"><span class="n">∞</span><span class="l">Sessions</span></div>
+      <div class="eyebrow">Link Start // Aincrad Server</div>
+      <h1>Der <span>Sword Art Online</span><br>WhatsApp-Bot</h1>
+      <p class="lead">Level, Ausrüstung, Gilden-Duelle und ein ganzes Aincrad voller Spiele — direkt in deiner WhatsApp-Gruppe.</p>
+      <div class="hero-ctas">
+        <a class="btn filled" href="https://chat.whatsapp.com/DBiDcF2s16FEWiGKyZA7Nl" target="_blank" rel="noopener">Zur offiziellen Community</a>
+        <a class="btn" href="#features">Fähigkeiten ansehen</a>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label"><span>HP</span><span>1000 / 1000</span></div>
+        <div class="bar-track"><div class="bar-fill hp"></div></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label"><span>SP</span><span>100 / 100</span></div>
+        <div class="bar-track"><div class="bar-fill sp"></div></div>
       </div>
     </div>
   </div>
@@ -259,59 +300,49 @@
 <section id="features">
   <div class="wrap">
     <div class="section-head reveal">
-      <div class="floor-tag">FLOOR 01</div>
+      <span class="tab-label">Menu // Skills</span>
       <h2>Was der Bot kann</h2>
       <p>Von Wirtschaftssystem bis Kampfarena — jede Funktion ist aus echten Aincrad-Mechaniken gebaut.</p>
     </div>
     <div class="feature-grid reveal">
-      <div class="feature-card" style="--rc:var(--rare-common)">
-        <span class="tag">Common</span>
-        <h3>Level & Wirtschaft</h3>
+      <div class="feature-card"><span class="corner tl"></span><span class="corner br"></span>
+        <span class="tag">System</span><h3>Level & Wirtschaft</h3>
         <p>XP durch Chatten, tägliche Belohnungen, Arbeiten, Angeln in den Gewässern von Aincrad und ein Shop für Tränke und Boxen.</p>
       </div>
-      <div class="feature-card" style="--rc:var(--rare-uncommon)">
-        <span class="tag">Uncommon</span>
-        <h3>Haustiere</h3>
+      <div class="feature-card"><span class="corner tl"></span><span class="corner br"></span>
+        <span class="tag">Companion</span><h3>Haustiere</h3>
         <p>Adoptiere Hund, Katze oder Vogel, füttere und spiele mit ihnen und baue Glück und Erfahrung auf.</p>
       </div>
-      <div class="feature-card" style="--rc:var(--rare-rare)">
-        <span class="tag">Rare</span>
-        <h3>Arena & Ausrüstung</h3>
+      <div class="feature-card"><span class="corner tl"></span><span class="corner br"></span>
+        <span class="tag">Battle</span><h3>Arena & Ausrüstung</h3>
         <p>Öffne Ausrüstungskisten für Waffen und Rüstungen von Gewöhnlich bis Legendär und fordere andere Spieler zum PVP-Duell heraus.</p>
       </div>
-      <div class="feature-card" style="--rc:var(--rare-rare)">
-        <span class="tag">Rare</span>
-        <h3>Gilden-System</h3>
+      <div class="feature-card"><span class="corner tl"></span><span class="corner br"></span>
+        <span class="tag">Guild</span><h3>Gilden-System</h3>
         <p>Gründe eine Gilde, nimm neue Mitglieder auf und klettert gemeinsam in der Gildenrangliste nach oben.</p>
       </div>
-      <div class="feature-card" style="--rc:var(--rare-epic)">
-        <span class="tag">Epic</span>
-        <h3>Pokémon-Minispiel</h3>
+      <div class="feature-card"><span class="corner tl"></span><span class="corner br"></span>
+        <span class="tag">Collection</span><h3>Pokémon-Minispiel</h3>
         <p>Fange wilde Pokémon, trainiere, entwickle und kämpfe — ein komplettes Sammelspiel innerhalb des Bots.</p>
       </div>
-      <div class="feature-card" style="--rc:var(--rare-epic)">
-        <span class="tag">Epic</span>
-        <h3>Titel & Achievements</h3>
+      <div class="feature-card"><span class="corner tl"></span><span class="corner br"></span>
+        <span class="tag">Records</span><h3>Titel & Achievements</h3>
         <p>Heirat, Gildenmeisterschaft und andere Meilensteine schalten sichtbare Titel im Profil frei.</p>
       </div>
-      <div class="feature-card" style="--rc:var(--rare-uncommon)">
-        <span class="tag">Uncommon</span>
-        <h3>Social & Minispiele</h3>
+      <div class="feature-card"><span class="corner tl"></span><span class="corner br"></span>
+        <span class="tag">Social</span><h3>Social & Minispiele</h3>
         <p>Heiraten, Scheiden, Bewerbungssystem für die Gilde sowie Slots, Blackjack und Schere-Stein-Papier.</p>
       </div>
-      <div class="feature-card" style="--rc:var(--rare-legendary)">
-        <span class="tag">Legendary</span>
-        <h3>Moderation & Rollen</h3>
+      <div class="feature-card"><span class="corner tl"></span><span class="corner br"></span>
+        <span class="tag">Admin</span><h3>Moderation & Rollen</h3>
         <p>Sieben Rollenstufen von Owner bis Test-Supporter, Anti-Link-Schutz, automatische Nachtsperre und Multi-Session-Verwaltung.</p>
       </div>
-      <div class="feature-card" style="--rc:var(--rare-common)">
-        <span class="tag">Common</span>
-        <h3>Support-Tickets</h3>
+      <div class="feature-card"><span class="corner tl"></span><span class="corner br"></span>
+        <span class="tag">Support</span><h3>Support-Tickets</h3>
         <p>Nutzer eröffnen Tickets direkt im Chat, das Team antwortet zentral — inklusive DSGVO-konformer Registrierung.</p>
       </div>
-      <div class="feature-card" style="--rc:var(--rare-uncommon)">
-        <span class="tag">Uncommon</span>
-        <h3>Sticker & Medien</h3>
+      <div class="feature-card"><span class="corner tl"></span><span class="corner br"></span>
+        <span class="tag">Media</span><h3>Sticker & Medien</h3>
         <p>Sticker aus Bildern und Videos erstellen, YouTube-Links als MP3 laden und animierte Reaction-Gifs verschicken.</p>
       </div>
     </div>
@@ -321,46 +352,46 @@
 <section id="team">
   <div class="wrap">
     <div class="section-head reveal">
-      <div class="floor-tag">FLOOR 02</div>
+      <span class="tab-label">Menu // Friends</span>
       <h2>Das Team hinter dem System</h2>
       <p>Die Schwertkämpfer, die Aincrad am Laufen halten.</p>
     </div>
 
     <div class="reveal">
-      <div class="role-tier" style="--rc:var(--rare-legendary)">
-        <div class="role-tier-head"><h3>👑 Owner</h3><span class="count">2 Mitglieder</span></div>
+      <div class="role-tier" style="--rc:#f4c94b">
+        <div class="role-tier-head"><h3>Owner</h3><span class="count">2 Mitglieder</span></div>
         <div class="team-grid">
           <div class="player-card"><div class="avatar">K</div><div><div class="player-name">Kirito</div><div class="player-role">Owner</div></div></div>
           <div class="player-card"><div class="avatar">V</div><div><div class="player-name">Viviolin Moon</div><div class="player-role">Owner</div></div></div>
         </div>
       </div>
 
-      <div class="role-tier" style="--rc:var(--rare-legendary)">
-        <div class="role-tier-head"><h3>👑 Co-Owner</h3><span class="count">2 Mitglieder</span></div>
+      <div class="role-tier" style="--rc:#ff9d4d">
+        <div class="role-tier-head"><h3>Co-Owner</h3><span class="count">2 Mitglieder</span></div>
         <div class="team-grid">
           <div class="player-card"><div class="avatar">J</div><div><div class="player-name">Jwan</div><div class="player-role">Co-Owner</div></div></div>
           <div class="player-card"><div class="avatar">L</div><div><div class="player-name">Lena</div><div class="player-role">Co-Owner</div></div></div>
         </div>
       </div>
 
-      <div class="role-tier" style="--rc:var(--rare-epic)">
-        <div class="role-tier-head"><h3>⚔ Moderator</h3><span class="count">2 Mitglieder</span></div>
+      <div class="role-tier" style="--rc:#b47bff">
+        <div class="role-tier-head"><h3>Moderator</h3><span class="count">2 Mitglieder</span></div>
         <div class="team-grid">
           <div class="player-card"><div class="avatar">C</div><div><div class="player-name">Chillicat64</div><div class="player-role">Moderator</div></div></div>
           <div class="player-card"><div class="avatar">P</div><div><div class="player-name">PfoteTheFox</div><div class="player-role">Moderator</div></div></div>
         </div>
       </div>
 
-      <div class="role-tier" style="--rc:var(--rare-rare)">
-        <div class="role-tier-head"><h3>🌟 Supporter</h3><span class="count">2 Mitglieder</span></div>
+      <div class="role-tier" style="--rc:#3fd6ff">
+        <div class="role-tier-head"><h3>Supporter</h3><span class="count">2 Mitglieder</span></div>
         <div class="team-grid">
           <div class="player-card"><div class="avatar">L</div><div><div class="player-name">Legacy</div><div class="player-role">Supporter</div></div></div>
           <div class="player-card"><div class="avatar">T</div><div><div class="player-name">Tobi</div><div class="player-role">Supporter</div></div></div>
         </div>
       </div>
 
-      <div class="role-tier" style="--rc:var(--rare-uncommon)">
-        <div class="role-tier-head"><h3>🔰 Test-Supporter</h3><span class="count">2 Mitglieder</span></div>
+      <div class="role-tier" style="--rc:#57d68d">
+        <div class="role-tier-head"><h3>Test-Supporter</h3><span class="count">2 Mitglieder</span></div>
         <div class="team-grid">
           <div class="player-card"><div class="avatar">B</div><div><div class="player-name">Bastian</div><div class="player-role">Test-Supporter</div></div></div>
           <div class="player-card"><div class="avatar">S</div><div><div class="player-name">shion</div><div class="player-role">Test-Supporter</div></div></div>
@@ -372,13 +403,36 @@
 
 <footer>
   <div class="wrap footer-inner">
-    <div class="brand"><span class="dot"></span>AINCRAD // BOT.SYS</div>
-    <div class="divider">┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈</div>
+    <div class="brand"><span class="hex"></span>AINCRAD // PLAYER MENU</div>
     <p>Gebaut von der SAO-Gilde. Nicht offiziell mit WhatsApp oder Sword Art Online verbunden.</p>
   </div>
 </footer>
 
 <script>
+  // Sternenfeld generieren
+  const starfield = document.getElementById('starfield');
+  for(let i=0;i<90;i++){
+    const s = document.createElement('div');
+    s.className = 'star';
+    const size = Math.random()*2 + 0.5;
+    s.style.width = size+'px';
+    s.style.height = size+'px';
+    s.style.left = Math.random()*100+'%';
+    s.style.top = Math.random()*100+'%';
+    s.style.animationDelay = (Math.random()*4)+'s';
+    starfield.appendChild(s);
+  }
+
+  // Aincrad-Hintergrund erst ab den Befehlen/Features einblenden
+  const aincradBg = document.getElementById('aincradBg');
+  const featuresSection = document.getElementById('features');
+  const bgObserver = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){ aincradBg.classList.add('show'); }
+    });
+  }, {threshold:0, rootMargin:'0px 0px -60% 0px'});
+  bgObserver.observe(featuresSection);
+
   const io = new IntersectionObserver((entries)=>{
     entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
   }, {threshold:0.12});
