@@ -892,17 +892,7 @@ const WEB_API_PORT = process.env.WEB_API_PORT || 3001;
 webApi.listen(WEB_API_PORT, () => {
   console.log(`✅ Web-Login-API läuft auf Port ${WEB_API_PORT}`);
 });
-setInterval(async () => {
-  try {
-    await guildBoss.checkExpiry({
-      send: async (text, opts) => { try { await sock.sendMessage(OWNER_PRIV, { text, ...opts }); } catch (e) {} },
-      sock, users, guilds, save, FILES, getNumberMention,
-      ITEM_DB,
-      ensureArenaFields: arena.ensureArenaFields,
-      randInt
-    });
-  } catch (e) { console.error('[guildboss] Expiry-Check Fehler:', e); }
-}, 60 * 1000);
+
 // ========== START BOT ==========
 
 // hooks: optionale { onQr(qrBuffer, sessionName), onOpen(botId, sessionName) },
@@ -1073,7 +1063,10 @@ setInterval(async () => {
   try {
     await guildBoss.checkExpiry({
       send: async (text, opts) => { try { await sock.sendMessage(OWNER_PRIV, { text, ...opts }); } catch (e) {} },
-      sock, users, guilds, save, FILES, getNumberMention
+      sock, users, guilds, save, FILES, getNumberMention,
+      ITEM_DB,
+      ensureArenaFields: arena.ensureArenaFields,
+      randInt
     });
   } catch (e) { console.error('[guildboss] Expiry-Check Fehler:', e); }
 }, 60 * 1000);
