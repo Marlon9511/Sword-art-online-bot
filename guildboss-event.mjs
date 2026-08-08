@@ -2,18 +2,15 @@ import fs from 'fs';
 import path from 'path';
 
 function findUserGuildId(users, guilds, userJid) {
-  // Variante A: User speichert seine Gilden-ID direkt
   if (users[userJid]?.guildId && guilds[users[userJid].guildId]) {
     return users[userJid].guildId;
   }
-  // Variante B: Gilde hat ein members[]-Array mit JIDs
   for (const [gid, g] of Object.entries(guilds)) {
     if (Array.isArray(g.members) && g.members.includes(userJid)) return gid;
   }
   return null;
 }
 
-// Rarität -> zusätzlicher prozentualer Schadensbonus obendrauf auf die reine Waffen-"power"
 const RARITY_DAMAGE_BONUS = {
   common: 0,
   uncommon: 0.10,
@@ -22,12 +19,15 @@ const RARITY_DAMAGE_BONUS = {
   legendary: 0.55
 };
 
-// Secret-Waffen (ownerOnly/secret) bekommen ZUSÄTZLICH zum Rarity-Bonus noch einen Machtaufschlag
-const SECRET_WEAPON_BONUS = 0.40; // +40% oben drauf
-const SECRET_WEAPON_CRIT_BONUS = 10; // +10% Crit-Chance
+const SECRET_WEAPON_BONUS = 0.40;
+const SECRET_WEAPON_CRIT_BONUS = 10;
 
-const RARITY_EMOJI = { common: '⚪', uncommon: '🟢', rare: '🔵', epic: '🟣', legendary: '🟡' };
-const CRIT_CHANCE_BY_RARITY = { common: 5, uncommon: 8, rare: 12, epic: 16, legendary: 22 };
+const RARITY_EMOJI = { common: '⚪', uncommon: '🟢', rare: '🔵', epic: '🟣', legendary: '🟡', secret: '⚫' };
+const CRIT_CHANCE_BY_RARITY = { common: 5, uncommon: 8, rare: 12, epic: 16, legendary: 22, secret: 30 };
+
+// ID der exklusiven Boss-Event-Waffe (muss zu arena-system.mjs passen)
+const RAGNAROK_ITEM_ID = 'w_ragnarok';
+const RAGNAROK_DROP_CHANCE_PERCENT = 25; // 25% Chance, dass der Top-1-Spieler sie bekommt
 
 export function createGuildBossSystem(DATA_PATH) {
   const BOSS_FILE = path.join(DATA_PATH, 'guildboss.json');
@@ -40,10 +40,10 @@ export function createGuildBossSystem(DATA_PATH) {
     startedAt: null,
     endsAt: null,
     startedBy: null,
-    originChat: null,        // Gruppe, in der gestartet wurde (für Status-Updates)
-    damageByGuild: {},       // { guildId: totalDamage }
-    damageByUser: {},        // { userJid: totalDamage }
-    lastAttack: {}           // { userJid: timestamp } für Cooldown
+    originChat: null,
+    damageByGuild: {},
+    damageByUser: {},
+    lastAttack: {}
   };
 
   let state = loadState();
@@ -70,7 +70,7 @@ export function createGuildBossSystem(DATA_PATH) {
     }
   }
 
-  const ATTACK_COOLDOWN_MS = 3 * 60 * 1000; // 3 Minuten pro Spieler
+  const ATTACK_COOLDOWN_MS = 3 * 60 * 1000;
   const BOSS_NAMES = [
     'Der Skelettreaper von Floor 74', 'Heathcliffs Schatten', 'Der Sturmdrache Kayaba',
     'Der Kristallgolem von Floor 22', 'Der Verzerrte Wächter'
@@ -90,58 +90,88 @@ export function createGuildBossSystem(DATA_PATH) {
   }
 
   function getTopGuilds(limit = 5) {
-    return Object.entries(state.damageByGuild)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, limit);
+    return Object.entries(state.damageByGuild).sort((a, b) => b[1] - a[1]).slice(0, limit);
   }
 
-  // ===== Schaden basierend auf der ausgerüsteten Waffe berechnen (inkl. Secret-Waffen) =====
+  // ===== Schaden basierend auf der ausgerüsteten Waffe berechnen =====
+  // Ragnarok bekommt hier einen zusätzlichen "bossBonus", der NUR im Boss-Kampf zählt.
   function calculateWeaponDamage({ users, ITEM_DB, ensureArenaFields, normalizedSender, randInt, isPrimaryOwner }) {
     ensureArenaFields(users, normalizedSender);
     const weaponId = users[normalizedSender].equipped?.weapon;
     const weapon = weaponId ? ITEM_DB[weaponId] : null;
 
-    // Keine Waffe ausgerüstet -> schwacher Faustschlag
     if (!weapon) {
       return {
         damage: randInt(5, 15),
         weaponName: 'bloße Fäuste',
         weaponEmoji: '👊',
         isCrit: false,
-        isSecret: false
+        isSecret: false,
+        isRagnarok: false
       };
     }
 
     const basePower = weapon.power || 10;
     const isSecretWeapon = !!(weapon.secret || weapon.ownerOnly);
+    const isRagnarok = weaponId === RAGNAROK_ITEM_ID;
 
     let rarityBonus = RARITY_DAMAGE_BONUS[weapon.rarity] || 0;
     if (isSecretWeapon) rarityBonus += SECRET_WEAPON_BONUS;
+    if (isRagnarok && weapon.bossBonus) rarityBonus += weapon.bossBonus; // exklusiver Boss-Bonus
 
-    // Streuung: 85% - 115% der Grundstärke
     const variance = 0.85 + (randInt(0, 30) / 100);
     let damage = Math.round(basePower * (1 + rarityBonus) * variance);
 
     let critChance = CRIT_CHANCE_BY_RARITY[weapon.rarity] || 5;
     if (isSecretWeapon) critChance += SECRET_WEAPON_CRIT_BONUS;
+    if (isRagnarok) critChance += 15; // Ragnarok crittet besonders oft
 
     const isCrit = randInt(1, 100) <= critChance;
     if (isCrit) damage = Math.round(damage * 2);
 
-    // Name/Emoji verschleiern, wenn Secret UND Angreifer nicht der Haupt-Owner ist
     const viewerIsPrimaryOwner = isPrimaryOwner ? isPrimaryOwner(normalizedSender) : false;
     let weaponName = weapon.name;
     let weaponEmoji = RARITY_EMOJI[weapon.rarity] || '';
 
-    if (isSecretWeapon && !viewerIsPrimaryOwner) {
+    // Ragnarok bleibt sichtbar (kein Verschleiern) — es ist eine verdiente Trophäe,
+    // kein Owner-Secret. Andere Secret-Waffen (Excalibur etc.) bleiben verschleiert.
+    if (isSecretWeapon && !isRagnarok && !viewerIsPrimaryOwner) {
       weaponName = 'einer geheimnisvollen Klinge';
       weaponEmoji = '❓';
     }
 
-    return { damage, weaponName, weaponEmoji, isCrit, isSecret: isSecretWeapon };
+    return { damage, weaponName, weaponEmoji, isCrit, isSecret: isSecretWeapon, isRagnarok };
   }
 
-  async function endEvent({ send, sock, users, guilds, save, FILES, getNumberMention }, reason = 'time') {
+  // ===== Ragnarok-Vergabe nach Event-Ende =====
+  // 25% Chance: Top-1-Spieler bekommt Ragnarok exklusiv.
+  // 75% Chance: Die gesamte siegreiche Gilde bekommt je eine Ragnarok.
+  function distributeRagnarok({ users, guilds, save, FILES, ITEM_DB, ensureArenaFields, randInt, winningGuildId, topPlayerJid }) {
+    const roll = randInt(1, 100);
+    const wentToTopPlayer = roll <= RAGNAROK_DROP_CHANCE_PERCENT;
+
+    const recipients = [];
+
+    if (wentToTopPlayer && topPlayerJid && users[topPlayerJid]) {
+      ensureArenaFields(users, topPlayerJid);
+      users[topPlayerJid].items[RAGNAROK_ITEM_ID] = (users[topPlayerJid].items[RAGNAROK_ITEM_ID] || 0) + 1;
+      recipients.push(topPlayerJid);
+    } else {
+      const winningGuild = guilds[winningGuildId];
+      const members = Array.isArray(winningGuild?.members) ? winningGuild.members : [];
+      for (const jid of members) {
+        if (!users[jid]) continue;
+        ensureArenaFields(users, jid);
+        users[jid].items[RAGNAROK_ITEM_ID] = (users[jid].items[RAGNAROK_ITEM_ID] || 0) + 1;
+        recipients.push(jid);
+      }
+    }
+
+    save(FILES.users, users);
+    return { wentToTopPlayer, recipients };
+  }
+
+  async function endEvent({ send, sock, users, guilds, save, FILES, getNumberMention, ITEM_DB, ensureArenaFields, randInt }, reason = 'time') {
     if (!state.active) return;
 
     const topGuilds = getTopGuilds(1);
@@ -163,7 +193,6 @@ export function createGuildBossSystem(DATA_PATH) {
     const guildName = winningGuild?.name || winningGuildId;
     const members = Array.isArray(winningGuild?.members) ? winningGuild.members : [];
 
-    // Belohnung: Coins + XP für alle Mitglieder der siegreichen Gilde
     const REWARD_COINS_PER_MEMBER = 300;
     const REWARD_XP_PER_MEMBER = 100;
     const mentions = [];
@@ -175,11 +204,13 @@ export function createGuildBossSystem(DATA_PATH) {
       mentions.push(jid);
     }
 
-    // Bonus für den Top-Damage-Dealer (unabhängig von der Gilde)
     const topPlayerEntry = Object.entries(state.damageByUser).sort((a, b) => b[1] - a[1])[0];
     let topPlayerLine = '';
+    let topPlayerJid = null;
+
     if (topPlayerEntry) {
       const [topJid, topDmg] = topPlayerEntry;
+      topPlayerJid = topJid;
       if (users[topJid]) {
         users[topJid].coins = (users[topJid].coins || 0) + 150;
         users[topJid].xp = (users[topJid].xp || 0) + 50;
@@ -190,6 +221,33 @@ export function createGuildBossSystem(DATA_PATH) {
     }
 
     save(FILES.users, users);
+
+    // ===== NEU: Ragnarok-Vergabe =====
+    let ragnarokLine = '';
+    if (ITEM_DB && ensureArenaFields && randInt && ITEM_DB[RAGNAROK_ITEM_ID]) {
+      const { wentToTopPlayer, recipients } = distributeRagnarok({
+        users, guilds, save, FILES, ITEM_DB, ensureArenaFields, randInt,
+        winningGuildId, topPlayerJid
+      });
+
+      const ragnarok = ITEM_DB[RAGNAROK_ITEM_ID];
+
+      if (wentToTopPlayer && recipients.length) {
+        const mention = await getNumberMention(recipients[0], sock);
+        mentions.push(recipients[0]);
+        ragnarokLine =
+          `\n\n⚫✨ *— LEGENDÄRER DROP —* ✨⚫\n` +
+          `Das System erzittert... ${mention} hat *${ragnarok.name}* erhalten!\n` +
+          `_${ragnarok.trueName}_\n` +
+          `🍀 Chance war nur ${RAGNAROK_DROP_CHANCE_PERCENT}%!`;
+      } else if (recipients.length) {
+        mentions.push(...recipients);
+        ragnarokLine =
+          `\n\n⚫✨ *— LEGENDÄRER GILDEN-SEGEN —* ✨⚫\n` +
+          `Kein Einzelheld war würdig genug — stattdessen hat die *gesamte Gilde ${guildName}* je eine *${ragnarok.name}* erhalten!\n` +
+          `_${ragnarok.trueName}_`;
+      }
+    }
 
     const guildRanking = getTopGuilds(5)
       .map(([gid, dmg], i) => `${i + 1}. ${guilds[gid]?.name || gid} — ${dmg} DMG`)
@@ -205,6 +263,7 @@ export function createGuildBossSystem(DATA_PATH) {
       `💥 Gesamtschaden: ${winningDamage} DMG\n` +
       `🎁 Belohnung pro Mitglied: +${REWARD_COINS_PER_MEMBER} Coins, +${REWARD_XP_PER_MEMBER} XP` +
       topPlayerLine +
+      ragnarokLine +
       `\n\n📊 *Schadensrangliste (Gilden):*\n${guildRanking}\n` +
       `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈`;
 
@@ -222,8 +281,6 @@ export function createGuildBossSystem(DATA_PATH) {
     saveState();
   }
 
-  // Wird vom Hauptscript regelmäßig aufgerufen (z.B. im 60s-Interval), um
-  // abgelaufene Events automatisch zu beenden.
   async function checkExpiry(ctx) {
     if (!state.active) return;
     if (state.endsAt && Date.now() >= state.endsAt) {
@@ -239,7 +296,6 @@ export function createGuildBossSystem(DATA_PATH) {
       ITEM_DB, ensureArenaFields, isPrimaryOwner
     } = ctx;
 
-    // ---- BOSSEVENT (start/status/end) ----
     if (cmd === 'bossevent') {
       const sub = (args[0] || '').toLowerCase();
 
@@ -290,6 +346,7 @@ export function createGuildBossSystem(DATA_PATH) {
           `➡️ ${activePrefix}bossevent status — Status anzeigen\n\n` +
           `💡 Rüstet eure beste Waffe mit ${activePrefix}equip aus, bevor ihr angreift!\n` +
           `🏆 Die Gilde mit dem meisten Gesamtschaden gewinnt die Belohnung!\n` +
+          `⚫ Der Spieler mit dem höchsten Einzelschaden hat 25% Chance auf *Ragnarok* — die stärkste Waffe im Spiel!\n` +
           `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈`
         );
         return true;
@@ -318,11 +375,19 @@ export function createGuildBossSystem(DATA_PATH) {
           .map(([gid, dmg], i) => `${i + 1}. ${guilds[gid]?.name || gid} — ${dmg} DMG`)
           .join('\n') || '(noch kein Schaden)';
 
+        // Aktueller Top-Spieler (für Vorschau, wer aktuell auf Ragnarok-Kurs ist)
+        const currentTopEntry = Object.entries(state.damageByUser).sort((a, b) => b[1] - a[1])[0];
+        let topPlayerPreview = '';
+        if (currentTopEntry) {
+          const mention = await getNumberMention(currentTopEntry[0], sock);
+          topPlayerPreview = `\n⚔️ Aktuell führend: ${mention} (${currentTopEntry[1]} DMG)`;
+        }
+
         await send(
           `👹 *${state.name}*\n` +
           `❤️ HP: ${Math.max(0, state.hp)} / ${state.maxHp}\n` +
           `${hpBar(state.hp, state.maxHp)}\n` +
-          `⏳ Verbleibend: ${timeLeft}\n\n` +
+          `⏳ Verbleibend: ${timeLeft}${topPlayerPreview}\n\n` +
           `📊 *Aktuelle Gilden-Rangliste:*\n${guildRanking}\n\n` +
           `Nutze ${activePrefix}bossattack, um mitzukämpfen!`
         );
@@ -333,7 +398,6 @@ export function createGuildBossSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- BOSSATTACK ----
     if (cmd === 'bossattack' || cmd === 'bossangriff') {
       if (!state.active) {
         await send('ℹ️ Aktuell erscheint kein Clan-Boss zum Angreifen.');
@@ -359,8 +423,7 @@ export function createGuildBossSystem(DATA_PATH) {
         return true;
       }
 
-      // Schaden aus der ausgerüsteten Waffe berechnen (inkl. Secret-Waffen-Logik)
-      const { damage, weaponName, weaponEmoji, isCrit, isSecret } = calculateWeaponDamage({
+      const { damage, weaponName, weaponEmoji, isCrit, isSecret, isRagnarok } = calculateWeaponDamage({
         users, ITEM_DB, ensureArenaFields, normalizedSender, randInt, isPrimaryOwner
       });
 
@@ -369,17 +432,17 @@ export function createGuildBossSystem(DATA_PATH) {
       state.damageByUser[normalizedSender] = (state.damageByUser[normalizedSender] || 0) + damage;
       state.lastAttack[normalizedSender] = now;
 
-      // Kleiner XP-Bonus fürs Mitmachen
       users[normalizedSender].xp = (users[normalizedSender].xp || 0) + 5;
       save(FILES.users, users);
       saveState();
 
       const guildName = guilds[guildId]?.name || guildId;
       const critText = isCrit ? '💥 KRITISCHER TREFFER! ' : '';
-      const secretFlavor = isSecret ? '\n🌌 Eine unheimliche Macht durchströmt die Waffe...' : '';
+      const secretFlavor = isSecret && !isRagnarok ? '\n🌌 Eine unheimliche Macht durchströmt die Waffe...' : '';
+      const ragnarokFlavor = isRagnarok ? '\n⚫ *RAGNAROK ERWACHT* — die Klinge der Götterdämmerung tobt!' : '';
 
       await send(
-        `⚔️ ${critText}Mit ${weaponEmoji ? weaponEmoji + ' ' : ''}*${weaponName}* fügst du dem Boss *${damage}* Schaden zu!${secretFlavor}\n` +
+        `⚔️ ${critText}Mit ${weaponEmoji ? weaponEmoji + ' ' : ''}*${weaponName}* fügst du dem Boss *${damage}* Schaden zu!${secretFlavor}${ragnarokFlavor}\n` +
         `👹 ${state.name}: ${Math.max(0, state.hp)} / ${state.maxHp} HP\n` +
         `${hpBar(state.hp, state.maxHp)}\n` +
         `🛡️ Für Gilde: ${guildName}`
@@ -404,6 +467,7 @@ export function createGuildBossSystem(DATA_PATH) {
 ${'{P}'}bossevent start <hp> [min] — Boss starten (Owner)
 ${'{P}'}bossevent status — Boss-Status ansehen
 ${'{P}'}bossevent end — Event abbrechen (Owner)
-${'{P}'}bossattack — Dem Boss Schaden zufügen (Schaden = deine ausgerüstete Waffe!)`
+${'{P}'}bossattack — Dem Boss Schaden zufügen (Schaden = deine ausgerüstete Waffe!)
+_Der Top-Damage-Dealer hat 25% Chance auf Ragnarok — sonst erhält die ganze Gilde die Waffe!_`
   };
 }
