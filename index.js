@@ -798,6 +798,75 @@ function bjDraw() { return { value: BJ_VALUES[randInt(0, BJ_VALUES.length - 1)],
 function bjVal(card) { if (['J', 'Q', 'K'].includes(card.value)) return 10; if (card.value === 'A') return 11; return parseInt(card.value); }
 function bjScore(hand) { let s = 0, ac = 0; for (const c of hand) { if (c.value === 'A') { ac++; s += 11; } else s += bjVal(c); } while (s > 21 && ac > 0) { s -= 10; ac--; } return s; }
 
+const RARITY_INFO = {
+  common:    { label: 'Gewöhnlich', emoji: '⚪', weight: 45 },
+  uncommon:  { label: 'Ungewöhnlich', emoji: '🟢', weight: 30 },
+  rare:      { label: 'Selten', emoji: '🔵', weight: 15 },
+  epic:      { label: 'Episch', emoji: '🟣', weight: 8 },
+  legendary: { label: 'Legendär', emoji: '🟡', weight: 2 }
+};
+const ITEM_DB = {
+  // ---- WAFFEN ----
+  w_common_1:    { name: 'Rostiges Schwert',        type: 'weapon', rarity: 'common',    power: 8 },
+  w_common_2:    { name: 'Holzstab',                type: 'weapon', rarity: 'common',    power: 6 },
+  w_common_3:    { name: 'Alter Dolch',             type: 'weapon', rarity: 'common',    power: 7 },
+  w_uncommon_1:  { name: 'Stahlschwert',            type: 'weapon', rarity: 'uncommon',  power: 16 },
+  w_uncommon_2:  { name: 'Kampfaxt',                type: 'weapon', rarity: 'uncommon',  power: 18 },
+  w_uncommon_3:  { name: 'Kurzbogen',               type: 'weapon', rarity: 'uncommon',  power: 15 },
+  w_rare_1:      { name: 'Silberklinge',            type: 'weapon', rarity: 'rare',      power: 28 },
+  w_rare_2:      { name: 'Kristalldolch',           type: 'weapon', rarity: 'rare',      power: 26 },
+  w_rare_3:      { name: 'Kriegshammer',            type: 'weapon', rarity: 'rare',      power: 30 },
+  w_epic_1:      { name: 'Nachtschattenklinge',     type: 'weapon', rarity: 'epic',      power: 45 },
+  w_epic_2:      { name: 'Flammenschwert',          type: 'weapon', rarity: 'epic',      power: 48 },
+  w_epic_3:      { name: 'Sturmspeer',              type: 'weapon', rarity: 'epic',      power: 46 },
+  w_legendary_1: { name: 'Elucidator',              type: 'weapon', rarity: 'legendary', power: 70 },
+  w_legendary_2: { name: 'Dark Repulser',           type: 'weapon', rarity: 'legendary', power: 68 },
+  w_legendary_3: { name: 'Lambent Light',           type: 'weapon', rarity: 'legendary', power: 66 },
+
+  // ---- SECRET-WAFFEN (nur Owner, nie via Kiste/Shop) ----
+  w_excalibur: {
+    name: 'Excalibur',
+    type: 'weapon',
+    rarity: 'legendary',
+    power: 95,
+    secret: true,
+    ownerOnly: true
+  },
+  w_ragnarok: {
+    name: 'Ragnarok',
+    trueName: 'Die Klinge der Götterdämmerung',
+    type: 'weapon',
+    rarity: 'legendary',
+    power: 90,
+    secret: true,
+    bossBonus: 0.30
+  },
+
+  // ---- RÜSTUNGEN ----
+  a_common_1:    { name: 'Lederrüstung',            type: 'armor',  rarity: 'common',    power: 8 },
+  a_common_2:    { name: 'Stoffmantel',             type: 'armor',  rarity: 'common',    power: 6 },
+  a_common_3:    { name: 'Einfacher Schild',        type: 'armor',  rarity: 'common',    power: 7 },
+  a_uncommon_1:  { name: 'Kettenhemd',              type: 'armor',  rarity: 'uncommon',  power: 16 },
+  a_uncommon_2:  { name: 'Verstärkte Weste',        type: 'armor',  rarity: 'uncommon',  power: 18 },
+  a_uncommon_3:  { name: 'Eisenschild',             type: 'armor',  rarity: 'uncommon',  power: 15 },
+  a_rare_1:      { name: 'Silberharnisch',          type: 'armor',  rarity: 'rare',      power: 28 },
+  a_rare_2:      { name: 'Drachenschuppen-Umhang',  type: 'armor',  rarity: 'rare',      power: 30 },
+  a_rare_3:      { name: 'Kristallschild',          type: 'armor',  rarity: 'rare',      power: 26 },
+  a_epic_1:      { name: 'Nachtschatten-Rüstung',   type: 'armor',  rarity: 'epic',      power: 46 },
+  a_epic_2:      { name: 'Phönixmantel',            type: 'armor',  rarity: 'epic',      power: 45 },
+  a_epic_3:      { name: 'Titanplatte',             type: 'armor',  rarity: 'epic',      power: 48 },
+  a_legendary_1: { name: 'Coat of Midnight',        type: 'armor',  rarity: 'legendary', power: 70 },
+  a_legendary_2: { name: 'Rune des Kobold-Königs',  type: 'armor',  rarity: 'legendary', power: 68 },
+  a_legendary_3: { name: 'Himmlischer Panzer',      type: 'armor',  rarity: 'legendary', power: 66 },
+
+  // ---- SECRET-RÜSTUNG (Pendant zu Excalibur) ----
+  a_aegis: {
+    name: 'Aegis des Systemadministrators',
+    type: 'armor',
+    rarity: 'legendary',
+    power: 92,
+    secret: true,
+    ownerOnly: true
 
 import express from 'express';
 import cors from 'cors';
