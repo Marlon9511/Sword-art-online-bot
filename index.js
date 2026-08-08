@@ -5000,6 +5000,40 @@ if (cmd === 'myid') {
   }
   return send(`🆔 Deine ID: *${webId}*\n\n(Passwort vergessen? Setze es neu mit ${activePrefix}setpasswort <neues-passwort> — die ID bleibt gleich.)`);
 }
+// KISTE AN ALLE — verschenkt jedem registrierten User X Kisten
+if (cmd === 'kisteall' || cmd === 'giftkisteall') {
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
+
+  const amount = parseInt(args[0]) || 1;
+  if (amount < 1 || amount > 50) {
+    return send(`❌ Nutzung: ${activePrefix}kisteall [anzahl]\nBeispiel: ${activePrefix}kisteall 1\n(Erlaubt: 1-50 Kisten pro User)`);
+  }
+
+  const registeredJids = Object.keys(users).filter(jid => users[jid]?.registered === true);
+  if (!registeredJids.length) return send('ℹ️ Es sind keine registrierten Nutzer vorhanden.');
+
+  for (const jid of registeredJids) {
+    if (!users[jid].items) users[jid].items = {};
+    users[jid].items['kiste'] = (users[jid].items['kiste'] || 0) + amount;
+  }
+  save(FILES.users, users);
+
+  await send(`🎁 ${amount}x Kiste an ${registeredJids.length} registrierte Nutzer verschenkt...`);
+
+  // Optional: jeden einzeln benachrichtigen (kann bei vielen Usern etwas dauern)
+  let notified = 0;
+  for (const jid of registeredJids) {
+    try {
+      await sock.sendMessage(jid, {
+        text: `🎁 Der Owner hat dir ${amount}x *Kiste* geschenkt! Öffne sie mit ${activePrefix}openkiste`
+      });
+      notified++;
+      await sleep(200);
+    } catch (e) {}
+  }
+
+  return send(`✅ Fertig! ${amount}x Kiste an ${registeredJids.length} Nutzer gutgeschrieben (${notified} davon benachrichtigt).`);
+}
 // Unbekannter Befehl
 const suggestion = findClosestCommand(cmd);
 if (suggestion) {
