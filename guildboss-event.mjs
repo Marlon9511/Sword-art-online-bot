@@ -27,7 +27,16 @@ const CRIT_CHANCE_BY_RARITY = { common: 5, uncommon: 8, rare: 12, epic: 16, lege
 
 // ID der exklusiven Boss-Event-Waffe (muss zu arena-system.mjs passen)
 const RAGNAROK_ITEM_ID = 'w_ragnarok';
-const RAGNAROK_DROP_CHANCE_PERCENT = 25; // 25% Chance, dass der Top-1-Spieler sie bekommt
+
+// Skalierende Chance: je mehr HP der Boss hatte, desto höher die Ragnarok-Chance
+const RAGNAROK_BASE_CHANCE_PERCENT = 10;      // Mindest-Chance, auch bei kleinen Bossen
+const RAGNAROK_CHANCE_PER_1000_HP = 5;        // +5% pro 1000 maxHp
+const RAGNAROK_MAX_CHANCE_PERCENT = 75;       // Deckel, damit es nie garantiert ist
+
+function calculateRagnarokChance(maxHp) {
+  const chance = RAGNAROK_BASE_CHANCE_PERCENT + (maxHp / 1000) * RAGNAROK_CHANCE_PER_1000_HP;
+  return Math.min(RAGNAROK_MAX_CHANCE_PERCENT, Math.round(chance));
+}
 
 export function createGuildBossSystem(DATA_PATH) {
   const BOSS_FILE = path.join(DATA_PATH, 'guildboss.json');
@@ -144,11 +153,13 @@ export function createGuildBossSystem(DATA_PATH) {
   }
 
   // ===== Ragnarok-Vergabe nach Event-Ende =====
-  // 25% Chance: Top-1-Spieler bekommt Ragnarok exklusiv.
-  // 75% Chance: Die gesamte siegreiche Gilde bekommt je eine Ragnarok.
-  function distributeRagnarok({ users, guilds, save, FILES, ITEM_DB, ensureArenaFields, randInt, winningGuildId, topPlayerJid }) {
+  // Chance skaliert mit der maxHp des Bosses (siehe calculateRagnarokChance).
+  // Trifft die Chance: Top-1-Spieler bekommt Ragnarok exklusiv.
+  // Trifft sie nicht: Die gesamte siegreiche Gilde bekommt je eine Ragnarok.
+  function distributeRagnarok({ users, guilds, save, FILES, ITEM_DB, ensureArenaFields, randInt, winningGuildId, topPlayerJid, maxHp }) {
+    const dropChance = calculateRagnarokChance(maxHp);
     const roll = randInt(1, 100);
-    const wentToTopPlayer = roll <= RAGNAROK_DROP_CHANCE_PERCENT;
+    const wentToTopPlayer = roll <= dropChance;
 
     const recipients = [];
 
@@ -168,7 +179,7 @@ export function createGuildBossSystem(DATA_PATH) {
     }
 
     save(FILES.users, users);
-    return { wentToTopPlayer, recipients };
+    return { wentToTopPlayer, recipients, dropChance };
   }
 
   async function endEvent({ send, sock, users, guilds, save, FILES, getNumberMention, ITEM_DB, ensureArenaFields, randInt }, reason = 'time') {
@@ -222,12 +233,12 @@ export function createGuildBossSystem(DATA_PATH) {
 
     save(FILES.users, users);
 
-    // ===== NEU: Ragnarok-Vergabe =====
+    // ===== Ragnarok-Vergabe =====
     let ragnarokLine = '';
     if (ITEM_DB && ensureArenaFields && randInt && ITEM_DB[RAGNAROK_ITEM_ID]) {
-      const { wentToTopPlayer, recipients } = distributeRagnarok({
+      const { wentToTopPlayer, recipients, dropChance } = distributeRagnarok({
         users, guilds, save, FILES, ITEM_DB, ensureArenaFields, randInt,
-        winningGuildId, topPlayerJid
+        winningGuildId, topPlayerJid, maxHp: state.maxHp
       });
 
       const ragnarok = ITEM_DB[RAGNAROK_ITEM_ID];
@@ -239,13 +250,14 @@ export function createGuildBossSystem(DATA_PATH) {
           `\n\n⚫✨ *— LEGENDÄRER DROP —* ✨⚫\n` +
           `Das System erzittert... ${mention} hat *${ragnarok.name}* erhalten!\n` +
           `_${ragnarok.trueName}_\n` +
-          `🍀 Chance war nur ${RAGNAROK_DROP_CHANCE_PERCENT}%!`;
+          `🍀 Chance war ${dropChance}% (basierend auf ${state.maxHp} Boss-HP)!`;
       } else if (recipients.length) {
         mentions.push(...recipients);
         ragnarokLine =
           `\n\n⚫✨ *— LEGENDÄRER GILDEN-SEGEN —* ✨⚫\n` +
           `Kein Einzelheld war würdig genug — stattdessen hat die *gesamte Gilde ${guildName}* je eine *${ragnarok.name}* erhalten!\n` +
-          `_${ragnarok.trueName}_`;
+          `_${ragnarok.trueName}_\n` +
+          `🍀 Chance auf Einzeldrop war ${dropChance}% (basierend auf ${state.maxHp} Boss-HP).`;
       }
     }
 
@@ -346,7 +358,7 @@ export function createGuildBossSystem(DATA_PATH) {
           `➡️ ${activePrefix}bossevent status — Status anzeigen\n\n` +
           `💡 Rüstet eure beste Waffe mit ${activePrefix}equip aus, bevor ihr angreift!\n` +
           `🏆 Die Gilde mit dem meisten Gesamtschaden gewinnt die Belohnung!\n` +
-          `⚫ Der Spieler mit dem höchsten Einzelschaden hat 25% Chance auf *Ragnarok* — die stärkste Waffe im Spiel!\n` +
+          `⚫ Der Spieler mit dem höchsten Einzelschaden hat ${calculateRagnarokChance(hp)}% Chance auf *Ragnarok* — die stärkste Waffe im Spiel!\n` +
           `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈`
         );
         return true;
@@ -387,7 +399,8 @@ export function createGuildBossSystem(DATA_PATH) {
           `👹 *${state.name}*\n` +
           `❤️ HP: ${Math.max(0, state.hp)} / ${state.maxHp}\n` +
           `${hpBar(state.hp, state.maxHp)}\n` +
-          `⏳ Verbleibend: ${timeLeft}${topPlayerPreview}\n\n` +
+          `⏳ Verbleibend: ${timeLeft}${topPlayerPreview}\n` +
+          `⚫ Ragnarok-Chance bei Sieg: ${calculateRagnarokChance(state.maxHp)}%\n\n` +
           `📊 *Aktuelle Gilden-Rangliste:*\n${guildRanking}\n\n` +
           `Nutze ${activePrefix}bossattack, um mitzukämpfen!`
         );
@@ -468,6 +481,6 @@ ${'{P}'}bossevent start <hp> [min] — Boss starten (Owner)
 ${'{P}'}bossevent status — Boss-Status ansehen
 ${'{P}'}bossevent end — Event abbrechen (Owner)
 ${'{P}'}bossattack — Dem Boss Schaden zufügen (Schaden = deine ausgerüstete Waffe!)
-_Der Top-Damage-Dealer hat 25% Chance auf Ragnarok — sonst erhält die ganze Gilde die Waffe!_`
+_Der Top-Damage-Dealer hat je nach Boss-HP eine steigende Chance auf Ragnarok — sonst erhält die ganze Gilde die Waffe!_`
   };
 }
