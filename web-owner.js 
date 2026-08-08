@@ -1,0 +1,163 @@
+// web-owner.js
+// Owner-Dashboard-API: Nutzer verwalten, Ränge setzen, bannen/entbannen,
+// Coins/XP vergeben, Broadcasts senden.
+// Nutzt dieselben In-Memory-Objekte wie der Bot (users, ranks, bans),
+// damit Web und WhatsApp immer synchron bleiben.
+
+import express from 'express';
+
+const VALID_RANKS = ['OWNER', 'COOWNER', 'ADMIN', 'MOD', 'VIP', 'SUPPORTER', 'TEST_SUPPORTER', 'USER'];
+
+/**
+ * @param {object} deps
+ * @param {object} deps.users
+ * @param {object} deps.ranks
+ * @param {object} deps.bans
+ * @param {function} deps.save
+ * @param {object} deps.FILES
+ * @param {function} deps.normalizeJid
+ * @param {Map}      deps.activeSessions - Map<sessionName, sock> aus index.js
+ */
+export function createOwnerRoutes({ users, ranks, bans, save, FILES, normalizeJid, activeSessions }) {
+  const router = express.Router();
+
+  const findUserByWebId = (webId) => Object.entries(users).find(([, u]) => u.webId === webId) || null;
+
+  function getRank(jid) {
+    return ranks[jid] || users[jid]?.rank || 'USER';
+  }
+  function isOwnerRank(rank) {
+    return rank === 'OWNER' || rank === 'COOWNER';
+  }
+
+  // Jede Route hier erfordert: eingeloggt (authenticateToken, kommt aus index.js)
+  // UND Rang OWNER/COOWNER.
+  router.use((req, res, next) => {
+    const entry = findUserByWebId(req.webId);
+    if (!entry) return res.status(404).json({ success: false, error: 'Nutzer nicht gefunden.' });
+    const [jid] = entry;
+    if (!isOwnerRank(getRank(jid))) {
+      return res.status(403).json({ success: false, error: 'Kein Zugriff. Nur für Owner/Co-Owner.' });
+    }
+    req.callerJid = jid;
+    next();
+  });
+
+  // ---- Übersicht ----
+  router.get('/overview', (req, res) => {
+    const all = Object.values(users);
+    return res.json({
+      success: true,
+      isOwner: true,
+      totalUsers: all.length,
+      registeredUsers: all.filter(u => u.registered).length,
+      bannedUsers: Object.keys(bans || {}).length,
+      activeSessions: [...activeSessions.keys()]
+    });
+  });
+
+  // ---- Nutzerliste ----
+  router.get('/users', (req, res) => {
+    const list = Object.entries(users).map(([jid, u]) => ({
+      jid,
+      name: u.name || u.registrationName || null,
+      rank: getRank(jid),
+      coins: u.coins || 0,
+      level: u.level || 1,
+      xp: u.xp || 0,
+      registered: !!u.registered,
+      banned: !!bans[jid]
+    })).sort((a, b) => (b.level - a.level) || (b.coins - a.coins));
+    return res.json({ success: true, users: list });
+  });
+
+  // ---- Rang setzen ----
+  router.post('/rank', (req, res) => {
+    const { jid, rank } = req.body || {};
+    if (!jid || !rank) return res.status(400).json({ success: false, error: 'jid und rank erforderlich.' });
+    const target = normalizeJid(jid);
+    const rankUpper = String(rank).toUpperCase();
+    if (!VALID_RANKS.includes(rankUpper)) {
+      return res.status(400).json({ success: false, error: `Ungültiger Rang. Erlaubt: ${VALID_RANKS.join(', ')}` });
+    }
+    if (!users[target]) return res.status(404).json({ success: false, error: 'Nutzer nicht gefunden.' });
+
+    ranks[target] = rankUpper;
+    users[target].rank = rankUpper;
+    save(FILES.ranks, ranks);
+    save(FILES.users, users);
+    return res.json({ success: true, jid: target, rank: rankUpper });
+  });
+
+  // ---- Bannen ----
+  router.post('/ban', (req, res) => {
+    const { jid, reason } = req.body || {};
+    if (!jid) return res.status(400).json({ success: false, error: 'jid erforderlich.' });
+    const target = normalizeJid(jid);
+    bans[target] = { by: `web:${req.callerJid}`, at: new Date().toISOString(), reason: reason || 'Kein Grund' };
+    save(FILES.bans, bans);
+    return res.json({ success: true, jid: target, banned: true });
+  });
+
+  // ---- Entbannen ----
+  router.post('/unban', (req, res) => {
+    const { jid } = req.body || {};
+    if (!jid) return res.status(400).json({ success: false, error: 'jid erforderlich.' });
+    const target = normalizeJid(jid);
+    delete bans[target];
+    save(FILES.bans, bans);
+    return res.json({ success: true, jid: target, banned: false });
+  });
+
+  // ---- Coins vergeben (+/-) ----
+  router.post('/coins', (req, res) => {
+    const { jid, amount } = req.body || {};
+    const amt = parseInt(amount);
+    if (!jid || isNaN(amt)) return res.status(400).json({ success: false, error: 'jid und amount erforderlich.' });
+    const target = normalizeJid(jid);
+    if (!users[target]) return res.status(404).json({ success: false, error: 'Nutzer nicht gefunden.' });
+    users[target].coins = Math.max(0, (users[target].coins || 0) + amt);
+    save(FILES.users, users);
+    return res.json({ success: true, jid: target, coins: users[target].coins });
+  });
+
+  // ---- XP vergeben (+/-) ----
+  router.post('/xp', (req, res) => {
+    const { jid, amount } = req.body || {};
+    const amt = parseInt(amount);
+    if (!jid || isNaN(amt)) return res.status(400).json({ success: false, error: 'jid und amount erforderlich.' });
+    const target = normalizeJid(jid);
+    if (!users[target]) return res.status(404).json({ success: false, error: 'Nutzer nicht gefunden.' });
+    users[target].xp = Math.max(0, (users[target].xp || 0) + amt);
+    save(FILES.users, users);
+    return res.json({ success: true, jid: target, xp: users[target].xp });
+  });
+
+  // ---- Broadcast an alle Gruppen einer Session ----
+  router.post('/broadcast', async (req, res) => {
+    const { text, session } = req.body || {};
+    if (!text || !text.trim()) return res.status(400).json({ success: false, error: 'text erforderlich.' });
+
+    const sessionName = session || 'default';
+    const sock = activeSessions.get(sessionName);
+    if (!sock) return res.status(400).json({ success: false, error: `Session "${sessionName}" ist nicht aktiv.` });
+
+    try {
+      const groups = await sock.groupFetchAllParticipating();
+      const gids = Object.keys(groups);
+      let sent = 0;
+      for (const gid of gids) {
+        try {
+          await sock.sendMessage(gid, { text: `📣 Broadcast:\n${text}` });
+          sent++;
+          await new Promise(r => setTimeout(r, 300));
+        } catch (e) {}
+      }
+      return res.json({ success: true, sentTo: sent, totalGroups: gids.length });
+    } catch (e) {
+      return res.status(500).json({ success: false, error: 'Broadcast fehlgeschlagen: ' + e.message });
+    }
+  });
+
+  return router;
+}
