@@ -425,7 +425,7 @@
       <div class="auth-msg" id="authMsg"></div>
     </form>
 
-    <p class="security-note">Demo-System ohne echtes Backend: Zugangsdaten werden unverschlüsselt gespeichert. Bitte kein echtes/wiederverwendetes Passwort nutzen.</p>
+    <p class="security-note">Passwörter werden gehasht (SHA-256) in einer Firebase-Cloud-Datenbank gespeichert. Trotzdem: kein echtes/wiederverwendetes Passwort nutzen.</p>
   </div>
 </div>
 
@@ -572,6 +572,94 @@
   </div>
 </footer>
 
+<!-- ============================================================
+  FIREBASE SETUP — WICHTIG, BITTE LESEN
+  ============================================================
+  Diese Seite nutzt Firebase Firestore als zentrale, kostenlose
+  Cloud-Datenbank für Registrierung/Login (funktioniert
+  geräteübergreifend, auch auf GitHub Pages).
+
+  So richtest du es ein (einmalig, ca. 5 Minuten):
+  1. Gehe zu https://console.firebase.google.com und erstelle
+     ein kostenloses Projekt (Google-Konto nötig).
+  2. Im Projekt links auf "Build" -> "Firestore Database" ->
+     "Datenbank erstellen" -> Modus "Testmodus" (oder Produktions-
+     modus + eigene Regeln, siehe unten) -> Standort wählen -> fertig.
+  3. Links auf das Zahnrad -> "Projekteinstellungen" -> ganz unten
+     bei "Meine Apps" auf das Web-Symbol (</>) klicken -> App
+     registrieren (kein Hosting nötig) -> die angezeigten
+     firebaseConfig-Werte kopieren.
+  4. Die kopierten Werte unten bei "firebaseConfig" einfügen
+     (ersetze die Platzhalter-Werte).
+  5. In der Firestore-Konsole unter "Regeln" folgende Regeln
+     einfügen, damit nur die "users"-Sammlung nutzbar ist:
+
+     rules_version = '2';
+     service cloud.firestore {
+       match /databases/{database}/documents {
+         match /users/{userId} {
+           allow read, create: if true;
+           allow update, delete: if false;
+         }
+       }
+     }
+
+     Das erlaubt jedem, einen neuen Nutzer anzulegen und die
+     Nutzerliste zu lesen (nötig fürs Login), verhindert aber
+     dass jemand fremde Accounts löscht/überschreibt.
+     Für mehr Sicherheit später: Firebase Authentication statt
+     eigenem Passwortsystem nutzen.
+============================================================ -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+  import {
+    getFirestore, doc, getDoc, setDoc
+  } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+  // ---- HIER DEINE EIGENEN FIREBASE-WERTE EINTRAGEN ----
+  const firebaseConfig = {
+    apiKey: "DEIN_API_KEY",
+    authDomain: "DEIN_PROJEKT.firebaseapp.com",
+    projectId: "DEIN_PROJEKT",
+    storageBucket: "DEIN_PROJEKT.appspot.com",
+    messagingSenderId: "DEINE_SENDER_ID",
+    appId: "DEINE_APP_ID"
+  };
+  // -------------------------------------------------------
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  async function hashPassword(pw){
+    const enc = new TextEncoder().encode(pw);
+    const buf = await crypto.subtle.digest('SHA-256', enc);
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+  }
+
+  window.__firebaseAuth = {
+    async getUser(id){
+      const snap = await getDoc(doc(db, "users", id.toLowerCase()));
+      return snap.exists() ? snap.data() : null;
+    },
+    async register(id, pass){
+      const key = id.toLowerCase();
+      const existing = await getDoc(doc(db, "users", key));
+      if(existing.exists()) return { ok:false, reason:"exists" };
+      const passHash = await hashPassword(pass);
+      await setDoc(doc(db, "users", key), { displayId: id, passHash, createdAt: Date.now() });
+      return { ok:true };
+    },
+    async login(id, pass){
+      const key = id.toLowerCase();
+      const snap = await getDoc(doc(db, "users", key));
+      if(!snap.exists()) return { ok:false, reason:"not_found" };
+      const passHash = await hashPassword(pass);
+      if(snap.data().passHash !== passHash) return { ok:false, reason:"wrong_pass" };
+      return { ok:true, displayId: snap.data().displayId };
+    }
+  };
+</script>
+
 <script>
   // Sternenfeld generieren
   const starfield = document.getElementById('starfield');
@@ -595,7 +683,6 @@
   const hasSource = bgVideo.querySelector('source') !== null;
 
   if (!hasSource) {
-    // Kein Clip hinterlegt -> Hinweis zeigen, Fallback läuft weiter
     videoNotice.classList.add('show');
     aincradBg.classList.add('show');
   } else {
@@ -606,7 +693,6 @@
       videoNotice.classList.add('show');
       aincradBg.classList.add('show');
     });
-    // Aincrad-Effekt trotzdem ab den Features leicht einblenden (subtiler Layer über Video)
     const featuresSection = document.getElementById('features');
     const bgObserver = new IntersectionObserver((entries)=>{
       entries.forEach(e=>{
@@ -621,12 +707,8 @@
   }, {threshold:0.12});
   document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
 
-  // ---------- Auth-System (Demo, ohne echtes Backend) ----------
-  // Nutzerliste wird geteilt gespeichert (shared=true), damit sich Registrierungen
-  // über verschiedene Sitzungen/Geräte hinweg wiederfinden. Passwörter liegen dabei
-  // im Klartext im geteilten Speicher -> NICHT für echte/sensible Passwörter geeignet.
-  const USERS_KEY = 'registered_users';
-  let currentUser = null; // nur für die Dauer dieser Seiten-Sitzung im Speicher (kein localStorage)
+  // ---------- Auth-System (Firebase Firestore) ----------
+  let currentUser = null; // nur für die Dauer dieser Seiten-Sitzung im Speicher
 
   const overlay = document.getElementById('authOverlay');
   const loginBtn = document.getElementById('loginBtn');
@@ -670,7 +752,6 @@
 
   loginBtn.addEventListener('click', () => {
     if(currentUser){
-      // eingeloggt -> Klick loggt aus
       currentUser = null;
       updateAuthUI();
       return;
@@ -694,24 +775,6 @@
     }
   }
 
-  async function getUsers(){
-    try{
-      const res = await window.storage.get(USERS_KEY, true);
-      return res ? JSON.parse(res.value) : {};
-    }catch(err){
-      return {};
-    }
-  }
-
-  async function saveUsers(users){
-    try{
-      const res = await window.storage.set(USERS_KEY, JSON.stringify(users), true);
-      return !!res;
-    }catch(err){
-      return false;
-    }
-  }
-
   authForm.addEventListener('submit', async (e)=>{
     e.preventDefault();
     const id = authId.value.trim();
@@ -725,46 +788,52 @@
       return;
     }
 
+    if(!window.__firebaseAuth){
+      authMsg.textContent = 'Firebase ist nicht korrekt eingerichtet.';
+      authMsg.className = 'auth-msg error';
+      return;
+    }
+
     authSubmitBtn.disabled = true;
     authLoading.classList.add('show');
 
     try{
-      const users = await getUsers();
-
       if(mode === 'register'){
-        if(users[id]){
+        const res = await window.__firebaseAuth.register(id, pass);
+        if(!res.ok && res.reason === 'exists'){
           authMsg.textContent = 'Diese ID ist bereits vergeben.';
           authMsg.className = 'auth-msg error';
+        } else if(!res.ok){
+          authMsg.textContent = 'Registrierung fehlgeschlagen. Bitte erneut versuchen.';
+          authMsg.className = 'auth-msg error';
         } else {
-          users[id] = pass;
-          const ok = await saveUsers(users);
-          if(ok){
-            authMsg.textContent = 'Registrierung erfolgreich! Du bist jetzt angemeldet.';
-            authMsg.className = 'auth-msg ok';
-            currentUser = id;
-            updateAuthUI();
-            setTimeout(closeModal, 900);
-          } else {
-            authMsg.textContent = 'Speichern fehlgeschlagen. Bitte erneut versuchen.';
-            authMsg.className = 'auth-msg error';
-          }
+          authMsg.textContent = 'Registrierung erfolgreich! Du bist jetzt angemeldet.';
+          authMsg.className = 'auth-msg ok';
+          currentUser = id;
+          updateAuthUI();
+          setTimeout(closeModal, 900);
         }
       } else {
-        if(!users[id]){
+        const res = await window.__firebaseAuth.login(id, pass);
+        if(!res.ok && res.reason === 'not_found'){
           authMsg.textContent = 'Diese ID ist nicht registriert.';
           authMsg.className = 'auth-msg error';
-        } else if(users[id] !== pass){
+        } else if(!res.ok && res.reason === 'wrong_pass'){
           authMsg.textContent = 'Falsches Passwort.';
+          authMsg.className = 'auth-msg error';
+        } else if(!res.ok){
+          authMsg.textContent = 'Anmeldung fehlgeschlagen.';
           authMsg.className = 'auth-msg error';
         } else {
           authMsg.textContent = 'Anmeldung erfolgreich!';
           authMsg.className = 'auth-msg ok';
-          currentUser = id;
+          currentUser = res.displayId || id;
           updateAuthUI();
           setTimeout(closeModal, 700);
         }
       }
     } catch(err){
+      console.error(err);
       authMsg.textContent = 'Verbindung zum Server fehlgeschlagen.';
       authMsg.className = 'auth-msg error';
     } finally {
