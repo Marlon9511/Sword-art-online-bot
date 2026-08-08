@@ -1,5 +1,5 @@
 // app.js — AINCRAD Web-Terminal
-// Spricht mit den Endpunkten aus web-auth.js / web-games.js.
+// Spricht mit den Endpunkten aus web-auth.js / web-games.js / web-owner.js.
 
 const API_BASE = ''; // gleiche Origin wie die Seite; bei getrenntem Server: 'http://DEIN-SERVER:3001'
 
@@ -64,6 +64,7 @@ async function enterHub() {
   loginScreen.hidden = true;
   hubScreen.hidden = false;
   await refreshHud();
+  await checkOwnerAccess();
 }
 
 function applyStats(s) {
@@ -87,6 +88,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.game-panel').forEach(p => p.hidden = true);
     btn.classList.add('active');
     document.querySelector(`.game-panel[data-panel="${btn.dataset.game}"]`).hidden = false;
+    if (btn.dataset.game === 'owner') loadOwnerData();
   });
 });
 
@@ -176,6 +178,121 @@ document.querySelectorAll('.rps-btn').forEach(btn => {
     resultEl.textContent = msg[data.result];
     applyStats(data);
   });
+});
+
+// ---------------- OWNER ----------------
+const ownerTabBtn = document.getElementById('ownerTabBtn');
+const ownerOverviewEl = document.getElementById('ownerOverview');
+const ownerUserBody = document.getElementById('ownerUserBody');
+const ownerActionResult = document.getElementById('ownerActionResult');
+const RANKS = ['OWNER', 'COOWNER', 'ADMIN', 'MOD', 'VIP', 'SUPPORTER', 'TEST_SUPPORTER', 'USER'];
+
+async function checkOwnerAccess() {
+  const data = await apiGet('/api/owner/overview');
+  if (data.success && data.isOwner) {
+    ownerTabBtn.hidden = false;
+  }
+}
+
+async function loadOwnerData() {
+  const overview = await apiGet('/api/owner/overview');
+  if (overview.success) {
+    ownerOverviewEl.innerHTML = `
+      <div><b>${overview.totalUsers}</b>Nutzer gesamt</div>
+      <div><b>${overview.registeredUsers}</b>Registriert</div>
+      <div><b>${overview.bannedUsers}</b>Gebannt</div>
+      <div><b>${overview.activeSessions.length}</b>Aktive Sessions</div>
+    `;
+  }
+
+  const usersData = await apiGet('/api/owner/users');
+  if (!usersData.success) {
+    ownerUserBody.innerHTML = `<tr><td colspan="5">⚠ ${usersData.error}</td></tr>`;
+    return;
+  }
+  renderOwnerTable(usersData.users);
+}
+
+function renderOwnerTable(users) {
+  ownerUserBody.innerHTML = '';
+  users.forEach(u => {
+    const tr = document.createElement('tr');
+
+    const rankOptions = RANKS.map(r => `<option value="${r}" ${r === u.rank ? 'selected' : ''}>${r}</option>`).join('');
+
+    tr.innerHTML = `
+      <td>${u.name || u.jid.split('@')[0]}${u.banned ? ' 🚫' : ''}</td>
+      <td><select data-jid="${u.jid}" class="rankSelect">${rankOptions}</select></td>
+      <td>${u.level}</td>
+      <td>${u.coins}</td>
+      <td>
+        <div class="owner-row-actions">
+          <button class="owner-mini-btn coinsBtn" data-jid="${u.jid}" data-amount="100">+100💰</button>
+          <button class="owner-mini-btn xpBtn" data-jid="${u.jid}" data-amount="100">+100✨</button>
+          ${u.banned
+            ? `<button class="owner-mini-btn unbanBtn" data-jid="${u.jid}">Entbannen</button>`
+            : `<button class="owner-mini-btn danger banBtn" data-jid="${u.jid}">Bannen</button>`}
+        </div>
+      </td>
+    `;
+    ownerUserBody.appendChild(tr);
+  });
+
+  // Rang ändern
+  document.querySelectorAll('.rankSelect').forEach(sel => {
+    sel.addEventListener('change', async () => {
+      const data = await apiPost('/api/owner/rank', { jid: sel.dataset.jid, rank: sel.value });
+      ownerActionResult.textContent = data.success ? `✅ Rang gesetzt: ${sel.value}` : `⚠ ${data.error}`;
+    });
+  });
+
+  // Coins geben
+  document.querySelectorAll('.coinsBtn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const data = await apiPost('/api/owner/coins', { jid: btn.dataset.jid, amount: parseInt(btn.dataset.amount) });
+      if (data.success) { ownerActionResult.textContent = `✅ Coins aktualisiert: ${data.coins}`; loadOwnerData(); }
+      else ownerActionResult.textContent = `⚠ ${data.error}`;
+    });
+  });
+
+  // XP geben
+  document.querySelectorAll('.xpBtn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const data = await apiPost('/api/owner/xp', { jid: btn.dataset.jid, amount: parseInt(btn.dataset.amount) });
+      if (data.success) { ownerActionResult.textContent = `✅ XP aktualisiert: ${data.xp}`; loadOwnerData(); }
+      else ownerActionResult.textContent = `⚠ ${data.error}`;
+    });
+  });
+
+  // Bannen
+  document.querySelectorAll('.banBtn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const reason = prompt('Grund für den Bann (optional):') || '';
+      const data = await apiPost('/api/owner/ban', { jid: btn.dataset.jid, reason });
+      if (data.success) { ownerActionResult.textContent = '✅ Gebannt.'; loadOwnerData(); }
+      else ownerActionResult.textContent = `⚠ ${data.error}`;
+    });
+  });
+
+  // Entbannen
+  document.querySelectorAll('.unbanBtn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const data = await apiPost('/api/owner/unban', { jid: btn.dataset.jid });
+      if (data.success) { ownerActionResult.textContent = '✅ Entbannt.'; loadOwnerData(); }
+      else ownerActionResult.textContent = `⚠ ${data.error}`;
+    });
+  });
+}
+
+document.getElementById('broadcastSend').addEventListener('click', async () => {
+  const text = document.getElementById('broadcastText').value.trim();
+  const resultEl = document.getElementById('broadcastResult');
+  if (!text) { resultEl.textContent = '⚠ Bitte Text eingeben.'; return; }
+  resultEl.textContent = '⏳ Sende...';
+  const data = await apiPost('/api/owner/broadcast', { text });
+  resultEl.textContent = data.success
+    ? `✅ An ${data.sentTo}/${data.totalGroups} Gruppen gesendet.`
+    : `⚠ ${data.error}`;
 });
 
 tryAutoLogin();
