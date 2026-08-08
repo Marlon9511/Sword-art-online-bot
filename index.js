@@ -19,7 +19,7 @@ import { createGuildSystem, GUILD_COMMANDS, GUILD_HELP_TEXT } from './guild-syst
 import { createTitleSystem, TITLE_COMMANDS, TITLE_HELP_TEXT, checkProgress, TITLES } from './titel-achievments.js';
 import { createPokemonSystem, POKEMON_COMMANDS, POKEMON_HELP_TEXT } from './pokemon-system.mjs';
 import { createMenuSystem, MENU_COMMANDS } from './menu-system.mjs';
-
+import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -607,7 +607,37 @@ function protectPrimaryOwner() {
   }
 }
 protectPrimaryOwner();
+function generateWebId() {
+  // 6-stellige, gut lesbare ID (keine verwechselbaren Zeichen wie 0/O, 1/I)
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let id;
+  do {
+    id = '';
+    for (let i = 0; i < 6; i++) {
+      id += chars[Math.floor(Math.random() * chars.length)];
+    }
+  } while (Object.values(users).some(u => u.webId === id));
+  return id;
+}
 
+function hashPassword(password, salt) {
+  return crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
+}
+
+function setUserWebPassword(jid, password) {
+  const normalizedJid = normalizeJid(jid);
+  ensureUser(normalizedJid);
+  const u = users[normalizedJid];
+  if (!u.webId) {
+    u.webId = generateWebId();
+  }
+  const salt = crypto.randomBytes(16).toString('hex');
+  u.webPasswordSalt = salt;
+  u.webPasswordHash = hashPassword(password, salt);
+  u.webPasswordSetAt = new Date().toISOString();
+  save(FILES.users, users);
+  return u.webId;
+}
 function ensureUser(rawJid) {
   const jid = normalizeJid(rawJid);
   if (deletedUsers[jid]) return;
