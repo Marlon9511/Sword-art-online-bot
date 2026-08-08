@@ -193,6 +193,15 @@
   .feature-card p{color:var(--dim);font-size:14px;font-family:var(--font-body);}
 
   /* ---------- team ---------- */
+  .live-indicator{
+    display:inline-flex;align-items:center;gap:8px;
+    font-family:var(--font-display);font-size:12px;letter-spacing:0.1em;text-transform:uppercase;
+    color:var(--dim);margin-bottom:28px;
+  }
+  .live-dot{width:8px;height:8px;border-radius:50%;background:#57d68d;box-shadow:0 0 8px #57d68d;animation:pulse 2s ease-in-out infinite;}
+  .live-dot.offline{background:#ff3f5e;box-shadow:0 0 8px #ff3f5e;animation:none;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.35;}}
+
   .role-tier{margin-bottom:42px;}
   .role-tier-head{display:flex;align-items:baseline;gap:12px;margin-bottom:18px;padding-bottom:10px;border-bottom:1px solid var(--rc,rgba(111,224,255,0.2));}
   .role-tier-head h3{font-size:20px;color:var(--rc,var(--cyan));}
@@ -217,6 +226,7 @@
   }
   .player-name{font-weight:600;font-size:15px;font-family:var(--font-body);}
   .player-role{font-family:var(--font-display);font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:0.06em;}
+  .team-placeholder{color:var(--dim);font-family:var(--font-body);font-size:14px;padding:20px 0;}
 
   /* ---------- footer ---------- */
   footer{border-top:1px solid rgba(111,224,255,0.2);padding:44px 0;}
@@ -233,7 +243,6 @@
 <div class="aincrad-backdrop" id="aincradBg">
   <div class="starfield" id="starfield"></div>
   <svg class="aincrad-svg" viewBox="0 0 800 620" preserveAspectRatio="xMidYMax meet">
-    <!-- Aincrad: stacked conical floors, widest at base, narrowing upward -->
     <g>
       <polygon class="tier" points="400,0 430,40 370,40" />
       <polygon class="tier" points="400,30 460,90 340,90" />
@@ -357,46 +366,13 @@
       <p>Die Schwertkämpfer, die Aincrad am Laufen halten.</p>
     </div>
 
-    <div class="reveal">
-      <div class="role-tier" style="--rc:#f4c94b">
-        <div class="role-tier-head"><h3>Owner</h3><span class="count">2 Mitglieder</span></div>
-        <div class="team-grid">
-          <div class="player-card"><div class="avatar">K</div><div><div class="player-name">Kirito</div><div class="player-role">Owner</div></div></div>
-          <div class="player-card"><div class="avatar">V</div><div><div class="player-name">Viviolin Moon</div><div class="player-role">Owner</div></div></div>
-        </div>
-      </div>
+    <div class="live-indicator reveal">
+      <span class="live-dot" id="liveDot"></span>
+      <span id="liveText">Live synchronisiert mit dem Bot</span>
+    </div>
 
-      <div class="role-tier" style="--rc:#ff9d4d">
-        <div class="role-tier-head"><h3>Co-Owner</h3><span class="count">2 Mitglieder</span></div>
-        <div class="team-grid">
-          <div class="player-card"><div class="avatar">J</div><div><div class="player-name">Jwan</div><div class="player-role">Co-Owner</div></div></div>
-          <div class="player-card"><div class="avatar">L</div><div><div class="player-name">Lena</div><div class="player-role">Co-Owner</div></div></div>
-        </div>
-      </div>
-
-      <div class="role-tier" style="--rc:#b47bff">
-        <div class="role-tier-head"><h3>Moderator</h3><span class="count">2 Mitglieder</span></div>
-        <div class="team-grid">
-          <div class="player-card"><div class="avatar">C</div><div><div class="player-name">Chillicat64</div><div class="player-role">Moderator</div></div></div>
-          <div class="player-card"><div class="avatar">P</div><div><div class="player-name">PfoteTheFox</div><div class="player-role">Moderator</div></div></div>
-        </div>
-      </div>
-
-      <div class="role-tier" style="--rc:#3fd6ff">
-        <div class="role-tier-head"><h3>Supporter</h3><span class="count">2 Mitglieder</span></div>
-        <div class="team-grid">
-          <div class="player-card"><div class="avatar">L</div><div><div class="player-name">Legacy</div><div class="player-role">Supporter</div></div></div>
-          <div class="player-card"><div class="avatar">T</div><div><div class="player-name">Tobi</div><div class="player-role">Supporter</div></div></div>
-        </div>
-      </div>
-
-      <div class="role-tier" style="--rc:#57d68d">
-        <div class="role-tier-head"><h3>Test-Supporter</h3><span class="count">2 Mitglieder</span></div>
-        <div class="team-grid">
-          <div class="player-card"><div class="avatar">B</div><div><div class="player-name">Bastian</div><div class="player-role">Test-Supporter</div></div></div>
-          <div class="player-card"><div class="avatar">S</div><div><div class="player-name">shion</div><div class="player-role">Test-Supporter</div></div></div>
-        </div>
-      </div>
+    <div class="reveal" id="teamContainer">
+      <p class="team-placeholder">Lade Team-Daten…</p>
     </div>
   </div>
 </section>
@@ -423,7 +399,6 @@
     starfield.appendChild(s);
   }
 
-  // Aincrad-Hintergrund erst ab den Befehlen/Features einblenden
   const aincradBg = document.getElementById('aincradBg');
   const featuresSection = document.getElementById('features');
   const bgObserver = new IntersectionObserver((entries)=>{
@@ -437,6 +412,88 @@
     entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
   }, {threshold:0.12});
   document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+
+  /* ------------------------------------------------------------------
+     LIVE-SYNC MIT DEM BOT (index.js -> roles.json -> /api/team)
+     Passe API_URL an, falls die Webseite NICHT vom selben Server
+     ausgeliefert wird wie die API (z.B. wenn du sie separat hostest).
+     Beispiel: 'https://deine-domain-oder-tunnel.de/api/team'
+  ------------------------------------------------------------------- */
+  const API_URL = '/api/team';
+  const POLL_INTERVAL_MS = 15000;
+
+  // Reihenfolge + Farbe + Anzeigename pro Rolle.
+  // "key" muss exakt dem Rollen-String aus ranks.json entsprechen
+  // (also dem, was du z.B. bei ?setrole @user ADMIN als ADMIN eingibst).
+  const ROLE_CONFIG = [
+    { key: 'OWNER',          label: 'Owner',          color: '#f4c94b' },
+    { key: 'COOWNER',        label: 'Co-Owner',       color: '#ff9d4d' },
+    { key: 'ADMIN',          label: 'Admin',          color: '#ff6b6b' },
+    { key: 'MOD',            label: 'Moderator',      color: '#b47bff' },
+    { key: 'SUPPORTER',      label: 'Supporter',      color: '#3fd6ff' },
+    { key: 'TEST_SUPPORTER', label: 'Test-Supporter', color: '#57d68d' }
+  ];
+
+  function initials(name){
+    return name.trim().charAt(0).toUpperCase();
+  }
+
+  function renderTeam(data){
+    const container = document.getElementById('teamContainer');
+    container.innerHTML = '';
+
+    ROLE_CONFIG.forEach(role => {
+      const members = data[role.key];
+      if(!members || members.length === 0) return;
+
+      const tier = document.createElement('div');
+      tier.className = 'role-tier';
+      tier.style.setProperty('--rc', role.color);
+
+      tier.innerHTML = `
+        <div class="role-tier-head">
+          <h3>${role.label}</h3>
+          <span class="count">${members.length} Mitglied${members.length === 1 ? '' : 'er'}</span>
+        </div>
+        <div class="team-grid">
+          ${members.map(name => `
+            <div class="player-card">
+              <div class="avatar">${initials(name)}</div>
+              <div>
+                <div class="player-name">${name}</div>
+                <div class="player-role">${role.label}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+      container.appendChild(tier);
+    });
+
+    if(container.children.length === 0){
+      container.innerHTML = '<p class="team-placeholder">Noch keine Team-Mitglieder eingetragen.</p>';
+    }
+  }
+
+  async function fetchTeam(){
+    const dot = document.getElementById('liveDot');
+    const text = document.getElementById('liveText');
+    try {
+      const res = await fetch(API_URL, { cache: 'no-store' });
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      renderTeam(data);
+      dot.classList.remove('offline');
+      text.textContent = 'Live synchronisiert mit dem Bot';
+    } catch(err) {
+      dot.classList.add('offline');
+      text.textContent = 'Bot-Server nicht erreichbar — zeige letzten Stand';
+      console.error('Team-Sync fehlgeschlagen:', err);
+    }
+  }
+
+  fetchTeam();
+  setInterval(fetchTeam, POLL_INTERVAL_MS);
 </script>
 
 </body>
