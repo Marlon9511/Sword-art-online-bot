@@ -3,20 +3,31 @@
 // index.js und liest ranks/users direkt aus dem Speicher — dadurch ist
 // die Webseite SOFORT aktuell, sobald du z.B. ?setrole ausführst.
 //
-// Keine neuen npm-Pakete nötig (nur Node-eigene Module).
+// Diese Version liest die Webseite aus public/index.html (statt sie
+// einzubetten) — bequemer zum Bearbeiten der Seite direkt in Termux.
+//
+// Startet zusätzlich automatisch einen localtunnel, damit die Seite
+// öffentlich erreichbar ist. Der öffentliche Link ändert sich bei jedem
+// Neustart und wird beim Start in der Konsole ausgegeben + in
+// current-link.txt gespeichert.
+//
+// Installation (im Bot-Ordner, einmalig):
+//   npm install localtunnel
 
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import localtunnel from 'localtunnel';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const LINK_FILE = path.join(__dirname, 'current-link.txt');
 
 // Reihenfolge + Anzeige-Rollen für die Team-Seite.
 // USER und VIP werden absichtlich weggelassen (kein "Team").
 const ROLE_ORDER = ['OWNER', 'COOWNER', 'ADMIN', 'MOD', 'SUPPORTER', 'TEST_SUPPORTER'];
 
-export function startTeamApi({ getRanks, getUsers, port = 3000, htmlPath }) {
+export function startTeamApi({ getRanks, getUsers, port = 3000, htmlPath, onLink } = {}) {
   const resolvedHtmlPath = htmlPath || path.join(__dirname, 'public', 'index.html');
 
   const server = http.createServer((req, res) => {
@@ -47,7 +58,7 @@ export function startTeamApi({ getRanks, getUsers, port = 3000, htmlPath }) {
       return;
     }
 
-    // ---- Webseite selbst ausliefern ----
+    // ---- Webseite aus public/index.html ausliefern ----
     if ((req.url === '/' || req.url === '/index.html') && req.method === 'GET') {
       fs.readFile(resolvedHtmlPath, (err, data) => {
         if (err) {
@@ -65,10 +76,36 @@ export function startTeamApi({ getRanks, getUsers, port = 3000, htmlPath }) {
     res.end('Not found');
   });
 
-  server.listen(port, () => {
-    console.log(`✅ Player-Menu läuft auf Port ${port}`);
-    console.log(`   Webseite: http://localhost:${port}/`);
-    console.log(`   API:      http://localhost:${port}/api/team`);
+  server.listen(port, async () => {
+    console.log('✅ Player-Menu läuft lokal auf Port ' + port);
+    console.log('   Webseite-Datei: ' + resolvedHtmlPath);
+
+    // ---- Automatisch öffentlichen Tunnel-Link erzeugen ----
+    try {
+      const tunnel = await localtunnel({ port });
+      console.log('🔗 Öffentlicher Link: ' + tunnel.url);
+
+      try {
+        fs.writeFileSync(LINK_FILE, tunnel.url + '\n');
+      } catch (e) {
+        console.error('[team-api] Konnte current-link.txt nicht schreiben:', e.message);
+      }
+
+      if (typeof onLink === 'function') {
+        try { onLink(tunnel.url); } catch (e) {}
+      }
+
+      tunnel.on('close', () => {
+        console.log('❌ Tunnel wurde geschlossen (z.B. wegen Inaktivität). Bot-Neustart erzeugt einen neuen Link.');
+      });
+
+      tunnel.on('error', (err) => {
+        console.error('[team-api] Tunnel-Fehler:', err.message);
+      });
+    } catch (err) {
+      console.error('❌ Konnte keinen öffentlichen Tunnel-Link erzeugen:', err.message);
+      console.error('   Die Seite ist trotzdem lokal unter http://localhost:' + port + '/ erreichbar.');
+    }
   });
 
   return server;
