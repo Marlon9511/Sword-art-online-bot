@@ -1,8 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 
-// ⚠️ Passe diese beiden Zeilen an dein Gilden-Datenmodell an, falls es anders
-// aufgebaut ist als angenommen (guilds[guildId] = { name, members: [jid,...] }).
 function findUserGuildId(users, guilds, userJid) {
   // Variante A: User speichert seine Gilden-ID direkt
   if (users[userJid]?.guildId && guilds[users[userJid].guildId]) {
@@ -14,6 +12,22 @@ function findUserGuildId(users, guilds, userJid) {
   }
   return null;
 }
+
+// Rarität -> zusätzlicher prozentualer Schadensbonus obendrauf auf die reine Waffen-"power"
+const RARITY_DAMAGE_BONUS = {
+  common: 0,
+  uncommon: 0.10,
+  rare: 0.20,
+  epic: 0.35,
+  legendary: 0.55
+};
+
+// Secret-Waffen (ownerOnly/secret) bekommen ZUSÄTZLICH zum Rarity-Bonus noch einen Machtaufschlag
+const SECRET_WEAPON_BONUS = 0.40; // +40% oben drauf
+const SECRET_WEAPON_CRIT_BONUS = 10; // +10% Crit-Chance
+
+const RARITY_EMOJI = { common: '⚪', uncommon: '🟢', rare: '🔵', epic: '🟣', legendary: '🟡' };
+const CRIT_CHANCE_BY_RARITY = { common: 5, uncommon: 8, rare: 12, epic: 16, legendary: 22 };
 
 export function createGuildBossSystem(DATA_PATH) {
   const BOSS_FILE = path.join(DATA_PATH, 'guildboss.json');
@@ -81,6 +95,52 @@ export function createGuildBossSystem(DATA_PATH) {
       .slice(0, limit);
   }
 
+  // ===== Schaden basierend auf der ausgerüsteten Waffe berechnen (inkl. Secret-Waffen) =====
+  function calculateWeaponDamage({ users, ITEM_DB, ensureArenaFields, normalizedSender, randInt, isPrimaryOwner }) {
+    ensureArenaFields(users, normalizedSender);
+    const weaponId = users[normalizedSender].equipped?.weapon;
+    const weapon = weaponId ? ITEM_DB[weaponId] : null;
+
+    // Keine Waffe ausgerüstet -> schwacher Faustschlag
+    if (!weapon) {
+      return {
+        damage: randInt(5, 15),
+        weaponName: 'bloße Fäuste',
+        weaponEmoji: '👊',
+        isCrit: false,
+        isSecret: false
+      };
+    }
+
+    const basePower = weapon.power || 10;
+    const isSecretWeapon = !!(weapon.secret || weapon.ownerOnly);
+
+    let rarityBonus = RARITY_DAMAGE_BONUS[weapon.rarity] || 0;
+    if (isSecretWeapon) rarityBonus += SECRET_WEAPON_BONUS;
+
+    // Streuung: 85% - 115% der Grundstärke
+    const variance = 0.85 + (randInt(0, 30) / 100);
+    let damage = Math.round(basePower * (1 + rarityBonus) * variance);
+
+    let critChance = CRIT_CHANCE_BY_RARITY[weapon.rarity] || 5;
+    if (isSecretWeapon) critChance += SECRET_WEAPON_CRIT_BONUS;
+
+    const isCrit = randInt(1, 100) <= critChance;
+    if (isCrit) damage = Math.round(damage * 2);
+
+    // Name/Emoji verschleiern, wenn Secret UND Angreifer nicht der Haupt-Owner ist
+    const viewerIsPrimaryOwner = isPrimaryOwner ? isPrimaryOwner(normalizedSender) : false;
+    let weaponName = weapon.name;
+    let weaponEmoji = RARITY_EMOJI[weapon.rarity] || '';
+
+    if (isSecretWeapon && !viewerIsPrimaryOwner) {
+      weaponName = 'einer geheimnisvollen Klinge';
+      weaponEmoji = '❓';
+    }
+
+    return { damage, weaponName, weaponEmoji, isCrit, isSecret: isSecretWeapon };
+  }
+
   async function endEvent({ send, sock, users, guilds, save, FILES, getNumberMention }, reason = 'time') {
     if (!state.active) return;
 
@@ -88,11 +148,13 @@ export function createGuildBossSystem(DATA_PATH) {
     const totalDamage = Object.values(state.damageByGuild).reduce((a, b) => a + b, 0);
 
     if (!topGuilds.length || totalDamage === 0) {
+      const msg = 'ℹ️ Boss-Event beendet — es wurde kein Schaden verursacht, keine Belohnung vergeben.';
+      try {
+        if (state.originChat) await sock.sendMessage(state.originChat, { text: msg });
+        else await send(msg);
+      } catch (e) {}
       state = { ...defaultState };
       saveState();
-      try {
-        await sock.sendMessage(state.originChat || (await send('ℹ️ Boss-Event beendet — es wurde kein Schaden verursacht, keine Belohnung vergeben.')), {});
-      } catch (e) {}
       return;
     }
 
@@ -173,10 +235,11 @@ export function createGuildBossSystem(DATA_PATH) {
     const {
       cmd, args, sender, from, isGroup, activePrefix, send, sock,
       users, guilds, save, FILES, ensureUser, normalizeJid,
-      getNumberMention, randInt, isAuthorized
+      getNumberMention, randInt, isAuthorized,
+      ITEM_DB, ensureArenaFields, isPrimaryOwner
     } = ctx;
 
-    // ---- START ----
+    // ---- BOSSEVENT (start/status/end) ----
     if (cmd === 'bossevent') {
       const sub = (args[0] || '').toLowerCase();
 
@@ -223,8 +286,9 @@ export function createGuildBossSystem(DATA_PATH) {
           `${hpBar(hp, hp)}\n` +
           `⏳ Dauer: ${minutes} Minuten\n\n` +
           `Kämpft mit euren Gilden gemeinsam! Nutzt:\n` +
-          `➡️ ${activePrefix}bossattack — Schaden zufügen\n` +
+          `➡️ ${activePrefix}bossattack — Schaden zufügen (deine ausgerüstete Waffe bestimmt den Schaden!)\n` +
           `➡️ ${activePrefix}bossevent status — Status anzeigen\n\n` +
+          `💡 Rüstet eure beste Waffe mit ${activePrefix}equip aus, bevor ihr angreift!\n` +
           `🏆 Die Gilde mit dem meisten Gesamtschaden gewinnt die Belohnung!\n` +
           `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈`
         );
@@ -269,7 +333,7 @@ export function createGuildBossSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- ATTACK ----
+    // ---- BOSSATTACK ----
     if (cmd === 'bossattack' || cmd === 'bossangriff') {
       if (!state.active) {
         await send('ℹ️ Aktuell erscheint kein Clan-Boss zum Angreifen.');
@@ -295,11 +359,10 @@ export function createGuildBossSystem(DATA_PATH) {
         return true;
       }
 
-      // Schaden: Basis + Zufall, optional durch ausgerüstete Waffe beeinflussbar
-      // (falls du arena.ITEM_DB verfügbar hast, kannst du hier die "power" einbauen)
-      const baseDamage = randInt(20, 80);
-      const critChance = randInt(1, 100) <= 10; // 10% Crit-Chance
-      const damage = critChance ? baseDamage * 2 : baseDamage;
+      // Schaden aus der ausgerüsteten Waffe berechnen (inkl. Secret-Waffen-Logik)
+      const { damage, weaponName, weaponEmoji, isCrit, isSecret } = calculateWeaponDamage({
+        users, ITEM_DB, ensureArenaFields, normalizedSender, randInt, isPrimaryOwner
+      });
 
       state.hp = Math.max(0, state.hp - damage);
       state.damageByGuild[guildId] = (state.damageByGuild[guildId] || 0) + damage;
@@ -312,10 +375,11 @@ export function createGuildBossSystem(DATA_PATH) {
       saveState();
 
       const guildName = guilds[guildId]?.name || guildId;
-      const critText = critChance ? '💥 KRITISCHER TREFFER! ' : '';
+      const critText = isCrit ? '💥 KRITISCHER TREFFER! ' : '';
+      const secretFlavor = isSecret ? '\n🌌 Eine unheimliche Macht durchströmt die Waffe...' : '';
 
       await send(
-        `⚔️ ${critText}Du hast dem Boss *${damage}* Schaden zugefügt!\n` +
+        `⚔️ ${critText}Mit ${weaponEmoji ? weaponEmoji + ' ' : ''}*${weaponName}* fügst du dem Boss *${damage}* Schaden zu!${secretFlavor}\n` +
         `👹 ${state.name}: ${Math.max(0, state.hp)} / ${state.maxHp} HP\n` +
         `${hpBar(state.hp, state.maxHp)}\n` +
         `🛡️ Für Gilde: ${guildName}`
@@ -340,6 +404,6 @@ export function createGuildBossSystem(DATA_PATH) {
 ${'{P}'}bossevent start <hp> [min] — Boss starten (Owner)
 ${'{P}'}bossevent status — Boss-Status ansehen
 ${'{P}'}bossevent end — Event abbrechen (Owner)
-${'{P}'}bossattack — Dem Boss Schaden zufügen`
+${'{P}'}bossattack — Dem Boss Schaden zufügen (Schaden = deine ausgerüstete Waffe!)`
   };
 }
