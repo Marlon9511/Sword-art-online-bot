@@ -23,6 +23,7 @@ import crypto from 'crypto';
 import { createAuthTools } from './web-auth.js';
 import { createGameRoutes } from './web-games.js';
 import { createGuildBossSystem } from './guildboss-event.mjs';
+import { createOwnerRoutes } from './web-owner.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -920,7 +921,9 @@ const WEB_API_PORT = process.env.WEB_API_PORT || 3001;
 webApi.listen(WEB_API_PORT, () => {
   console.log(`✅ Web-Login-API läuft auf Port ${WEB_API_PORT}`);
 });
-
+webApi.use('/api/owner', authenticateToken, createOwnerRoutes({
+  users, ranks, bans, save, FILES, normalizeJid, activeSessions
+}));
 // ========== START BOT ==========
 
 // hooks: optionale { onQr(qrBuffer, sessionName), onOpen(botId, sessionName) },
