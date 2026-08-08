@@ -867,7 +867,8 @@ const ITEM_DB = {
     power: 92,
     secret: true,
     ownerOnly: true
-
+ }
+};
 import express from 'express';
 import cors from 'cors';
 
