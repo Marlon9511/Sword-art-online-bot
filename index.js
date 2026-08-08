@@ -4831,7 +4831,12 @@ const pokemonHandled = await pokemonSystem.handle({
   getNumberMention, randInt, sleep, isPrimaryOwner
 });
 if (pokemonHandled) return;
-
+const bossEventHandled = await guildBoss.handle({
+  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
+  users, guilds, save, FILES, ensureUser, normalizeJid, isSameJid,
+  getNumberMention, randInt, sleep, isAuthorized
+});
+if (bossEventHandled) return;
 
 
 // OWNERMODE
