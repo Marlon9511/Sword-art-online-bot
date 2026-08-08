@@ -5,8 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "node index.js"
-  },
+    "start": "node index.js"},
   "author": "Kirito",
   "license": "MIT",
   "dependencies": {
@@ -14,14 +13,6 @@
     "pino": "^9.0.0",
     "node-fetch": "^3.3.2",
     "qrcode-terminal": "^0.12.0",
-    "qrcode": "^1.5.4",
-    "archiver": "^7.0.1",
-    "chalk": "^5.3.0",
-    "gradient-string": "^2.0.2",
-    "node-webpmux": "^3.1.7",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "cors": "^2.8.5",
-    "jsonwebtoken": "^9.0.2"
+    "archiver": "^7.0.1"
   }
 }
