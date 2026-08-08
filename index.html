@@ -70,6 +70,7 @@
     <button class="tab-btn active" data-game="slot">🎰 SLOTS</button>
     <button class="tab-btn" data-game="blackjack">🃏 BLACKJACK</button>
     <button class="tab-btn" data-game="rps">✊ DUELL</button>
+    <button class="tab-btn" data-game="owner" id="ownerTabBtn" hidden>👑 OWNER</button>
   </nav>
 
   <!-- SLOTS -->
@@ -121,6 +122,32 @@
       <button class="rps-btn" data-choice="scissors">✂️<br>SCHERE</button>
     </div>
     <p id="rpsResult" class="result-text"></p>
+  </section>
+
+  <!-- OWNER -->
+  <section class="panel game-panel owner-panel" data-panel="owner" hidden>
+    <span class="bracket tl"></span><span class="bracket tr"></span><span class="bracket bl"></span><span class="bracket br"></span>
+    <p class="eyebrow">GILDENMEISTER-KONSOLE</p>
+
+    <div class="owner-overview" id="ownerOverview"></div>
+
+    <div class="owner-broadcast">
+      <p class="bj-label">📣 BROADCAST</p>
+      <textarea id="broadcastText" class="owner-textarea" placeholder="Nachricht an alle Gruppen..."></textarea>
+      <button id="broadcastSend" class="btn-primary"><span>SENDEN</span></button>
+      <p id="broadcastResult" class="result-text"></p>
+    </div>
+
+    <p class="bj-label" style="margin-top:24px;">👥 NUTZER</p>
+    <div class="owner-table-wrap">
+      <table class="owner-table" id="ownerUserTable">
+        <thead>
+          <tr><th>Name</th><th>Rang</th><th>Lv</th><th>Coins</th><th>Aktion</th></tr>
+        </thead>
+        <tbody id="ownerUserBody"></tbody>
+      </table>
+    </div>
+    <p id="ownerActionResult" class="result-text"></p>
   </section>
 
 </main>
