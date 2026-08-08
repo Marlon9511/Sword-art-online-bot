@@ -4834,10 +4834,12 @@ if (pokemonHandled) return;
 const bossEventHandled = await guildBoss.handle({
   cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
   users, guilds, save, FILES, ensureUser, normalizeJid, isSameJid,
-  getNumberMention, randInt, sleep, isAuthorized
+  getNumberMention, randInt, sleep, isAuthorized,
+  ITEM_DB,
+  ensureArenaFields: arena.ensureArenaFields,
+  isPrimaryOwner   // NEU
 });
 if (bossEventHandled) return;
-
 
 // OWNERMODE
       if (cmd === 'ownermode' || cmd === 'om') {
