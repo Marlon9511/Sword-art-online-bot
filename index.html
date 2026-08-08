@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sword Art Online Bot — Aincrad System</title>
+<meta name="description" content="Ein WhatsApp-Bot im Sword Art Online-Universum: Level, Arena-Duelle, Gilden, Pokémon und mehr.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-deep:#060a14;
+    --bg-panel:#0c1424;
+    --bg-panel-2:#101b30;
+    --border-glow:#1f3served55;
+    --border:#1e3559;
+    --cyan:#4dd8ff;
+    --cyan-dim:#1c6f8c;
+    --gold:#ffd166;
+    --danger:#ff4d6d;
+    --text:#eaf2ff;
+    --text-dim:#7288ab;
+    --rare-common:#9fb3cc;
+    --rare-uncommon:#57d68d;
+    --rare-rare:#4dabff;
+    --rare-epic:#b47bff;
+    --rare-legendary:#ffd166;
+    --font-display:'Rajdhani',sans-serif;
+    --font-body:'Inter',sans-serif;
+    --font-mono:'Share Tech Mono',monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    background:var(--bg-deep);
+    color:var(--text);
+    font-family:var(--font-body);
+    line-height:1.6;
+    overflow-x:hidden;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(77,216,255,0.12), transparent),
+      linear-gradient(rgba(77,216,255,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(77,216,255,0.035) 1px, transparent 1px);
+    background-size:auto, 44px 44px, 44px 44px;
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition-duration:0.01ms !important; scroll-behavior:auto !important;}
+  }
+  a{color:inherit;text-decoration:none;}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 24px;}
+  h1,h2,h3{font-family:var(--font-display);font-weight:700;letter-spacing:0.02em;}
+  .eyebrow{
+    font-family:var(--font-mono);
+    font-size:12px;
+    letter-spacing:0.25em;
+    text-transform:uppercase;
+    color:var(--cyan);
+    display:flex;align-items:center;gap:10px;
+    margin-bottom:14px;
+  }
+  .eyebrow::before{content:'';width:22px;height:1px;background:var(--cyan);display:inline-block;}
+
+  /* ---------- corner-cut HUD panel ---------- */
+  .panel{
+    position:relative;
+    background:linear-gradient(180deg, var(--bg-panel), var(--bg-panel-2));
+    border:1px solid var(--border);
+    clip-path:polygon(0 14px, 14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
+  }
+  .panel::before{
+    content:'';position:absolute;inset:0;pointer-events:none;
+    border:1px solid transparent;
+    box-shadow:inset 0 0 0 1px rgba(77,216,255,0.06);
+  }
+  .panel-corner{position:absolute;width:14px;height:14px;pointer-events:none;}
+  .panel-corner.tr{top:0;right:0;border-top:1px solid var(--cyan-dim);border-right:1px solid var(--cyan-dim);}
+  .panel-corner.bl{bottom:0;left:0;border-bottom:1px solid var(--cyan-dim);border-left:1px solid var(--cyan-dim);}
+
+  /* ---------- nav ---------- */
+  nav{
+    position:fixed;top:0;left:0;right:0;z-index:100;
+    background:rgba(6,10,20,0.82);
+    backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--border);
+  }
+  nav .wrap{display:flex;align-items:center;justify-content:space-between;height:64px;}
+  .brand{display:flex;align-items:center;gap:10px;font-family:var(--font-display);font-weight:700;font-size:18px;letter-spacing:0.03em;}
+  .brand .dot{width:8px;height:8px;background:var(--cyan);box-shadow:0 0 10px var(--cyan);border-radius:1px;transform:rotate(45deg);}
+  .navlinks{display:flex;gap:32px;font-size:14px;color:var(--text-dim);}
+  .navlinks a:hover{color:var(--cyan);}
+  .navlinks{display:none;}
+  @media(min-width:760px){.navlinks{display:flex;}}
+  .btn{
+    font-family:var(--font-mono);
+    font-size:13px;
+    letter-spacing:0.05em;
+    padding:9px 18px;
+    border:1px solid var(--cyan-dim);
+    color:var(--cyan);
+    background:rgba(77,216,255,0.06);
+    clip-path:polygon(0 8px, 8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%);
+    transition:all .2s ease;
+    display:inline-block;
+  }
+  .btn:hover{background:rgba(77,216,255,0.16);box-shadow:0 0 18px rgba(77,216,255,0.25);}
+  .btn.gold{border-color:#8a6d1f;color:var(--gold);background:rgba(255,209,102,0.06);}
+  .btn.gold:hover{background:rgba(255,209,102,0.14);box-shadow:0 0 18px rgba(255,209,102,0.2);}
+
+  /* ---------- hero ---------- */
+  .hero{min-height:100vh;display:flex;align-items:center;padding-top:64px;position:relative;}
+  .hero-inner{width:100%;padding:80px 0;}
+  .hero .eyebrow{justify-content:center;}
+  .hero-panel{padding:52px 40px;text-align:center;max-width:760px;margin:0 auto;}
+  .hp-bar{
+    width:220px;height:6px;margin:0 auto 28px;
+    background:rgba(255,255,255,0.06);
+    border:1px solid var(--border);
+    position:relative;overflow:hidden;
+  }
+  .hp-bar::after{
+    content:'';position:absolute;left:0;top:0;bottom:0;width:100%;
+    background:linear-gradient(90deg,var(--cyan),var(--rare-uncommon));
+    animation:hpfill 2.4s ease-out forwards;
+  }
+  @keyframes hpfill{from{width:0}to{width:100%}}
+  .hero h1{
+    font-size:clamp(34px,6vw,58px);
+    line-height:1.05;
+    margin-bottom:18px;
+  }
+  .hero h1 span{color:var(--cyan);text-shadow:0 0 24px rgba(77,216,255,0.5);}
+  .hero p.lead{color:var(--text-dim);font-size:17px;max-width:520px;margin:0 auto 34px;}
+  .hero-ctas{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;}
+  .stat-strip{
+    display:flex;justify-content:center;gap:0;margin-top:48px;flex-wrap:wrap;
+  }
+  .stat{
+    font-family:var(--font-mono);
+    padding:0 28px;border-right:1px solid var(--border);
+    text-align:center;
+  }
+  .stat:last-child{border-right:none;}
+  .stat .n{font-size:26px;color:var(--cyan);display:block;}
+  .stat .l{font-size:11px;color:var(--text-dim);letter-spacing:0.1em;text-transform:uppercase;}
+
+  /* ---------- sections ---------- */
+  section{padding:110px 0;position:relative;}
+  .section-head{max-width:640px;margin-bottom:56px;}
+  .section-head h2{font-size:clamp(28px,4vw,38px);margin-bottom:14px;}
+  .section-head p{color:var(--text-dim);font-size:16px;}
+  .floor-tag{font-family:var(--font-mono);color:var(--gold);font-size:13px;}
+
+  /* ---------- features ---------- */
+  .feature-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);}
+  .feature-card{
+    background:var(--bg-panel);
+    padding:28px 26px;
+    position:relative;
+    border-left:3px solid var(--rc);
+  }
+  .feature-card .tag{
+    font-family:var(--font-mono);font-size:10px;letter-spacing:0.15em;text-transform:uppercase;
+    color:var(--rc);margin-bottom:10px;display:block;
+  }
+  .feature-card h3{font-size:19px;margin-bottom:8px;font-weight:600;}
+  .feature-card p{color:var(--text-dim);font-size:14px;}
+
+  /* ---------- team ---------- */
+  .role-tier{margin-bottom:44px;}
+  .role-tier-head{display:flex;align-items:baseline;gap:12px;margin-bottom:18px;padding-bottom:10px;border-bottom:1px solid var(--border);}
+  .role-tier-head h3{font-size:20px;color:var(--rc);}
+  .role-tier-head .count{font-family:var(--font-mono);font-size:12px;color:var(--text-dim);}
+  .team-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;}
+  .player-card{
+    background:var(--bg-panel);
+    border:1px solid var(--border);
+    padding:16px 18px;
+    display:flex;align-items:center;gap:12px;
+    clip-path:polygon(0 10px, 10px 0, 100% 0, 100% 100%, 0 100%);
+    transition:border-color .2s ease, transform .2s ease;
+  }
+  .player-card:hover{border-color:var(--rc);transform:translateX(2px);}
+  .avatar{
+    width:40px;height:40px;flex:0 0 40px;
+    border:1px solid var(--rc);
+    background:linear-gradient(135deg, rgba(255,255,255,0.04), transparent);
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--font-display);font-weight:700;color:var(--rc);
+    clip-path:polygon(0 8px, 8px 0, 100% 0, 100% 100%, 0 100%);
+  }
+  .player-name{font-weight:600;font-size:15px;}
+  .player-role{font-family:var(--font-mono);font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.06em;}
+
+  /* ---------- setup ---------- */
+  .setup-grid{display:grid;grid-template-columns:1fr;gap:20px;}
+  @media(min-width:820px){.setup-grid{grid-template-columns:1fr 1fr;}}
+  .terminal{
+    background:#050810;border:1px solid var(--border);padding:22px 22px 26px;
+    font-family:var(--font-mono);font-size:13px;color:var(--rare-uncommon);
+    clip-path:polygon(0 12px, 12px 0, 100% 0, 100% 100%, 0 100%);
+  }
+  .terminal .tbar{display:flex;gap:6px;margin-bottom:16px;}
+  .terminal .tbar span{width:9px;height:9px;border-radius:50%;background:var(--border);}
+  .terminal .line{margin-bottom:8px;white-space:pre-wrap;word-break:break-word;}
+  .terminal .line .prompt{color:var(--text-dim);}
+  .terminal .line .comment{color:var(--text-dim);}
+  .setup-note{padding:26px;}
+  .setup-note h3{font-size:19px;margin-bottom:10px;}
+  .setup-note p{color:var(--text-dim);font-size:14px;margin-bottom:10px;}
+  .setup-note ul{list-style:none;padding:0;}
+  .setup-note li{color:var(--text-dim);font-size:14px;padding:6px 0 6px 20px;position:relative;}
+  .setup-note li::before{content:'⌈';position:absolute;left:0;color:var(--cyan);}
+
+  /* ---------- footer ---------- */
+  footer{border-top:1px solid var(--border);padding:44px 0;}
+  .footer-inner{display:flex;flex-direction:column;gap:16px;align-items:center;text-align:center;}
+  .divider{font-family:var(--font-mono);color:var(--border);letter-spacing:2px;font-size:10px;}
+  footer p{color:var(--text-dim);font-size:13px;}
+  footer .brand{justify-content:center;margin-bottom:6px;}
+
+  .reveal{opacity:0;transform:translateY(18px);transition:opacity .6s ease, transform .6s ease;}
+  .reveal.in{opacity:1;transform:translateY(0);}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <div class="brand"><span class="dot"></span>AINCRAD // BOT.SYS</div>
+    <div class="navlinks">
+      <a href="#features">Features</a>
+      <a href="#team">Team</a>
+      <a href="#setup">Selbst hosten</a>
+    </div>
+    <a class="btn" href="#setup">GitHub</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap hero-inner">
+    <div class="panel hero-panel">
+      <span class="panel-corner tr"></span><span class="panel-corner bl"></span>
+      <div class="eyebrow">System Login // Aincrad Server</div>
+      <div class="hp-bar"></div>
+      <h1>Der <span>Sword Art Online</span><br>WhatsApp-Bot</h1>
+      <p class="lead">Level, Ausrüstung, Gilden-Duelle und ein ganzes Aincrad voller Spiele — direkt in deiner WhatsApp-Gruppe. Open Source, selbst gehostet.</p>
+      <div class="hero-ctas">
+        <a class="btn gold" href="#setup">⌈ Auf GitHub ansehen ⌋</a>
+        <a class="btn" href="#features">Features durchsuchen</a>
+      </div>
+      <div class="stat-strip">
+        <div class="stat"><span class="n">100+</span><span class="l">Befehle</span></div>
+        <div class="stat"><span class="n">5</span><span class="l">Seltenheitsstufen</span></div>
+        <div class="stat"><span class="n">∞</span><span class="l">Sessions</span></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section id="features">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="floor-tag">FLOOR 01</div>
+      <h2>Was der Bot kann</h2>
+      <p>Von Wirtschaftssystem bis Kampfarena — jede Funktion ist aus echten Aincrad-Mechaniken gebaut.</p>
+    </div>
+    <div class="feature-grid reveal">
+      <div class="feature-card" style="--rc:var(--rare-common)">
+        <span class="tag">Common</span>
+        <h3>Level & Wirtschaft</h3>
+        <p>XP durch Chatten, tägliche Belohnungen, Arbeiten, Angeln in den Gewässern von Aincrad und ein Shop für Tränke und Boxen.</p>
+      </div>
+      <div class="feature-card" style="--rc:var(--rare-uncommon)">
+        <span class="tag">Uncommon</span>
+        <h3>Haustiere</h3>
+        <p>Adoptiere Hund, Katze oder Vogel, füttere und spiele mit ihnen und baue Glück und Erfahrung auf.</p>
+      </div>
+      <div class="feature-card" style="--rc:var(--rare-rare)">
+        <span class="tag">Rare</span>
+        <h3>Arena & Ausrüstung</h3>
+        <p>Öffne Ausrüstungskisten für Waffen und Rüstungen von Gewöhnlich bis Legendär und fordere andere Spieler zum PVP-Duell heraus.</p>
+      </div>
+      <div class="feature-card" style="--rc:var(--rare-rare)">
+        <span class="tag">Rare</span>
+        <h3>Gilden-System</h3>
+        <p>Gründe eine Gilde, nimm neue Mitglieder auf und klettert gemeinsam in der Gildenrangliste nach oben.</p>
+      </div>
+      <div class="feature-card" style="--rc:var(--rare-epic)">
+        <span class="tag">Epic</span>
+        <h3>Pokémon-Minispiel</h3>
+        <p>Fange wilde Pokémon, trainiere, entwickle und kämpfe — ein komplettes Sammelspiel innerhalb des Bots.</p>
+      </div>
+      <div class="feature-card" style="--rc:var(--rare-epic)">
+        <span class="tag">Epic</span>
+        <h3>Titel & Achievements</h3>
+        <p>Heirat, Gildenmeisterschaft und andere Meilensteine schalten sichtbare Titel im Profil frei.</p>
+      </div>
+      <div class="feature-card" style="--rc:var(--rare-uncommon)">
+        <span class="tag">Uncommon</span>
+        <h3>Social & Minispiele</h3>
+        <p>Heiraten, Scheiden, Bewerbungssystem für die Gilde sowie Slots, Blackjack und Schere-Stein-Papier.</p>
+      </div>
+      <div class="feature-card" style="--rc:var(--rare-legendary)">
+        <span class="tag">Legendary</span>
+        <h3>Moderation & Rollen</h3>
+        <p>Sieben Rollenstufen von Owner bis Test-Supporter, Anti-Link-Schutz, automatische Nachtsperre und Multi-Session-Verwaltung.</p>
+      </div>
+      <div class="feature-card" style="--rc:var(--rare-common)">
+        <span class="tag">Common</span>
+        <h3>Support-Tickets</h3>
+        <p>Nutzer eröffnen Tickets direkt im Chat, das Team antwortet zentral — inklusive DSGVO-konformer Registrierung.</p>
+      </div>
+      <div class="feature-card" style="--rc:var(--rare-uncommon)">
+        <span class="tag">Uncommon</span>
+        <h3>Sticker & Medien</h3>
+        <p>Sticker aus Bildern und Videos erstellen, YouTube-Links als MP3 laden und animierte Reaction-Gifs verschicken.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="team">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="floor-tag">FLOOR 02</div>
+      <h2>Das Team hinter dem System</h2>
+      <p>Die Schwertkämpfer, die Aincrad am Laufen halten.</p>
+    </div>
+
+    <div class="reveal">
+      <div class="role-tier" style="--rc:var(--rare-legendary)">
+        <div class="role-tier-head"><h3>👑 Owner</h3><span class="count">2 Mitglieder</span></div>
+        <div class="team-grid">
+          <div class="player-card"><div class="avatar">K</div><div><div class="player-name">Kirito</div><div class="player-role">Owner</div></div></div>
+          <div class="player-card"><div class="avatar">V</div><div><div class="player-name">Viviolin Moon</div><div class="player-role">Owner</div></div></div>
+        </div>
+      </div>
+
+      <div class="role-tier" style="--rc:var(--rare-legendary)">
+        <div class="role-tier-head"><h3>👑 Co-Owner</h3><span class="count">2 Mitglieder</span></div>
+        <div class="team-grid">
+          <div class="player-card"><div class="avatar">J</div><div><div class="player-name">Jwan</div><div class="player-role">Co-Owner</div></div></div>
+          <div class="player-card"><div class="avatar">L</div><div><div class="player-name">Lena</div><div class="player-role">Co-Owner</div></div></div>
+        </div>
+      </div>
+
+      <div class="role-tier" style="--rc:var(--rare-epic)">
+        <div class="role-tier-head"><h3>⚔ Moderator</h3><span class="count">2 Mitglieder</span></div>
+        <div class="team-grid">
+          <div class="player-card"><div class="avatar">C</div><div><div class="player-name">Chillicat64</div><div class="player-role">Moderator</div></div></div>
+          <div class="player-card"><div class="avatar">P</div><div><div class="player-name">PfoteTheFox</div><div class="player-role">Moderator</div></div></div>
+        </div>
+      </div>
+
+      <div class="role-tier" style="--rc:var(--rare-rare)">
+        <div class="role-tier-head"><h3>🌟 Supporter</h3><span class="count">2 Mitglieder</span></div>
+        <div class="team-grid">
+          <div class="player-card"><div class="avatar">L</div><div><div class="player-name">Legacy</div><div class="player-role">Supporter</div></div></div>
+          <div class="player-card"><div class="avatar">T</div><div><div class="player-name">Tobi</div><div class="player-role">Supporter</div></div></div>
+        </div>
+      </div>
+
+      <div class="role-tier" style="--rc:var(--rare-uncommon)">
+        <div class="role-tier-head"><h3>🔰 Test-Supporter</h3><span class="count">2 Mitglieder</span></div>
+        <div class="team-grid">
+          <div class="player-card"><div class="avatar">B</div><div><div class="player-name">Bastian</div><div class="player-role">Test-Supporter</div></div></div>
+          <div class="player-card"><div class="avatar">S</div><div><div class="player-name">shion</div><div class="player-role">Test-Supporter</div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="setup">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="floor-tag">FLOOR 03</div>
+      <h2>Selbst hosten</h2>
+      <p>Der Bot läuft auf Node.js und der Baileys-Bibliothek. Klonen, Abhängigkeiten installieren, starten.</p>
+    </div>
+    <div class="setup-grid reveal">
+      <div class="terminal">
+        <div class="tbar"><span></span><span></span><span></span></div>
+        <div class="line"><span class="comment"># Repository klonen</span></div>
+        <div class="line"><span class="prompt">$</span> git clone https://github.com/dein-name/dein-repo.git</div>
+        <div class="line"><span class="prompt">$</span> cd dein-repo</div>
+        <div class="line"><span class="comment"># Abhängigkeiten installieren</span></div>
+        <div class="line"><span class="prompt">$</span> npm install</div>
+        <div class="line"><span class="comment"># Bot starten</span></div>
+        <div class="line"><span class="prompt">$</span> node index.js</div>
+        <div class="line"><span class="comment"># Nummer eingeben & Pairing-Code scannen</span></div>
+      </div>
+      <div class="panel setup-note">
+        <span class="panel-corner tr"></span><span class="panel-corner bl"></span>
+        <h3>Bevor du startest</h3>
+        <p>Kurzer Check, damit der Login glatt läuft:</p>
+        <ul>
+          <li>Node.js ist installiert (aktuelle LTS-Version)</li>
+          <li>Eine WhatsApp-Nummer bereit für den Pairing-Code</li>
+          <li>ffmpeg installiert, für Sticker- und Audio-Funktionen</li>
+          <li>yt-dlp installiert, für YouTube-Downloads</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap footer-inner">
+    <div class="brand"><span class="dot"></span>AINCRAD // BOT.SYS</div>
+    <div class="divider">┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈</div>
+    <p>Gebaut von der SAO-Gilde. Nicht offiziell mit WhatsApp oder Sword Art Online verbunden.</p>
+  </div>
+</footer>
+
+<script>
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, {threshold:0.12});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+
+</body>
+</html>
