@@ -4864,6 +4864,43 @@ if (cmd === 'resetcooldown' || cmd === 'resetcd') {
   commandCooldowns.delete(targetJid);
   return send(`✅ Alle ${count} Cooldown(s) von @${targetJid.split('@')[0]} wurden zurückgesetzt.`, { mentions: [targetJid] });
 }
+// SETPASSWORT — Passwort für die Website setzen (nur im Privatchat)
+if (cmd === 'setpasswort' || cmd === 'setpassword') {
+  if (isGroup) {
+    return send('🔒 Aus Sicherheitsgründen funktioniert dieser Befehl nur im Privatchat mit mir. Schreib mir direkt eine Nachricht.');
+  }
+
+  const password = args.join(' ').trim();
+  if (!password || password.length < 4) {
+    return send(`❌ Nutzung: ${activePrefix}setpasswort <passwort>\nDas Passwort muss mindestens 4 Zeichen lang sein.`);
+  }
+  if (password.length > 100) {
+    return send('❌ Das Passwort ist zu lang (max. 100 Zeichen).');
+  }
+
+  ensureUser(sender);
+  const hadIdBefore = !!users[sender].webId;
+  const webId = setUserWebPassword(sender, password);
+
+  return send(
+    hadIdBefore
+      ? `✅ Dein Passwort wurde aktualisiert.\n🆔 Deine ID bleibt: *${webId}*\n\nNutze ID + Passwort, um dich auf der Website anzumelden.`
+      : `✅ Passwort gesetzt!\n🆔 Deine ID lautet: *${webId}*\n\nMerke dir ID + Passwort gut. Du kannst dir die ID jederzeit erneut anzeigen lassen mit ${activePrefix}myid.`
+  );
+}
+
+// MYID — eigene Web-ID anzeigen (nur im Privatchat)
+if (cmd === 'myid') {
+  if (isGroup) {
+    return send('🔒 Aus Sicherheitsgründen zeige ich deine ID nur im Privatchat. Schreib mir direkt eine Nachricht.');
+  }
+  ensureUser(sender);
+  const webId = users[sender].webId;
+  if (!webId) {
+    return send(`ℹ️ Du hast noch keine ID. Setze zuerst ein Passwort mit:\n${activePrefix}setpasswort <passwort>`);
+  }
+  return send(`🆔 Deine ID: *${webId}*\n\n(Passwort vergessen? Setze es neu mit ${activePrefix}setpasswort <neues-passwort> — die ID bleibt gleich.)`);
+}
 // Unbekannter Befehl
 const suggestion = findClosestCommand(cmd);
 if (suggestion) {
