@@ -19,7 +19,7 @@ import { createGuildSystem, GUILD_COMMANDS, GUILD_HELP_TEXT } from './guild-syst
 import { createTitleSystem, TITLE_COMMANDS, TITLE_HELP_TEXT, checkProgress, TITLES } from './titel-achievments.js';
 import { createPokemonSystem, POKEMON_COMMANDS, POKEMON_HELP_TEXT } from './pokemon-system.mjs';
 import { createMenuSystem, MENU_COMMANDS } from './menu-system.mjs';
-import { startTeamApi } from './team-api.js';
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -809,7 +809,7 @@ const ITEM_DB = {
   a_legendary_3: { name: 'Himmlischer Panzer',      type: 'armor',  rarity: 'legendary', power: 66 }
 };
 
-startTeamApi({ getRanks: () => ranks, getUsers: () => users, port: 3000 });
+
 // ========== START BOT ==========
 
 // hooks: optionale { onQr(qrBuffer, sessionName), onOpen(botId, sessionName) },
