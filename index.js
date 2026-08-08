@@ -809,7 +809,7 @@ const ITEM_DB = {
   a_legendary_3: { name: 'Himmlischer Panzer',      type: 'armor',  rarity: 'legendary', power: 66 }
 };
 
-
+startTeamApi({ getRanks: () => ranks, getUsers: () => users, port: 3000 });
 // ========== START BOT ==========
 
 // hooks: optionale { onQr(qrBuffer, sessionName), onOpen(botId, sessionName) },
