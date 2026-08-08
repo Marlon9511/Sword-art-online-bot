@@ -838,7 +838,41 @@ const ITEM_DB = {
   a_legendary_2: { name: 'Rune des Kobold-Königs',  type: 'armor',  rarity: 'legendary', power: 68 },
   a_legendary_3: { name: 'Himmlischer Panzer',      type: 'armor',  rarity: 'legendary', power: 66 }
 };
+import express from 'express';
+import cors from 'cors';
 
+const webApi = express();
+webApi.use(cors());
+webApi.use(express.json());
+
+webApi.post('/api/login', (req, res) => {
+  const { id, password } = req.body || {};
+  if (!id || !password) {
+    return res.status(400).json({ success: false, error: 'ID und Passwort erforderlich.' });
+  }
+
+  const entry = Object.entries(users).find(([, u]) => u.webId === String(id).toUpperCase());
+  if (!entry) {
+    return res.status(401).json({ success: false, error: 'ID nicht gefunden.' });
+  }
+
+  const [, user] = entry;
+  if (!user.webPasswordHash || !user.webPasswordSalt) {
+    return res.status(401).json({ success: false, error: 'Für diese ID wurde noch kein Passwort gesetzt.' });
+  }
+
+  const hash = hashPassword(password, user.webPasswordSalt);
+  if (hash !== user.webPasswordHash) {
+    return res.status(401).json({ success: false, error: 'Falsches Passwort.' });
+  }
+
+  return res.json({ success: true, id: user.webId, name: user.name || null });
+});
+
+const WEB_API_PORT = process.env.WEB_API_PORT || 3001;
+webApi.listen(WEB_API_PORT, () => {
+  console.log(`✅ Web-Login-API läuft auf Port ${WEB_API_PORT}`);
+});
 
 // ========== START BOT ==========
 
