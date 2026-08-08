@@ -847,6 +847,11 @@ const webApi = express();
 webApi.use(cors());
 webApi.use(express.json());
 
+// Statische Website ausliefern (public/index.html, style.css, app.js)
+webApi.use(express.static(path.join(__dirname, 'public')));
+
+const { signToken, authenticateToken } = createAuthTools(DATA_PATH);
+
 webApi.post('/api/login', (req, res) => {
   const { id, password } = req.body || {};
   if (!id || !password) {
@@ -868,14 +873,23 @@ webApi.post('/api/login', (req, res) => {
     return res.status(401).json({ success: false, error: 'Falsches Passwort.' });
   }
 
-  return res.json({ success: true, id: user.webId, name: user.name || null });
+  const token = signToken(user.webId);
+  return res.json({ success: true, token, id: user.webId, name: user.name || null });
+});
+
+// Ab hier: alle Routen brauchen ein gültiges Token
+webApi.use('/api/games', authenticateToken, createGameRoutes({ users, save, FILES }));
+webApi.get('/api/me', authenticateToken, (req, res) => {
+  const entry = Object.entries(users).find(([, u]) => u.webId === req.webId);
+  if (!entry) return res.status(404).json({ success: false, error: 'Nutzer nicht gefunden.' });
+  const u = entry[1];
+  res.json({ success: true, coins: u.coins || 0, level: u.level || 1, xp: u.xp || 0, name: u.name || null });
 });
 
 const WEB_API_PORT = process.env.WEB_API_PORT || 3001;
 webApi.listen(WEB_API_PORT, () => {
   console.log(`✅ Web-Login-API läuft auf Port ${WEB_API_PORT}`);
 });
-
 // ========== START BOT ==========
 
 // hooks: optionale { onQr(qrBuffer, sessionName), onOpen(botId, sessionName) },
