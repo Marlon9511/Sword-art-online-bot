@@ -24,6 +24,17 @@ import { createAuthTools } from './web-auth.js';
 import { createGameRoutes } from './web-games.js';
 import { createGuildBossSystem } from './guildboss-event.mjs';
 
+// ========== GLOBALE FEHLERABSICHERUNG ==========
+// Verhindert, dass ein einzelner nicht abgefangener Async-Fehler
+// (z.B. ein Timeout bei sock.groupMetadata) den kompletten Bot-Prozess
+// killt. Der Fehler wird stattdessen nur geloggt, der Bot läuft weiter.
+process.on('unhandledRejection', (reason) => {
+  console.error('⚠️ Unhandled Rejection:', reason?.message || reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('⚠️ Uncaught Exception:', err?.message || err);
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
