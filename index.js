@@ -5116,3 +5116,26 @@ const sessionManager = {
 };
 
 initTelegramConnect(sessionManager);
+
+// ---- WhatsApp: bestehende Sessions laden oder eine neue ("default") starten ----
+(async () => {
+  let existingSessions = [];
+  try {
+    existingSessions = fs.readdirSync(SESSIONS_DIR, { withFileTypes: true })
+      .filter(d => d.isDirectory())
+      .map(d => d.name);
+  } catch (e) {
+    existingSessions = [];
+  }
+
+  if (existingSessions.length === 0) {
+
+    await startBot('default');
+  } else {
+
+    for (const sessionName of existingSessions) {
+      await startBot(sessionName);
+      await sleep(1000);
+    }
+  }
+})();
