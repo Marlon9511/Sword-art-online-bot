@@ -952,6 +952,7 @@ async function startBot(sessionName = 'default', hooks = {}) {
   if (sessionName === 'default') {
     setActiveSock(sock);
   }
+sock.ev.on('creds.update', saveCreds);
 
 const pendingMarriageProposals = new Map(); // targetJid -> { from, at }
 const pendingApplications = new Map(); // sender -> { step, answers }
