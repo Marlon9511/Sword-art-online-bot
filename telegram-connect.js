@@ -118,6 +118,7 @@ export function initTelegramConnect(manager) {
 
     const [, name, number] = match;
     let sock = sessionManager.getSession(name);
+    let justCreated = false;
 
     // Falls die Session noch gar nicht existiert, gleich mit erstellen
     if (!sock) {
@@ -129,6 +130,7 @@ export function initTelegramConnect(manager) {
           }
         });
         setActiveSock(sock);
+        justCreated = true;
       } catch (e) {
         return telegramBot.sendMessage(msg.chat.id, `❌ Fehler beim Erstellen von "${name}": ${e.message}`);
       }
@@ -138,15 +140,32 @@ export function initTelegramConnect(manager) {
       return telegramBot.sendMessage(msg.chat.id, `✅ Session "${name}" ist bereits verbunden.`);
     }
 
-    try {
-      let code = await sock.requestPairingCode(number);
-      code = code?.match(/.{1,4}/g)?.join('-') || code;
-      telegramBot.sendMessage(msg.chat.id,
-        `🔑 Pairing-Code für "${name}": *${code}*\n\n` +
-        'In WhatsApp: Einstellungen → Verknüpfte Geräte → Gerät verknüpfen → "Stattdessen mit Telefonnummer verknüpfen" → Code eingeben.',
-        { parse_mode: 'Markdown' });
-    } catch (e) {
-      telegramBot.sendMessage(msg.chat.id, `❌ Fehler beim Generieren des Codes für "${name}": ${e.message}`);
+    // WICHTIG: Bei einem frisch erstellten Socket ist der WebSocket-Handshake
+    // noch nicht abgeschlossen. requestPairingCode() zu früh aufzurufen führt
+    // zu "Connection Closed". Kurz warten, bevor der Code angefordert wird —
+    // genau wie es die alte connectBot()-Funktion in index.js schon macht.
+    if (justCreated) {
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+
+    // Bis zu 3 Versuche, falls die Verbindung beim ersten Mal noch nicht bereit war
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        let code = await sock.requestPairingCode(number);
+        code = code?.match(/.{1,4}/g)?.join('-') || code;
+        return telegramBot.sendMessage(msg.chat.id,
+          `🔑 Pairing-Code für "${name}": *${code}*\n\n` +
+          'In WhatsApp: Einstellungen → Verknüpfte Geräte → Gerät verknüpfen → "Stattdessen mit Telefonnummer verknüpfen" → Code eingeben.',
+          { parse_mode: 'Markdown' });
+      } catch (e) {
+        const isConnectionIssue = /connection closed/i.test(e.message || '');
+        if (isConnectionIssue && attempt < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          continue;
+        }
+        return telegramBot.sendMessage(msg.chat.id, `❌ Fehler beim Generieren des Codes für "${name}": ${e.message}`);
+      }
     }
   });
 
