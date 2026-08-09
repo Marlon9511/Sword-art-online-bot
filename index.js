@@ -4955,34 +4955,81 @@ if (cmd === 'kisteall' || cmd === 'giftkisteall') {
   if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
 
   const amount = parseInt(args[0]) || 1;
+  // Alles nach der Zahl wird als Gruppen-Filter interpretiert (Name oder "gruppe" für aktuelle Gruppe)
+  const groupArg = args.slice(1).join(' ').trim();
+
   if (amount < 1 || amount > 50) {
-    return send(`❌ Nutzung: ${activePrefix}kisteall [anzahl]\nBeispiel: ${activePrefix}kisteall 1\n(Erlaubt: 1-50 Kisten pro User)`);
+    return send(
+      `❌ Nutzung:\n` +
+      `${activePrefix}kisteall [anzahl]  → alle registrierten Nutzer\n` +
+      `${activePrefix}kisteall [anzahl] gruppe  → nur aktuelle Gruppe\n` +
+      `${activePrefix}kisteall [anzahl] gruppe:<Gruppenname>  → nur bestimmte Gruppe\n` +
+      `(Erlaubt: 1-50 Kisten pro User)`
+    );
   }
 
-  const registeredJids = Object.keys(users).filter(jid => users[jid]?.registered === true);
-  if (!registeredJids.length) return send('ℹ️ Es sind keine registrierten Nutzer vorhanden.');
+  let targetJids = [];
+  let targetLabel = '';
 
-  for (const jid of registeredJids) {
+  if (groupArg.toLowerCase() === 'gruppe') {
+    // Nur die Gruppe, in der der Command ausgeführt wurde
+    const groupJid = m.key.remoteJid;
+    if (!groupJid?.endsWith('@g.us')) {
+      return send('❌ "gruppe" funktioniert nur, wenn der Command in einer Gruppe ausgeführt wird.');
+    }
+    let metadata;
+    try {
+      metadata = await sock.groupMetadata(groupJid);
+    } catch (e) {
+      return send('❌ Konnte Gruppenmitglieder nicht abrufen.');
+    }
+    targetJids = metadata.participants.map(p => p.id).filter(jid => users[jid]?.registered === true);
+    targetLabel = metadata.subject;
+
+  } else if (groupArg.toLowerCase().startsWith('gruppe:')) {
+    // Bestimmte Gruppe per Name, egal wo der Command ausgeführt wird
+    const searchName = groupArg.slice('gruppe:'.length).trim().toLowerCase();
+    if (!searchName) return send('❌ Bitte einen Gruppennamen angeben, z.B. gruppe:MeineGruppe');
+
+    let allGroups;
+    try {
+      allGroups = await sock.groupFetchAllParticipating();
+    } catch (e) {
+      return send('❌ Konnte Gruppenliste nicht abrufen.');
+    }
+
+    const match = Object.values(allGroups).find(g =>
+      g.subject?.toLowerCase().includes(searchName)
+    );
+
+    if (!match) {
+      return send(`❌ Keine Gruppe mit dem Namen "${searchName}" gefunden.`);
+    }
+
+    targetJids = match.participants.map(p => p.id).filter(jid => users[jid]?.registered === true);
+    targetLabel = match.subject;
+
+  } else {
+    // Global: alle registrierten Nutzer
+    targetJids = Object.keys(users).filter(jid => users[jid]?.registered === true);
+    targetLabel = 'alle Gruppen';
+  }
+
+  if (!targetJids.length) {
+    return send(`ℹ️ Keine registrierten Nutzer gefunden (${targetLabel || 'Ziel'}).`);
+  }
+
+  for (const jid of targetJids) {
     if (!users[jid].items) users[jid].items = {};
     users[jid].items['kiste'] = (users[jid].items['kiste'] || 0) + amount;
   }
   save(FILES.users, users);
 
-  await send(`🎁 ${amount}x Kiste an ${registeredJids.length} registrierte Nutzer verschenkt...`);
-
-  // Optional: jeden einzeln benachrichtigen (kann bei vielen Usern etwas dauern)
-  let notified = 0;
-  for (const jid of registeredJids) {
-    try {
-      await sock.sendMessage(jid, {
-        text: `🎁 Der Owner hat dir ${amount}x *Kiste* geschenkt! Öffne sie mit ${activePrefix}openkiste`
-      });
-      notified++;
-      await sleep(200);
-    } catch (e) {}
-  }
-
-  return send(`✅ Fertig! ${amount}x Kiste an ${registeredJids.length} Nutzer gutgeschrieben (${notified} davon benachrichtigt).`);
+  return send(
+    `🎁 ${amount}x Kiste an ${targetJids.length} registrierte Nutzer verschenkt` +
+    (targetLabel ? ` (${targetLabel})` : '') + `!\n` +
+    `Öffne sie mit ${activePrefix}openkiste`
+  );
 }
 // Unbekannter Befehl
 const suggestion = findClosestCommand(cmd);
