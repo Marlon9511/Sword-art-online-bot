@@ -5066,26 +5066,53 @@ return send(
   return sock;
 }
 // ========== MAIN ==========
-initTelegramConnect();
 
-(async () => {
-  let existingSessions = [];
-  try {
-    existingSessions = fs.readdirSync(SESSIONS_DIR, { withFileTypes: true })
-      .filter(d => d.isDirectory())
-      .map(d => d.name);
-  } catch (e) {
-    existingSessions = [];
-  }
+// Adapter: verbindet telegram-connect.js mit den bereits vorhandenen
+// Funktionen/Strukturen (startBot, activeSessions) dieser Datei.
+const sessionManager = {
+  // Startet eine neue Session (oder gibt die laufende zurück, falls schon aktiv)
+  startSession: (name, hooks) => startBot(name, hooks),
 
-  if (existingSessions.length === 0) {
-    
-    await startBot('default');
-  } else {
-    
-    for (const sessionName of existingSessions) {
-      await startBot(sessionName);
-      await sleep(1000);
+  // Gibt den sock der Session zurück (oder undefined)
+  getSession: (name) => activeSessions.get(name),
+
+  // Liste aller aktiven Sessions im vom Telegram-Bot erwarteten Format
+  listSessions: () => [...activeSessions.entries()].map(([name, sock]) => ({
+    name,
+    connected: !!sock?.user,
+    jid: sock?.user?.id || null
+  })),
+
+  // Trennt eine Session (Login-Daten bleiben erhalten)
+  stopSession: async (name) => {
+    const targetSock = activeSessions.get(name);
+    if (!targetSock) throw new Error(`Session "${name}" ist nicht aktiv.`);
+    activeSessions.delete(name);
+    targetSock.ev.removeAllListeners();
+    try { await targetSock.logout(); } catch (e) {}
+    try { targetSock.end(new Error('stopped by telegram')); } catch (e) {}
+  },
+
+  // Stoppt eine Session UND löscht die Login-Daten von der Platte
+  deleteSession: async (name) => {
+    const targetPath = path.join(SESSIONS_DIR, name);
+    const normalizedTargetPath = path.normalize(targetPath);
+    if (!normalizedTargetPath.startsWith(SESSIONS_DIR)) {
+      throw new Error('Ungültiger Session-Name.');
+    }
+
+    const targetSock = activeSessions.get(name);
+    if (targetSock) {
+      activeSessions.delete(name);
+      targetSock.ev.removeAllListeners();
+      try { await targetSock.logout(); } catch (e) {}
+      try { targetSock.end(new Error('deleted by telegram')); } catch (e) {}
+    }
+
+    if (fs.existsSync(targetPath)) {
+      fs.rmSync(targetPath, { recursive: true, force: true });
     }
   }
-})();
+};
+
+initTelegramConnect(sessionManager);
