@@ -1020,29 +1020,21 @@ const pendingApplications = new Map(); // sender -> { step, answers }
     return nowMinutes >= start || nowMinutes < end;
   }
 
- setInterval(async () => {
+  setInterval(async () => {
     try {
       const now = new Date();
       const nowMinutes = now.getHours() * 60 + now.getMinutes();
-
-      const scheduleCount = Object.keys(groupLockSchedules).length;
-      console.log('[nachtsperre] Check läuft:', now.toLocaleTimeString('de-DE'), '| Session:', sessionName, '| Zeitzone:', Intl.DateTimeFormat().resolvedOptions().timeZone, '| Gruppen mit Zeitplan:', scheduleCount);
 
       for (const [groupJid, schedule] of Object.entries(groupLockSchedules)) {
         const shouldBeLocked = isWithinLockWindow(schedule.start, schedule.end, nowMinutes);
         const currentState = lockStateCache.get(groupJid);
         const desiredState = shouldBeLocked ? 'locked' : 'unlocked';
 
-        console.log('[nachtsperre]', groupJid, '| soll:', desiredState, '| ist aktuell:', currentState || '(unbekannt)');
-
         if (currentState === desiredState) continue;
 
         try {
           const meta = await getGroupMetaSafe(groupJid, true);
-          if (!meta) {
-            console.error('[nachtsperre] ❌ Konnte Gruppen-Metadaten nicht laden für', groupJid, '(Bot noch Mitglied?)');
-            continue;
-          }
+          if (!meta) continue;
 
           const allBotIds = [...getBotSelfIds(sock)];
           const botPart = (meta.participants || []).find(p => {
@@ -1061,28 +1053,29 @@ const pendingApplications = new Map(); // sender -> { step, answers }
             botPart?.isAdmin === true
           );
 
-          if (!botIsAdmin) {
-            console.error('[nachtsperre] ❌ Bot ist kein Admin in', groupJid, '— kann nicht sperren/entsperren. Bitte Bot zum Admin machen.');
-            continue;
-          }
+          if (!botIsAdmin) continue;
         } catch (metaErr) {
-          console.error('[nachtsperre] ❌ Fehler beim Prüfen der Admin-Rechte für', groupJid, ':', metaErr?.message || metaErr);
           continue;
         }
 
         try {
           await sock.groupSettingUpdate(groupJid, shouldBeLocked ? 'announcement' : 'not_announcement');
           lockStateCache.set(groupJid, desiredState);
-          console.log('[nachtsperre] ✅ Gruppe', groupJid, shouldBeLocked ? 'gesperrt' : 'entsperrt');
 
           if (shouldBeLocked) {
             await sock.sendMessage(groupJid, { text: '🌙 Nachtsperre aktiv. Die Gruppe wurde bis ' + schedule.end + ' Uhr gesperrt.' });
           } else {
             await sock.sendMessage(groupJid, { text: '☀️ Nachtsperre beendet. Die Gruppe ist wieder offen.' });
           }
-        
-      
+        } catch (e) {
+          // Sperren/Entsperren fehlgeschlagen — nächste Minute erneut versuchen
+        }
+      }
+    } catch (e) {
+      // Scheduler-Fehler — nächste Minute erneut versuchen
+    }
   }, 60 * 1000); // jede Minute prüfen
+
 setInterval(async () => {
   try {
     await guildBoss.checkExpiry({
