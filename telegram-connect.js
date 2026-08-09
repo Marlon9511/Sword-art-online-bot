@@ -19,8 +19,8 @@ import TelegramBot from 'node-telegram-bot-api';
 // am Ende der Datei für ein Beispiel, wie das aussehen muss).
 // ============================================================
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
-const OWNER_TELEGRAM_ID = process.env.OWNER_TELEGRAM_ID ? Number(process.env.OWNER_TELEGRAM_ID) : null;
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8614468465:AAHP7693iiKX56Sp-9TRNa3q2gGMBXOQ-ms';
+const OWNER_TELEGRAM_ID = process.env.OWNER_TELEGRAM_ID ? Number(process.env.OWNER_TELEGRAM_ID) : 8598584607;
 
 let telegramBot = null;
 let sessionManager = null;
