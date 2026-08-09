@@ -1658,7 +1658,7 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
         try { save(FILES.users, users); } catch (e) {}
         return send(`🔕 Du bist jetzt AFK: ${reason}`);
       }
-const SHORT_URL = 'https://youtube.com/shorts/Tnj-yTpHpoY?si=nZXYlSHtpdT42Awi';
+const SHORT_URL = 'https://youtube.com/shorts/FBMAN-SeeBQ?si=WfMtoSNb1ZD95Dk9';
 const CACHE_PATH = path.join(__dirname, 'cache', 'menu-edit.mp4');
 const YTMP3_CACHE_DIR = path.join(__dirname, 'cache', 'ytmp3');
 
