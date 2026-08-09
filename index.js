@@ -1080,13 +1080,8 @@ const pendingApplications = new Map(); // sender -> { step, answers }
           } else {
             await sock.sendMessage(groupJid, { text: '☀️ Nachtsperre beendet. Die Gruppe ist wieder offen.' });
           }
-        } catch (e) {
-          console.error('[nachtsperre] ❌ Fehler beim Sperren/Entsperren von', groupJid, ':', e?.message || e);
-        }
-      }
-    } catch (e) {
-      console.error('[nachtsperre] Scheduler-Fehler:', e);
-    }
+        
+      
   }, 60 * 1000); // jede Minute prüfen
 setInterval(async () => {
   try {
