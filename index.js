@@ -1104,7 +1104,7 @@ async function updateBotProfile() {
       console.error('❌ Fehler beim Aktualisieren des Profils:', error);
     }
   }
-  sock.ev.on('connection.update', async (update) => {
+   sock.ev.on('connection.update', async (update) => {
     const { connection, qr, lastDisconnect } = update;
 
     if (qr) {
@@ -1119,10 +1119,11 @@ async function updateBotProfile() {
         if (hooks.onQr) {
           await hooks.onQr(qrBuffer, sessionName);
         } else {
-          await sock.sendMessage(OWNER_PRIV, {
-            image: qrBuffer,
-            caption: `🤖 QR-Code zum Scannen mit WhatsApp (Session: ${sessionName})`
-          });
+          // sock ist hier NICHT mit WhatsApp verbunden (deshalb der QR-Code) —
+          // sock.sendMessage() würde daher immer mit "Cannot read properties
+          // of undefined (reading 'id')" abstürzen. Der QR-Code kann nur über
+          // Telegram oder das Terminal zugestellt werden, solange keine
+          // WhatsApp-Verbindung besteht.
           await sendQrToTelegram(qrBuffer);
         }
       } catch (err) {
@@ -1139,7 +1140,28 @@ async function updateBotProfile() {
     }
 
     if (connection === 'close') {
-      console.log(`⚠ Session "${sessionName}" getrennt — neu verbinden in 3s`);
+      const statusCode = lastDisconnect?.error?.output?.statusCode;
+      const errorMessage = lastDisconnect?.error?.message || '(keine Fehlermeldung)';
+      console.log(`⚠ Session "${sessionName}" getrennt — Code: ${statusCode || '(unbekannt)'} | Grund: ${errorMessage}`);
+
+      const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+      const isConflict = statusCode === DisconnectReason.connectionReplaced;
+      const isRestartRequired = statusCode === DisconnectReason.restartRequired;
+
+      if (isRestartRequired) {
+        console.log(`ℹ️ Session "${sessionName}": Code 515 (restartRequired) — das ist NORMAL direkt nach dem ersten QR-Scan/Pairing. Verbinde automatisch neu...`);
+      }
+
+      if (isLoggedOut) {
+        console.log(`❌ Session "${sessionName}" wurde ausgeloggt (Code 401). Login-Daten sind ungültig — Account wurde vermutlich getrennt/gesperrt. Neu pairen nötig, kein automatischer Reconnect.`);
+        activeSessions.delete(sessionName);
+        return;
+      }
+
+      if (isConflict) {
+        console.log(`⚠ Session "${sessionName}": Verbindung ersetzt (Code 440) — läuft evtl. ein zweiter Bot-Prozess mit denselben Login-Daten, oder WhatsApp Web ist parallel auf einem anderen Gerät offen?`);
+      }
+
       activeSessions.delete(sessionName);
       setTimeout(() => startBot(sessionName, hooks), 3000);
     }
