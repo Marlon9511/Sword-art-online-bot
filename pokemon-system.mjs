@@ -143,12 +143,15 @@ const BALL_TYPES = {
   meisterball: { name: 'Meisterball', bonus: null, price: 5000 } // fängt immer
 };
 
-// Geheimcodes: einmal pro Spieler einlösbar, geben ein garantiertes geheimes Pokémon
+// Geheimcodes: einmal pro Spieler einlösbar, geben ein garantiertes Pokémon.
+// Jeder Code trägt sein eigenes Level (Standard-Codes: Lv.15, neue Codes: Lv.30).
 const SECRET_CODES = {
-  'MEWCODE2026':  'mew',
-  'ZAPCODE2026':  'zapdos',
-  'ICECODE2026':  'arktos',
-  'FIRECODE2026': 'lavados'
+  'MEWCODE2026':   { species: 'mew',     level: 15 },
+  'ZAPCODE2026':   { species: 'zapdos',  level: 15 },
+  'ICECODE2026':   { species: 'arktos',  level: 15 },
+  'FIRECODE2026':  { species: 'lavados', level: 15 },
+  'PIKACODE2026':  { species: 'pikachu', level: 30 },
+  'EVOLICODE2026': { species: 'evoli',   level: 30 }
 };
 
 const ENCOUNTER_COOLDOWN_MS = 3 * 60 * 1000; // 3 Minuten
@@ -237,8 +240,8 @@ export function createPokemonSystem() {
         await send(`❌ Nutzung: ${activePrefix}pokesecret <code>`);
         return true;
       }
-      const speciesId = SECRET_CODES[code];
-      if (!speciesId) {
+      const codeEntry = SECRET_CODES[code];
+      if (!codeEntry) {
         await send('❌ Ungültiger Geheimcode.');
         return true;
       }
@@ -246,13 +249,15 @@ export function createPokemonSystem() {
         await send('❌ Dieser Code wurde bereits eingelöst.');
         return true;
       }
+      const speciesId = codeEntry.species;
+      const grantLevel = codeEntry.level || 15;
       p.secretCodes.push(code);
       const uid = 'PK' + Date.now().toString(36) + randInt(100, 999);
-      p.team.push({ uid, species: speciesId, level: 15, xp: 0, nickname: null });
+      p.team.push({ uid, species: speciesId, level: grantLevel, xp: 0, nickname: null });
       p.dex[speciesId] = true;
       if (!p.active) p.active = uid;
       persist();
-      await send(`🌟✨ Geheimcode akzeptiert! *${POKEMON_DB[speciesId].name}* schließt sich deinem Team an!\n${formatPoke(speciesId, 15, null)}`);
+      await send(`🌟✨ Geheimcode akzeptiert! *${POKEMON_DB[speciesId].name}* schließt sich deinem Team an!\n${formatPoke(speciesId, grantLevel, null)}`);
       return true;
     }
 
