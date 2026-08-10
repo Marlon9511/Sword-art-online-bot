@@ -377,6 +377,33 @@ export function createGuildBossSystem(DATA_PATH) {
         return true;
       }
 
+      // ===== Cooldown zurücksetzen (zum Testen) =====
+      if (sub === 'resetcd' || sub === 'cdreset') {
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) {
+          await send('❌ Nur Owner/CoOwner dürfen den Cooldown zurücksetzen.');
+          return true;
+        }
+        if (!state.active) {
+          await send('ℹ️ Es läuft aktuell kein Boss-Event, es gibt keinen Cooldown zum Zurücksetzen.');
+          return true;
+        }
+
+        const target = (args[1] || '').toLowerCase();
+
+        if (target === 'all') {
+          state.lastAttack = {};
+          saveState();
+          await send('✅ Alle Angriffs-Cooldowns wurden zurückgesetzt.');
+          return true;
+        }
+
+        const normalizedSender = normalizeJid(sender);
+        delete state.lastAttack[normalizedSender];
+        saveState();
+        await send('✅ Dein Angriffs-Cooldown wurde zurückgesetzt. Du kannst sofort wieder angreifen.');
+        return true;
+      }
+
       if (sub === 'status' || !sub) {
         if (!state.active) {
           await send('ℹ️ Aktuell erscheint kein Clan-Boss. Der Owner kann eins mit ?bossevent start <hp> [minuten] aktivieren.');
@@ -407,7 +434,7 @@ export function createGuildBossSystem(DATA_PATH) {
         return true;
       }
 
-      await send(`Nutzung: ${activePrefix}bossevent start <hp> [minuten] | status | end`);
+      await send(`Nutzung: ${activePrefix}bossevent start <hp> [minuten] | status | end | resetcd [all]`);
       return true;
     }
 
@@ -480,6 +507,7 @@ export function createGuildBossSystem(DATA_PATH) {
 ${'{P}'}bossevent start <hp> [min] — Boss starten (Owner)
 ${'{P}'}bossevent status — Boss-Status ansehen
 ${'{P}'}bossevent end — Event abbrechen (Owner)
+${'{P}'}bossevent resetcd [all] — Cooldown zurücksetzen zum Testen (Owner)
 ${'{P}'}bossattack — Dem Boss Schaden zufügen (Schaden = deine ausgerüstete Waffe!)
 _Der Top-Damage-Dealer hat je nach Boss-HP eine steigende Chance auf Ragnarok — sonst erhält die ganze Gilde die Waffe!_`
   };
