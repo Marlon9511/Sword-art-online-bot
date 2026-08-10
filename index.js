@@ -828,7 +828,6 @@ function bjDraw() { return { value: BJ_VALUES[randInt(0, BJ_VALUES.length - 1)],
 function bjVal(card) { if (['J', 'Q', 'K'].includes(card.value)) return 10; if (card.value === 'A') return 11; return parseInt(card.value); }
 function bjScore(hand) { let s = 0, ac = 0; for (const c of hand) { if (c.value === 'A') { ac++; s += 11; } else s += bjVal(c); } while (s > 21 && ac > 0) { s -= 10; ac--; } return s; }
 
-
 const RARITY_INFO = {
   common:    { label: 'Gewöhnlich', emoji: '⚪', weight: 45 },
   uncommon:  { label: 'Ungewöhnlich', emoji: '🟢', weight: 30 },
@@ -954,9 +953,6 @@ webApi.listen(WEB_API_PORT, () => {
 
 // ========== START BOT ==========
 
-// hooks: optionale { onQr(qrBuffer, sessionName), onOpen(botId, sessionName) },
-//        werden z.B. vom $newsession-Befehl genutzt, um QR/Status in den
-//        anfragenden Chat statt an OWNER_PRIV zu schicken.
 async function startBot(sessionName = 'default', hooks = {}) {
   if (activeSessions.has(sessionName)) {
     console.log(chalk.yellow(`⚠ Session "${sessionName}" läuft bereits.`));
@@ -1076,11 +1072,6 @@ async function updateBotProfile() {
         if (hooks.onQr) {
           await hooks.onQr(qrBuffer, sessionName);
         } else {
-          // sock ist hier NICHT mit WhatsApp verbunden (deshalb der QR-Code) —
-          // sock.sendMessage() würde daher immer mit "Cannot read properties
-          // of undefined (reading 'id')" abstürzen. Der QR-Code kann nur über
-          // Telegram oder das Terminal zugestellt werden, solange keine
-          // WhatsApp-Verbindung besteht.
           await sendQrToTelegram(qrBuffer);
         }
       } catch (err) {
@@ -1146,6 +1137,40 @@ async function updateBotProfile() {
         };
       }
       const settings = groupSettings[groupId];
+
+      // ---- BITCHKICK: automatisches Entfernen von gelisteten Nummern ----
+      if (action === 'add') {
+        const groupKickList = bitchkickData[groupId] || [];
+        if (groupKickList.length) {
+          const freshMeta = await getGroupMetaSafe(groupId, true);
+          const botCanKick = isBotAdminInGroup(freshMeta, sock);
+
+          if (botCanKick) {
+            for (const rawParticipant of participants) {
+              const participantJid = typeof rawParticipant === 'string'
+                ? rawParticipant
+                : (rawParticipant?.id || rawParticipant?.jid || null);
+              if (!participantJid) continue;
+
+              const normalizedParticipant = normalizeJid(participantJid);
+              const rawNum = extractRawNumber(normalizedParticipant);
+              const isListed = groupKickList.some(j => extractRawNumber(j) === rawNum);
+
+              if (isListed) {
+                try {
+                  await sock.groupParticipantsUpdate(groupId, [participantJid], 'remove');
+                  console.log(`[bitchkick] ${participantJid} aus ${groupId} entfernt.`);
+                } catch (e) {
+                  console.error(`[bitchkick] Kick fehlgeschlagen für ${participantJid}:`, e?.message || e);
+                }
+                await sleep(400);
+              }
+            }
+          } else {
+            console.log(`[bitchkick] Bot ist kein Admin in ${groupId}, automatischer Kick übersprungen.`);
+          }
+        }
+      }
 
       if (action === 'add' && settings.welcome.enabled) {
         const welcomeMsg = settings.welcome.message || 'Willkommen in der Gruppe! 👋';
@@ -1295,6 +1320,7 @@ const ALL_COMMANDS = [
   'selfpromote', 'sp', 'selfdemote', 'sd',
   'slap', 'hug', 'kiss', 'pat', 'poke', 'cuddle', 'bite', 'punch', 'throw',
   'love', 'blush', 'handhold', 'lick', 'nervous',
+  'bitchkick',
   ...ARENA_COMMANDS
 ];
 
@@ -1312,7 +1338,6 @@ function findClosestCommand(input) {
   const maxLen = Math.max(input.length, best ? best.length : 1);
   const similarity = Math.round((1 - bestDist / maxLen) * 100);
 
-  // Nur vorschlagen, wenn der Tippfehler "klein genug" ist (max. 40% der Wortlänge abweichend)
   const threshold = Math.max(1, Math.floor(input.length * 0.4));
   if (bestDist <= threshold) {
     return { command: best, similarity };
@@ -1372,8 +1397,6 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
         try {
           const antilinkSettings = groupSettings[from]?.antilink;
           if (antilinkSettings?.enabled) {
-            // Frische (nicht gecachte) Metadaten holen, damit ein kürzlich
-            // beförderter/degradierter Admin-Status korrekt erkannt wird.
             const meta = await getGroupMetaSafe(from, true);
 
             const senderIsGroupAdmin = isGroupAdminJid(meta, sender);
@@ -1444,8 +1467,6 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
             return;
           }
 
-          // Eigene Identität wird komplett dynamisch aus dem Socket ermittelt —
-          // keine hartkodierte LID mehr nötig.
           const allBotIds = [...getBotSelfIds(sock)];
 
           const botPart = (meta.participants || []).find(p => {
@@ -1668,6 +1689,77 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
         if (!isGroup) return send('❌ Dieser Befehl funktioniert nur in Gruppen.');
         return send(`📋 Diese Gruppen-ID ist:\n${from}`);
       }
+
+      // BITCHKICK — Nummern-Liste pro Gruppe, wird bei Beitritt automatisch gekickt
+      if (cmd === 'bitchkick') {
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
+        if (!isGroup) return send('❌ Dieser Befehl funktioniert nur innerhalb einer Gruppe.');
+
+        const sub = (args[0] || '').toLowerCase();
+
+        if (sub === 'add') {
+          const raw = args[1];
+          if (!raw) return send(`❌ Nutzung: ${activePrefix}bitchkick add <nummer>`);
+          const jid = normalizeNumber(raw);
+          if (!jid) return send('❌ Ungültige Nummer.');
+
+          if (!bitchkickData[from]) bitchkickData[from] = [];
+          if (bitchkickData[from].includes(jid)) {
+            return send(`ℹ️ ${raw} steht bereits auf der Kick-Liste dieser Gruppe.`);
+          }
+          bitchkickData[from].push(jid);
+          save(FILES.bitchkick, bitchkickData);
+          return send(`✅ ${raw} wurde zur Kick-Liste *dieser Gruppe* hinzugefügt.\nWird beim Beitritt automatisch entfernt.`);
+        }
+
+        if (sub === 'remove' || sub === 'del') {
+          const raw = args[1];
+          if (!raw) return send(`❌ Nutzung: ${activePrefix}bitchkick remove <nummer>`);
+          const jid = normalizeNumber(raw);
+          if (!jid) return send('❌ Ungültige Nummer.');
+
+          if (!bitchkickData[from] || !bitchkickData[from].includes(jid)) {
+            return send(`ℹ️ ${raw} steht nicht auf der Liste dieser Gruppe.`);
+          }
+          bitchkickData[from] = bitchkickData[from].filter(j => j !== jid);
+          save(FILES.bitchkick, bitchkickData);
+          return send(`✅ ${raw} wurde von der Liste entfernt.`);
+        }
+
+        if (sub === 'list') {
+          const list = bitchkickData[from] || [];
+          if (!list.length) return send('ℹ️ Die Kick-Liste dieser Gruppe ist leer.');
+          const formatted = list.map((jid, i) => `${i + 1}. ${jid.split('@')[0]}`).join('\n');
+          return send(`📋 *Bitchkick-Liste (diese Gruppe)* (${list.length}):\n${formatted}`);
+        }
+
+        if (sub === 'clear') {
+          const count = (bitchkickData[from] || []).length;
+          bitchkickData[from] = [];
+          save(FILES.bitchkick, bitchkickData);
+          return send(count ? `✅ ${count} Einträge aus der Liste gelöscht.` : 'ℹ️ Liste war bereits leer.');
+        }
+
+        if (sub === 'status') {
+          const meta = await getGroupMetaSafe(from, true);
+          const botIsAdmin = isBotAdminInGroup(meta, sock);
+          return send(
+            botIsAdmin
+              ? '✅ Bot ist Admin – Bitchkick funktioniert in dieser Gruppe.'
+              : '⚠️ Bot ist KEIN Admin – Bitchkick kann hier niemanden entfernen! Bitte Bot zum Admin machen.'
+          );
+        }
+
+        return send(
+          `❌ Nutzung:\n` +
+          `${activePrefix}bitchkick add <nummer>\n` +
+          `${activePrefix}bitchkick remove <nummer>\n` +
+          `${activePrefix}bitchkick list\n` +
+          `${activePrefix}bitchkick clear\n` +
+          `${activePrefix}bitchkick status`
+        );
+      }
+
       // AFK
       if (cmd === 'afk') {
         const reason = args.length ? args.join(' ') : 'Abwesend';
@@ -1676,6 +1768,7 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
         try { save(FILES.users, users); } catch (e) {}
         return send(`🔕 Du bist jetzt AFK: ${reason}`);
       }
+
 const SHORT_URL = 'https://youtube.com/shorts/FBMAN-SeeBQ?si=WfMtoSNb1ZD95Dk9';
 const CACHE_PATH = path.join(__dirname, 'cache', 'menu-edit.mp4');
 const YTMP3_CACHE_DIR = path.join(__dirname, 'cache', 'ytmp3');
