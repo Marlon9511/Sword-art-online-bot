@@ -25,9 +25,6 @@ import { createGameRoutes } from './web-games.js';
 import { createGuildBossSystem } from './guildboss-event.mjs';
 
 // ========== GLOBALE FEHLERABSICHERUNG ==========
-// Verhindert, dass ein einzelner nicht abgefangener Async-Fehler
-// (z.B. ein Timeout bei sock.groupMetadata) den kompletten Bot-Prozess
-// killt. Der Fehler wird stattdessen nur geloggt, der Bot läuft weiter.
 process.on('unhandledRejection', (reason) => {
   console.error('⚠️ Unhandled Rejection:', reason?.message || reason);
 });
@@ -106,7 +103,8 @@ marriages: { file: 'marriages.json', default: {} },
 commandAllow: { file: 'command-allow.json', default: {} },
   officialGroup: { file: 'official-group.json', default: { link: 'https://chat.whatsapp.com/DBiDcF2s16FEWiGKyZA7Nl' } },
 partners: { file: 'partners.json', default: { list: [] } },
-groupLockSchedule: { file: 'group-lock-schedule.json', default: {} }
+groupLockSchedule: { file: 'group-lock-schedule.json', default: {} },
+bitchkick: { file: 'bitchkick.json', default: {} }
 };
 
 Object.values(FILES).forEach(({ file, default: def }) => {
@@ -304,8 +302,6 @@ function addVip(jid, durationStr) {
     ROLES.VIP.push(normalizedJid);
   }
 
-  // Sichtbaren Rang setzen — aber nur, wenn die Person aktuell "nur" USER ist.
-  // Höhere Ränge (Owner/CoOwner/Admin/Mod) werden durch VIP nicht überschrieben.
   const currentRank = ranks[normalizedJid] || users[normalizedJid]?.rank || 'USER';
   if (currentRank === 'USER') {
     ranks[normalizedJid] = 'VIP';
@@ -318,7 +314,6 @@ function addVip(jid, durationStr) {
     ROLES.VIP = ROLES.VIP.filter(id => id !== normalizedJid);
     vipExpiry.delete(normalizedJid);
 
-    // Rang nur zurücksetzen, wenn er zwischenzeitlich nicht manuell geändert wurde
     const stillVip = (ranks[normalizedJid] || users[normalizedJid]?.rank) === 'VIP';
     if (stillVip) {
       ranks[normalizedJid] = 'USER';
@@ -355,7 +350,6 @@ function isVip(jid) {
 
 const COOLDOWN_TIME = 10 * 60 * 1000;
 const commandCooldowns = new Map();
-// Befehle, die TROTZ Zugehörigkeit zu Arena/Gilde/Pokemon KEINEN Cooldown bekommen sollen
 const COOLDOWN_EXCLUDED = ['pokeshop'];
 function checkCooldown(userId, command) {
   if (!commandCooldowns.has(userId)) {
@@ -420,6 +414,13 @@ function normalizeJid(jid) {
   return num ? `${num}@s.whatsapp.net` : jid;
 }
 
+// Bitchkick: Roh-Nummer -> @s.whatsapp.net JID (jede Formatierung wird toleriert)
+function normalizeNumber(input) {
+  const num = String(input || '').replace(/[^0-9]/g, '');
+  if (!num) return null;
+  return `${num}@s.whatsapp.net`;
+}
+
 function normalizeTicketId(id) {
   if (!id) return id;
   const ticketId = String(id).trim();
@@ -464,14 +465,6 @@ function isSenderGroupAdmin(groupMetadata, senderJid) {
   );
   return p?.admin === 'admin' || p?.admin === 'superadmin';
 }
-// ---- FIX: robuster Admin-Check über die reine Rufnummer ----
-// Baileys liefert Gruppenteilnehmer je nach Situation als @lid oder
-// @s.whatsapp.net (teils mit :device-Suffix). isSameJid() vergleicht nur
-// exakt normalisierte Strings und erkennt @lid <-> @s.whatsapp.net NICHT
-// als gleich. Dadurch wurden echte Gruppenadmins nicht erkannt, wenn ihr
-// JID-Typ nicht exakt zum gespeicherten sender-JID passte.
-// extractRawNumber() zieht in jedem Fall nur die reine Ziffernfolge raus,
-// damit der Vergleich unabhängig vom JID-Typ funktioniert.
 function extractRawNumber(jid) {
   if (!jid) return null;
   return String(jid).split(':')[0].split('@')[0].replace(/[^0-9]/g, '') || null;
@@ -488,6 +481,27 @@ function isGroupAdminJid(groupMeta, jid) {
     participant.admin === 'superadmin' ||
     participant.admin === true ||
     participant.isAdmin === true
+  );
+}
+
+// Bitchkick: prüft ob der BOT selbst (nicht der Sender) in der Gruppe Admin ist.
+// Nutzt getBotSelfIds(sock), daher muss sock als Parameter übergeben werden.
+function isBotAdminInGroup(groupMeta, sock) {
+  if (!groupMeta?.participants) return false;
+  const allBotIds = [...getBotSelfIds(sock)];
+  const botPart = groupMeta.participants.find(p => {
+    const pids = [
+      p.id,
+      p.id?.split('@')[0],
+      `${p.id?.split('@')[0]}@s.whatsapp.net`,
+    ].filter(Boolean).map(String);
+    return pids.some(pid => allBotIds.includes(pid));
+  });
+  return !!(
+    botPart?.admin === 'admin' ||
+    botPart?.admin === 'superadmin' ||
+    botPart?.admin === true ||
+    botPart?.isAdmin === true
   );
 }
 
@@ -569,6 +583,9 @@ let credits = load(FILES.credits.file) || { list: [] };
 let officialGroup = load(FILES.officialGroup.file) || { link: 'https://chat.whatsapp.com/DBiDcF2s16FEWiGKyZA7Nl' };
 if (!officialGroup.link) officialGroup.link = 'https://chat.whatsapp.com/DBiDcF2s16FEWiGKyZA7Nl';
 
+// Bitchkick: Kick-Listen pro Gruppe -> { "<groupJid>": ["<jid>", ...] }
+let bitchkickData = load(FILES.bitchkick.file) || {};
+
 console.log('Loaded ranks:', ranks);
 
 if (Object.keys(ranks).length === 0) {
@@ -625,7 +642,6 @@ function protectPrimaryOwner() {
 }
 protectPrimaryOwner();
 function generateWebId() {
-  // 6-stellige, gut lesbare ID (keine verwechselbaren Zeichen wie 0/O, 1/I)
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let id;
   do {
@@ -764,6 +780,7 @@ save(FILES.deleted, deletedUsers);
 save(FILES.marriages, marriages); 
   save(FILES.groupLockSchedule, groupLockSchedules);
 save(FILES.officialGroup, officialGroup);
+save(FILES.bitchkick, bitchkickData);
   try {
     save(FILES.owner, { ownerLid: OWNER_LID, ownerPriv: OWNER_PRIV, coownerLid: COOWNER_LID });
   } catch (e) { console.error('Failed to save owner config:', e); }
@@ -810,6 +827,7 @@ const BJ_VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 
 function bjDraw() { return { value: BJ_VALUES[randInt(0, BJ_VALUES.length - 1)], suit: BJ_SUITS[randInt(0, BJ_SUITS.length - 1)] }; }
 function bjVal(card) { if (['J', 'Q', 'K'].includes(card.value)) return 10; if (card.value === 'A') return 11; return parseInt(card.value); }
 function bjScore(hand) { let s = 0, ac = 0; for (const c of hand) { if (c.value === 'A') { ac++; s += 11; } else s += bjVal(c); } while (s > 21 && ac > 0) { s -= 10; ac--; } return s; }
+
 
 const RARITY_INFO = {
   common:    { label: 'Gewöhnlich', emoji: '⚪', weight: 45 },
