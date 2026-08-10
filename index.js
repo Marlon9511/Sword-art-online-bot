@@ -873,6 +873,56 @@ const ITEM_DB = {
     bossBonus: 0.30
   },
 
+  // ---- SECRET-POOL WAFFEN (via Kiste, 1:1000-Chance) ----
+  w_secret_dualblades: {
+    name: 'Holzstab',
+    trueName: 'Kiritos Doppelklingen (Dual Blades)',
+    type: 'weapon',
+    rarity: 'legendary',
+    power: 150,
+    secret: true
+  },
+  w_secret_liberator: {
+    name: 'Rostiger schwarzer Rapier',
+    trueName: 'Liberator — Asunas Rapier aus Neu-Aincrad',
+    type: 'weapon',
+    rarity: 'legendary',
+    power: 130,
+    secret: true
+  },
+  w_secret_lightflash: {
+    name: 'Abgenutztes Übungsrapier',
+    trueName: 'Lightning Flash — Asunas erstes Rapier',
+    type: 'weapon',
+    rarity: 'epic',
+    power: 95,
+    secret: true
+  },
+  w_secret_bluerose: {
+    name: 'Zersplitterte blaue Klinge',
+    trueName: 'Blue Rose Sword',
+    type: 'weapon',
+    rarity: 'legendary',
+    power: 135,
+    secret: true
+  },
+  w_secret_nightsky: {
+    name: 'Schwarzes Schattenschwert',
+    trueName: 'Night Sky Sword — Klinge des Dunklen Ritters',
+    type: 'weapon',
+    rarity: 'legendary',
+    power: 140,
+    secret: true
+  },
+  w_secret_holyblade: {
+    name: 'Verzierte gesegnete Klinge',
+    trueName: 'Heathcliffs Heilige Klinge — Rache des Systemadministrators',
+    type: 'weapon',
+    rarity: 'legendary',
+    power: 155,
+    secret: true
+  },
+
   // ---- RÜSTUNGEN ----
   a_common_1:    { name: 'Lederrüstung',            type: 'armor',  rarity: 'common',    power: 8 },
   a_common_2:    { name: 'Stoffmantel',             type: 'armor',  rarity: 'common',    power: 6 },
@@ -898,7 +948,41 @@ const ITEM_DB = {
     power: 92,
     secret: true,
     ownerOnly: true
- }
+  },
+
+  // ---- SECRET-POOL RÜSTUNGEN (via Kiste, 1:1000-Chance) ----
+  a_secret_bwcoat: {
+    name: 'Zerschlissener schwarzer Mantel',
+    trueName: 'Blackwyrm Coat',
+    type: 'armor',
+    rarity: 'legendary',
+    power: 120,
+    secret: true
+  },
+  a_secret_negacloak: {
+    name: 'Nachtschwarzer Umhang',
+    trueName: 'Umhang der Laughing Coffin',
+    type: 'armor',
+    rarity: 'legendary',
+    power: 125,
+    secret: true
+  },
+  a_secret_flashcoat: {
+    name: 'Zerrissene rote Weste',
+    trueName: 'Flash-Panzerung — Asunas Kommandantinnen-Rüstung',
+    type: 'armor',
+    rarity: 'legendary',
+    power: 130,
+    secret: true
+  },
+  a_secret_bloodoath: {
+    name: 'Rostiger Plattenpanzer',
+    trueName: 'Rüstung der Blutschwur-Ritter (Knights of the Blood Oath)',
+    type: 'armor',
+    rarity: 'legendary',
+    power: 128,
+    secret: true
+  }
 };
 import express from 'express';
 import cors from 'cors';
