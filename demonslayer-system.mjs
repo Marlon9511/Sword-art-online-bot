@@ -348,7 +348,7 @@ export function createDemonSlayerSystem(DATA_PATH) {
   const DS_HELP_TEXT =
     `👹 *Dämonentöter-System*\n` +
     `{P}atemzug — Atemstil erlernen\n` +
-    `{P}daemonboss — Dämon angreifen\n` +
+    `{P}dämonenboss — Dämon angreifen\n` +
     `{P}dsrang — Rang anzeigen | {P}dsaufstieg — aufsteigen`;
 
   return { handle, DS_COMMANDS, DS_HELP_TEXT };
