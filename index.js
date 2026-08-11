@@ -860,8 +860,8 @@ const ITEM_DB = {
   w_excalibur: {
     name: 'Excalibur',
     type: 'weapon',
-    rarity: 'legendary',
-    power: 95,
+    rarity: 'secret',
+    power: 10000,
     secret: true,
     ownerOnly: true
   },
@@ -870,7 +870,7 @@ const ITEM_DB = {
     trueName: 'Die Klinge der Götterdämmerung',
     type: 'weapon',
     rarity: 'legendary',
-    power: 90,
+    power: 170,
     secret: true,
     bossBonus: 0.30
   },
@@ -897,7 +897,7 @@ const ITEM_DB = {
     trueName: 'Lightning Flash — Asunas erstes Rapier',
     type: 'weapon',
     rarity: 'epic',
-    power: 95,
+    power: 145,
     secret: true
   },
   w_secret_bluerose: {
