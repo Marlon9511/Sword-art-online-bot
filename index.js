@@ -5019,7 +5019,15 @@ const bossEventHandled = await guildBoss.handle({
   isPrimaryOwner   // NEU
 });
 if (bossEventHandled) return;
-
+const guildWarHandled = await guildWars.handle({
+  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
+  users, guilds, save, FILES, ensureUser, normalizeJid, isSameJid,
+  getNumberMention, randInt, sleep, isAuthorized,
+  ITEM_DB,
+  ensureArenaFields: arena.ensureArenaFields,
+  isPrimaryOwner
+});
+if (guildWarHandled) return;
 // OWNERMODE
       if (cmd === 'ownermode' || cmd === 'om') {
         if (!isOwner) return send('❌ Nur der Inhaber/Co-Inhaber darf diesen Befehl nutzen.');
