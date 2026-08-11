@@ -1920,11 +1920,12 @@ function downloadShortIfNeeded() {
 // HELP / MENU
 if (cmd === 'help' || cmd === 'menu') {
   const helpText = menuSystem.buildMenuText({
-    args, sender, activePrefix, PREFIX,
-    isAuthorized, hasAdminPerms,
-    ARENA_HELP_TEXT, GUILD_HELP_TEXT, TITLE_HELP_TEXT, POKEMON_HELP_TEXT,
-    GUILDWAR_HELP_TEXT, demonSlayer.DS_COMMANDS
-  });
+  args, sender, activePrefix, PREFIX,
+  isAuthorized, hasAdminPerms,
+  ARENA_HELP_TEXT, GUILD_HELP_TEXT, TITLE_HELP_TEXT, POKEMON_HELP_TEXT,
+  GUILDWAR_HELP_TEXT,
+  DS_COMMANDS: demonSlayer.DS_COMMANDS
+});
 
   try {
     const videoPath = await downloadShortIfNeeded();
