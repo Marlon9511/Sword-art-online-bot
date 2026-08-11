@@ -27,6 +27,19 @@ const CRIT_CHANCE_BY_RARITY = { common: 5, uncommon: 8, rare: 12, epic: 16, lege
 
 // ID der exklusiven Boss-Event-Waffe (muss zu arena-system.mjs passen)
 const RAGNAROK_ITEM_ID = 'w_ragnarok';
+// Ragnarok ignoriert (wie Excalibur) die normale Schadensformel und macht
+// im Boss-Kampf immer einen festen Zufallsschaden in diesem Bereich.
+// Bewusst höher angesetzt als Excalibur, damit Ragnarok die stärkste
+// Waffe im Boss-Kampf bleibt.
+const RAGNAROK_MIN_DAMAGE = 500;
+const RAGNAROK_MAX_DAMAGE = 1000;
+
+// ID der Owner-exklusiven Waffe (muss zu arena-system.mjs passen)
+const EXCALIBUR_ITEM_ID = 'w_excalibur';
+// Excalibur ignoriert die normale Schadensformel und macht im Boss-Kampf
+// immer einen festen Zufallsschaden in diesem Bereich.
+const EXCALIBUR_MIN_DAMAGE = 250;
+const EXCALIBUR_MAX_DAMAGE = 1000;
 
 // Skalierende Chance: je mehr HP der Boss hatte, desto höher die Ragnarok-Chance
 const RAGNAROK_BASE_CHANCE_PERCENT = 10;      // Mindest-Chance, auch bei kleinen Bossen
@@ -123,20 +136,50 @@ export function createGuildBossSystem(DATA_PATH) {
     const basePower = weapon.power || 10;
     const isSecretWeapon = !!(weapon.secret || weapon.ownerOnly);
     const isRagnarok = weaponId === RAGNAROK_ITEM_ID;
+    const isExcalibur = weaponId === EXCALIBUR_ITEM_ID;
+
+    // ===== Ragnarok-Sonderregel =====
+    // Ignoriert die normale Power/Rarity-Formel komplett und macht
+    // stattdessen immer einen festen Zufallsschaden zwischen 500 und 1000.
+    // Damit ist Ragnarok im Schnitt stärker als Excalibur (250-1000).
+    if (isRagnarok) {
+      let damage = randInt(RAGNAROK_MIN_DAMAGE, RAGNAROK_MAX_DAMAGE);
+      const critChance = (CRIT_CHANCE_BY_RARITY[weapon.rarity] || 5) + SECRET_WEAPON_CRIT_BONUS + 15;
+      const isCrit = randInt(1, 100) <= critChance;
+      if (isCrit) damage = Math.round(damage * 2);
+
+      return {
+        damage,
+        weaponName: weapon.name,
+        weaponEmoji: RARITY_EMOJI[weapon.rarity] || '⚫',
+        isCrit,
+        isSecret: true,
+        isRagnarok: true,
+        isExcalibur: false
+      };
+    }
+
+    // ===== Excalibur-Sonderregel =====
+    // Ignoriert die normale Power/Rarity-Formel komplett und macht
+    // stattdessen immer einen festen Zufallsschaden zwischen 250 und 1000.
+    if (isExcalibur) {
+      let damage = randInt(EXCALIBUR_MIN_DAMAGE, EXCALIBUR_MAX_DAMAGE);
+      const critChance = (CRIT_CHANCE_BY_RARITY[weapon.rarity] || 5) + SECRET_WEAPON_CRIT_BONUS;
+      const isCrit = randInt(1, 100) <= critChance;
+      if (isCrit) damage = Math.round(damage * 2);
+
+      return {
+        damage,
+        weaponName: weapon.name,
+        weaponEmoji: RARITY_EMOJI[weapon.rarity] || '⚫',
+        isCrit,
+        isSecret: true,
+        isRagnarok: false,
+        isExcalibur: true
+      };
+    }
 
     let rarityBonus = RARITY_DAMAGE_BONUS[weapon.rarity] || 0;
-    if (isSecretWeapon) rarityBonus += SECRET_WEAPON_BONUS;
-    if (isRagnarok && weapon.bossBonus) rarityBonus += weapon.bossBonus; // exklusiver Boss-Bonus
-
-    const variance = 0.85 + (randInt(0, 30) / 100);
-    let damage = Math.round(basePower * (1 + rarityBonus) * variance);
-
-    let critChance = CRIT_CHANCE_BY_RARITY[weapon.rarity] || 5;
-    if (isSecretWeapon) critChance += SECRET_WEAPON_CRIT_BONUS;
-    if (isRagnarok) critChance += 15; // Ragnarok crittet besonders oft
-
-    const isCrit = randInt(1, 100) <= critChance;
-    if (isCrit) damage = Math.round(damage * 2);
 
     const viewerIsPrimaryOwner = isPrimaryOwner ? isPrimaryOwner(normalizedSender) : false;
     let weaponName = weapon.name;
@@ -463,7 +506,7 @@ export function createGuildBossSystem(DATA_PATH) {
         return true;
       }
 
-      const { damage, weaponName, weaponEmoji, isCrit, isSecret, isRagnarok } = calculateWeaponDamage({
+      const { damage, weaponName, weaponEmoji, isCrit, isSecret, isRagnarok, isExcalibur } = calculateWeaponDamage({
         users, ITEM_DB, ensureArenaFields, normalizedSender, randInt, isPrimaryOwner
       });
 
@@ -478,11 +521,12 @@ export function createGuildBossSystem(DATA_PATH) {
 
       const guildName = guilds[guildId]?.name || guildId;
       const critText = isCrit ? '💥 KRITISCHER TREFFER! ' : '';
-      const secretFlavor = isSecret && !isRagnarok ? '\n🌌 Eine unheimliche Macht durchströmt die Waffe...' : '';
+      const secretFlavor = isSecret && !isRagnarok && !isExcalibur ? '\n🌌 Eine unheimliche Macht durchströmt die Waffe...' : '';
       const ragnarokFlavor = isRagnarok ? '\n⚫ *RAGNAROK ERWACHT* — die Klinge der Götterdämmerung tobt!' : '';
+      const excaliburFlavor = isExcalibur ? '\n⚫ *EXCALIBUR ERSTRAHLT* — die Klinge des Systemadministrators verwüstet den Boss!' : '';
 
       await send(
-        `⚔️ ${critText}Mit ${weaponEmoji ? weaponEmoji + ' ' : ''}*${weaponName}* fügst du dem Boss *${damage}* Schaden zu!${secretFlavor}${ragnarokFlavor}\n` +
+        `⚔️ ${critText}Mit ${weaponEmoji ? weaponEmoji + ' ' : ''}*${weaponName}* fügst du dem Boss *${damage}* Schaden zu!${secretFlavor}${ragnarokFlavor}${excaliburFlavor}\n` +
         `👹 ${state.name}: ${Math.max(0, state.hp)} / ${state.maxHp} HP\n` +
         `${hpBar(state.hp, state.maxHp)}\n` +
         `🛡️ Für Gilde: ${guildName}`
