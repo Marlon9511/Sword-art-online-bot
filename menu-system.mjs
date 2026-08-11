@@ -5,7 +5,6 @@
 // ============================================================
 
 export const MENU_COMMANDS = ['help', 'menu'];
-import { createGuildWarSystem, GUILDWAR_COMMANDS, GUILDWAR_HELP_TEXT } from './guildwars.mjs';
 
 const DIVIDER = '⚔️┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈⚔️';
 
