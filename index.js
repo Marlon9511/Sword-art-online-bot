@@ -261,6 +261,7 @@ const titleSystem = createTitleSystem();
 const pokemonSystem = createPokemonSystem();
 const menuSystem = createMenuSystem();
 const guildBoss = createGuildBossSystem(DATA_PATH);
+const guildWars = createGuildWarSystem(DATA_PATH);
 
 async function createBackup() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
