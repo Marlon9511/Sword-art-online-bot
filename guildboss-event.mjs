@@ -51,6 +51,18 @@ function calculateRagnarokChance(maxHp) {
   return Math.min(RAGNAROK_MAX_CHANCE_PERCENT, Math.round(chance));
 }
 
+// ===== Zusätzliche Chance für Platz 2 & 3 der Gilden-Rangliste =====
+// Platz 1 (Sieger-Gilde) nutzt weiterhin die volle Chance aus
+// calculateRagnarokChance(). Platz 2 und 3 bekommen eine niedrigere,
+// unabhängige Chance, damit auch sie noch Ragnarok ergattern können.
+const RAGNAROK_RANK_CHANCE_DIVISOR = { 1: 1, 2: 2, 3: 3 }; // Rang -> Divisor der Basis-Chance
+
+function calculateGuildRankRagnarokChance(maxHp, rank) {
+  const baseChance = calculateRagnarokChance(maxHp);
+  const divisor = RAGNAROK_RANK_CHANCE_DIVISOR[rank] || 4;
+  return Math.max(1, Math.round(baseChance / divisor));
+}
+
 export function createGuildBossSystem(DATA_PATH) {
   const BOSS_FILE = path.join(DATA_PATH, 'guildboss.json');
 
@@ -207,29 +219,42 @@ export function createGuildBossSystem(DATA_PATH) {
   }
 
   // ===== Ragnarok-Vergabe nach Event-Ende =====
-  // Chance skaliert mit der maxHp des Bosses (siehe calculateRagnarokChance).
-  // Trifft die Chance: die GESAMTE siegreiche Gilde bekommt je eine Ragnarok.
-  // Trifft sie nicht: niemand bekommt Ragnarok.
-  function distributeRagnarok({ users, guilds, save, FILES, ITEM_DB, ensureArenaFields, randInt, winningGuildId, maxHp }) {
-    const dropChance = calculateRagnarokChance(maxHp);
-    const roll = randInt(1, 100);
-    const hit = roll <= dropChance;
+  // Jede der Top-3-Gilden (nach Gesamtschaden) rollt UNABHÄNGIG ihre eigene
+  // Chance (Platz 1 = volle Chance, Platz 2/3 = niedrigere Chance).
+  // Trifft eine Gilde, bekommt JEDES Mitglied dieser Gilde je eine Ragnarok.
+  function distributeRagnarok({ users, guilds, save, FILES, ITEM_DB, ensureArenaFields, randInt, top3Guilds, maxHp }) {
+    const results = []; // [{ guildId, guildName, rank, hit, chance, recipients }]
 
-    const recipients = [];
+    top3Guilds.forEach(([guildId, guildDamage], idx) => {
+      const rank = idx + 1;
+      const chance = calculateGuildRankRagnarokChance(maxHp, rank);
+      const roll = randInt(1, 100);
+      const hit = roll <= chance;
+      const recipients = [];
 
-    if (hit) {
-      const winningGuild = guilds[winningGuildId];
-      const members = Array.isArray(winningGuild?.members) ? winningGuild.members : [];
-      for (const jid of members) {
-        if (!users[jid]) continue;
-        ensureArenaFields(users, jid);
-        users[jid].items[RAGNAROK_ITEM_ID] = (users[jid].items[RAGNAROK_ITEM_ID] || 0) + 1;
-        recipients.push(jid);
+      if (hit) {
+        const guild = guilds[guildId];
+        const members = Array.isArray(guild?.members) ? guild.members : [];
+        for (const jid of members) {
+          if (!users[jid]) continue;
+          ensureArenaFields(users, jid);
+          users[jid].items[RAGNAROK_ITEM_ID] = (users[jid].items[RAGNAROK_ITEM_ID] || 0) + 1;
+          recipients.push(jid);
+        }
       }
-      save(FILES.users, users);
-    }
 
-    return { hit, recipients, dropChance };
+      results.push({
+        guildId,
+        guildName: guilds[guildId]?.name || guildId,
+        rank,
+        hit,
+        chance,
+        recipients
+      });
+    });
+
+    save(FILES.users, users);
+    return results;
   }
 
   async function endEvent({ send, sock, users, guilds, save, FILES, getNumberMention, ITEM_DB, ensureArenaFields, randInt }, reason = 'time') {
@@ -286,24 +311,28 @@ export function createGuildBossSystem(DATA_PATH) {
     // ===== Ragnarok-Vergabe =====
     let ragnarokLine = '';
     if (ITEM_DB && ensureArenaFields && randInt && ITEM_DB[RAGNAROK_ITEM_ID]) {
-      const { hit, recipients, dropChance } = distributeRagnarok({
+      const top3Guilds = getTopGuilds(3);
+      const results = distributeRagnarok({
         users, guilds, save, FILES, ITEM_DB, ensureArenaFields, randInt,
-        winningGuildId, maxHp: state.maxHp
+        top3Guilds, maxHp: state.maxHp
       });
 
       const ragnarok = ITEM_DB[RAGNAROK_ITEM_ID];
+      const rankEmoji = { 1: '🥇', 2: '🥈', 3: '🥉' };
 
-      if (hit && recipients.length) {
-        mentions.push(...recipients);
+      const resultLines = results.map(r => {
+        if (r.hit) {
+          mentions.push(...r.recipients);
+          return `${rankEmoji[r.rank] || `${r.rank}.`} *${r.guildName}* — Treffer! (${r.chance}% Chance) Alle Mitglieder erhalten *${ragnarok.name}*! ⚫✨`;
+        }
+        return `${rankEmoji[r.rank] || `${r.rank}.`} *${r.guildName}* — kein Glück (${r.chance}% Chance)`;
+      });
+
+      if (resultLines.length) {
         ragnarokLine =
-          `\n\n⚫✨ *— LEGENDÄRER GILDEN-SEGEN —* ✨⚫\n` +
-          `Das System erzittert... die *gesamte siegreiche Gilde ${guildName}* hat je eine *${ragnarok.name}* erhalten!\n` +
+          `\n\n⚫✨ *— RAGNAROK-AUSLOSUNG (TOP 3 GILDEN) —* ✨⚫\n` +
           `_${ragnarok.trueName}_\n` +
-          `🍀 Chance war ${dropChance}% (basierend auf ${state.maxHp} Boss-HP)!`;
-      } else {
-        ragnarokLine =
-          `\n\n⚫ Die Gilde hatte diesmal kein Glück — Ragnarok blieb verborgen.\n` +
-          `🍀 Chance war ${dropChance}% (basierend auf ${state.maxHp} Boss-HP).`;
+          resultLines.join('\n');
       }
     }
 
@@ -404,7 +433,7 @@ export function createGuildBossSystem(DATA_PATH) {
           `➡️ ${activePrefix}bossevent status — Status anzeigen\n\n` +
           `💡 Rüstet eure beste Waffe mit ${activePrefix}equip aus, bevor ihr angreift!\n` +
           `🏆 Die Gilde mit dem meisten Gesamtschaden gewinnt die Belohnung!\n` +
-          `⚫ Die siegreiche Gilde hat ${calculateRagnarokChance(hp)}% Chance, dass *alle Mitglieder* eine *Ragnarok* erhalten — die stärkste Waffe im Spiel!\n` +
+          `⚫ Die *Top 3 Gilden* der Schadensrangliste haben je eine eigene Chance auf *Ragnarok* für alle Mitglieder — Platz 1: ${calculateGuildRankRagnarokChance(hp, 1)}%, Platz 2: ${calculateGuildRankRagnarokChance(hp, 2)}%, Platz 3: ${calculateGuildRankRagnarokChance(hp, 3)}%!\n` +
           `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈`
         );
         return true;
@@ -474,7 +503,7 @@ export function createGuildBossSystem(DATA_PATH) {
           `❤️ HP: ${Math.max(0, state.hp)} / ${state.maxHp}\n` +
           `${hpBar(state.hp, state.maxHp)}\n` +
           `⏳ Verbleibend: ${timeLeft}${topGuildPreview}\n` +
-          `⚫ Ragnarok-Chance bei Sieg (ganze Gilde): ${calculateRagnarokChance(state.maxHp)}%\n\n` +
+          `⚫ Ragnarok-Chance (Top 3 Gilden): 🥇 ${calculateGuildRankRagnarokChance(state.maxHp, 1)}% | 🥈 ${calculateGuildRankRagnarokChance(state.maxHp, 2)}% | 🥉 ${calculateGuildRankRagnarokChance(state.maxHp, 3)}%\n\n` +
           `📊 *Aktuelle Gilden-Rangliste:*\n${guildRanking}\n\n` +
           `Nutze ${activePrefix}bossattack, um mitzukämpfen!`
         );
@@ -557,6 +586,6 @@ ${'{P}'}bossevent status — Boss-Status ansehen
 ${'{P}'}bossevent end — Event abbrechen (Owner)
 ${'{P}'}bossevent resetcd [all] — Cooldown zurücksetzen zum Testen (Owner)
 ${'{P}'}bossattack — Dem Boss Schaden zufügen (Schaden = deine ausgerüstete Waffe!)
-_Die siegreiche Gilde hat je nach Boss-HP eine steigende Chance, dass ALLE Mitglieder eine Ragnarok erhalten!_`
+_Die Top 3 Gilden der Schadensrangliste haben je eine eigene, absteigende Chance, dass ALLE Mitglieder eine Ragnarok erhalten!_`
   };
 }
