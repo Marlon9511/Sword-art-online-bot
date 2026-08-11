@@ -32,7 +32,7 @@ const RAGNAROK_ITEM_ID = 'w_ragnarok';
 // Bewusst höher angesetzt als Excalibur, damit Ragnarok die stärkste
 // Waffe im Boss-Kampf bleibt.
 const RAGNAROK_MIN_DAMAGE = 500;
-const RAGNAROK_MAX_DAMAGE = 1000;
+const RAGNAROK_MAX_DAMAGE = 4000;
 
 // ID der Owner-exklusiven Waffe (muss zu arena-system.mjs passen)
 const EXCALIBUR_ITEM_ID = 'w_excalibur';
