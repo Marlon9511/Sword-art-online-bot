@@ -69,9 +69,13 @@ function buildArenaLayer(ctx) {
 }
 
 function buildGuildLayer(ctx) {
-  const { PREFIX, GUILD_HELP_TEXT } = ctx;
+  const { PREFIX, GUILD_HELP_TEXT, GUILDWAR_HELP_TEXT } = ctx;
   let t = `🏰 *GILDEN-SYSTEM* (Verbünde)\n${DIVIDER}\n`;
   t += GUILD_HELP_TEXT.split('\n').filter(Boolean).map(l => l.replace(/\{P\}/g, PREFIX)).join('\n');
+  if (GUILDWAR_HELP_TEXT) {
+    t += `\n\n${DIVIDER}\n`;
+    t += GUILDWAR_HELP_TEXT.split('\n').filter(Boolean).map(l => l.replace(/\{P\}/g, PREFIX)).join('\n');
+  }
   return t;
 }
 
