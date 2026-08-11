@@ -1126,6 +1126,14 @@ setInterval(async () => {
     });
   } catch (e) { console.error('[guildboss] Expiry-Check Fehler:', e); }
 }, 60 * 1000);
+setInterval(async () => {
+  try {
+    await guildWars.checkExpiry({
+      send: async (text, opts) => { try { await sock.sendMessage(OWNER_PRIV, { text, ...opts }); } catch (e) {} },
+      sock, users, guilds, save, FILES, getNumberMention
+    });
+  } catch (e) { console.error('[guildwars] Expiry-Check Fehler:', e); }
+}, 60 * 1000);
 async function updateBotProfile() {
     try {
       const profileName = `Sword-art-online-bot (${sessionName})`;
