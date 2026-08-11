@@ -1,7 +1,7 @@
 // ============================================================
 // MENU-SYSTEM.MJS — Mehrschichtiges Hilfe-/Menü-System
 // Aufruf: {P}help / {P}menu [layer]
-// Beispiele: ?menu, ?menu owner, ?menu pokemon, ?menu arena
+// Beispiele: ?menu, ?menu owner, ?menu pokemon, ?menu arena, ?menu demonslayer
 // ============================================================
 
 export const MENU_COMMANDS = ['help', 'menu'];
@@ -10,7 +10,8 @@ const DIVIDER = '⚔️┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈⚔
 
 // Jede Layer bekommt (ctx) übergeben und liefert einen fertigen Text-String zurück.
 // ctx enthält: PREFIX, isAuthorized, hasAdminPerms, sender,
-//              ARENA_HELP_TEXT, GUILD_HELP_TEXT, TITLE_HELP_TEXT, POKEMON_HELP_TEXT
+//              ARENA_HELP_TEXT, GUILD_HELP_TEXT, TITLE_HELP_TEXT, POKEMON_HELP_TEXT,
+//              GUILDWAR_HELP_TEXT, DS_HELP_TEXT
 
 function buildMainLayer(ctx) {
   const { PREFIX, sender, isAuthorized, hasAdminPerms } = ctx;
@@ -37,6 +38,7 @@ function buildMainLayer(ctx) {
   t += `▸ ${PREFIX}menu gilde — Gilden-/Verbunds-System\n`;
   t += `▸ ${PREFIX}menu titel — Titel & Erfolge\n`;
   t += `▸ ${PREFIX}menu pokemon — Pokémon-System\n`;
+  t += `▸ ${PREFIX}menu demonslayer — Dämonentöter-System\n`;
   t += `▸ ${PREFIX}menu social — Interaktions-Skills (hug, kiss, pat, ...)\n`;
   t += `▸ ${PREFIX}menu fun — Fun & Action Skills (kill, yeet, nuke, ...)\n`;
   t += `▸ ${PREFIX}menu chat — Gilden-Chat & Gruppeneinstellungen\n`;
@@ -90,6 +92,18 @@ function buildPokemonLayer(ctx) {
   const { PREFIX, POKEMON_HELP_TEXT } = ctx;
   let t = `🐾 *POKÉMON-SYSTEM*\n${DIVIDER}\n`;
   t += POKEMON_HELP_TEXT.split('\n').filter(Boolean).map(l => l.replace(/\{P\}/g, PREFIX)).join('\n');
+  return t;
+}
+
+function buildDemonSlayerLayer(ctx) {
+  const { PREFIX, DS_HELP_TEXT } = ctx;
+  let t = `👹 *DÄMONENTÖTER-SYSTEM*\n${DIVIDER}\n`;
+  t += (DS_HELP_TEXT || '(keine Daten verfügbar)')
+    .split('\n')
+    .filter(Boolean)
+    .map(l => l.replace(/\{P\}/g, PREFIX))
+    .join('\n');
+  t += `\n\n☀️🌙 _Sonnen- und Mondatmung sind extrem selten — nur wahre Legenden erlernen sie._`;
   return t;
 }
 
@@ -224,18 +238,19 @@ function buildOwnerLayer(ctx) {
 
 // key -> { build, aliases }
 const LAYERS = {
-  main:    { build: buildMainLayer,    aliases: [] },
-  system:  { build: buildMainLayer,    aliases: ['start', 'basis'] },
-  arena:   { build: buildArenaLayer,   aliases: ['wirtschaft', 'economy'] },
-  gilde:   { build: buildGuildLayer,   aliases: ['guild', 'gilden'] },
-  titel:   { build: buildTitleLayer,   aliases: ['titles', 'achievements', 'erfolge'] },
-  pokemon: { build: buildPokemonLayer, aliases: ['poke', 'pokedex'] },
-  social:  { build: buildSocialLayer,  aliases: ['interaktion', 'interaction'] },
-  fun:     { build: buildFunLayer,     aliases: ['action', 'giphy'] },
-  chat:    { build: buildChatLayer,    aliases: ['gruppe', 'group', 'gilden-chat'] },
-  support: { build: buildSupportLayer, aliases: ['ticket', 'tickets'] },
-  admin:   { build: buildAdminLayer,   aliases: ['gildenmeister', 'mod'] },
-  owner:   { build: buildOwnerLayer,   aliases: ['kayaba', 'sysadmin', 'system-admin'] }
+  main:        { build: buildMainLayer,        aliases: [] },
+  system:      { build: buildMainLayer,        aliases: ['start', 'basis'] },
+  arena:       { build: buildArenaLayer,       aliases: ['wirtschaft', 'economy'] },
+  gilde:       { build: buildGuildLayer,       aliases: ['guild', 'gilden'] },
+  titel:       { build: buildTitleLayer,       aliases: ['titles', 'achievements', 'erfolge'] },
+  pokemon:     { build: buildPokemonLayer,     aliases: ['poke', 'pokedex'] },
+  demonslayer: { build: buildDemonSlayerLayer, aliases: ['dämonentöter', 'daemonslayer', 'ds', 'atmung'] },
+  social:      { build: buildSocialLayer,      aliases: ['interaktion', 'interaction'] },
+  fun:         { build: buildFunLayer,         aliases: ['action', 'giphy'] },
+  chat:        { build: buildChatLayer,        aliases: ['gruppe', 'group', 'gilden-chat'] },
+  support:     { build: buildSupportLayer,     aliases: ['ticket', 'tickets'] },
+  admin:       { build: buildAdminLayer,       aliases: ['gildenmeister', 'mod'] },
+  owner:       { build: buildOwnerLayer,       aliases: ['kayaba', 'sysadmin', 'system-admin'] }
 };
 
 function resolveLayerKey(input) {
@@ -255,20 +270,21 @@ function buildNavRows(ctx) {
   const prefix = activePrefix || PREFIX;
 
   const LABELS = {
-    main:    { title: '🔷 Hauptmenü',        desc: 'Übersicht & Basis-Befehle' },
-    arena:   { title: '⚔️ Arena',             desc: 'Ausrüstung, PVP & Wirtschaft' },
-    gilde:   { title: '🏰 Gilde',             desc: 'Verbünde & Gildensystem' },
-    titel:   { title: '🎖️ Titel',             desc: 'Titel & Erfolge' },
-    pokemon: { title: '🐾 Pokémon',           desc: 'Fangen, Leveln, Kämpfen' },
-    social:  { title: '💞 Social',            desc: 'Interaktions-Skills' },
-    fun:     { title: '💀 Fun & Action',      desc: 'Giphy-Reactions' },
-    chat:    { title: '💬 Gilden-Chat',       desc: 'Chat- & Gruppeneinstellungen' },
-    support: { title: '🎫 Support',           desc: 'Ticket-System (Team)' },
-    admin:   { title: '🛡️ Gildenmeister',     desc: 'Admin-Befehle' },
-    owner:   { title: '👑 System-Admin',       desc: 'Kayaba-Rechte' }
+    main:        { title: '🔷 Hauptmenü',     desc: 'Übersicht & Basis-Befehle' },
+    arena:       { title: '⚔️ Arena',          desc: 'Ausrüstung, PVP & Wirtschaft' },
+    gilde:       { title: '🏰 Gilde',          desc: 'Verbünde & Gildensystem' },
+    titel:       { title: '🎖️ Titel',          desc: 'Titel & Erfolge' },
+    pokemon:     { title: '🐾 Pokémon',        desc: 'Fangen, Leveln, Kämpfen' },
+    demonslayer: { title: '👹 Dämonentöter',   desc: 'Atemstile & Dämonen-Boss' },
+    social:      { title: '💞 Social',         desc: 'Interaktions-Skills' },
+    fun:         { title: '💀 Fun & Action',   desc: 'Giphy-Reactions' },
+    chat:        { title: '💬 Gilden-Chat',    desc: 'Chat- & Gruppeneinstellungen' },
+    support:     { title: '🎫 Support',        desc: 'Ticket-System (Team)' },
+    admin:       { title: '🛡️ Gildenmeister',  desc: 'Admin-Befehle' },
+    owner:       { title: '👑 System-Admin',    desc: 'Kayaba-Rechte' }
   };
 
-  const order = ['main', 'arena', 'gilde', 'titel', 'pokemon', 'social', 'fun', 'chat', 'support', 'admin', 'owner'];
+  const order = ['main', 'arena', 'gilde', 'titel', 'pokemon', 'demonslayer', 'social', 'fun', 'chat', 'support', 'admin', 'owner'];
   const rows = [];
 
   for (const key of order) {
