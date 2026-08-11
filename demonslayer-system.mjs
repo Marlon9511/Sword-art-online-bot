@@ -199,4 +199,157 @@ export function createDemonSlayerSystem(DATA_PATH) {
 
       await send(
         `${header}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
-        `${sty
+        `${style.name}${isSecret ? `\n"${style.trueName}"` : ''}\n` +
+        `${RARITY_LABEL[style.rarity]} | Kraft: ${style.power}\n` +
+        `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+        (isSecret
+          ? `Ein Licht durchbricht den Nebel von Aincrad... du hast Geschichte geschrieben. 🔥`
+          : `Trainiere fleißig und stelle dich dem Dämon mit ${P}daemonboss!`)
+      );
+      return true;
+    }
+
+    // ---- EIGENER ATEMSTIL ----
+    if (cmd === 'atemstil' || cmd === 'mybreathing') {
+      const data = load();
+      const player = ensurePlayer(data, senderJid);
+      save(data);
+      if (!player.style) {
+        await send(`❌ Du hast noch keinen Atemstil erlernt. Nutze ${P}atemzug (${GACHA_COST} Coins).`);
+        return true;
+      }
+      const style = BREATHING_STYLES[player.style];
+      await send(
+        `🧘 *Dein Atemstil*\n` +
+        `${style.name}${style.secret ? `\n"${style.trueName}"` : ''}\n` +
+        `${RARITY_LABEL[style.rarity]} | Kraft: ${style.power}`
+      );
+      return true;
+    }
+
+    // ---- RANG ANZEIGEN ----
+    if (cmd === 'dsrang' || cmd === 'dsrank') {
+      const data = load();
+      const player = ensurePlayer(data, senderJid);
+      save(data);
+      const rankName = RANKS[player.rankIndex];
+      const nextIdx = player.rankIndex + 1;
+      const nextInfo = nextIdx < RANKS.length
+        ? `Nächster Rang: ${RANKS[nextIdx]} (benötigt ${RANK_XP_REQUIRED(nextIdx)} XP, du hast ${player.xp})`
+        : `👑 Du hast den höchsten Rang erreicht: Hashira!`;
+      await send(
+        `🏅 *Dämonentöter-Rang*\n` +
+        `Aktueller Rang: *${rankName}*${rankName === 'Hashira' ? ' 👑' : ''}\n` +
+        `XP: ${player.xp} | Siege: ${player.wins}\n` +
+        `${nextInfo}`
+      );
+      return true;
+    }
+
+    // ---- RANGAUFSTIEG ----
+    if (cmd === 'dsaufstieg' || cmd === 'dspromote') {
+      const data = load();
+      const player = ensurePlayer(data, senderJid);
+      const nextIdx = player.rankIndex + 1;
+
+      if (nextIdx >= RANKS.length) {
+        save(data);
+        await send('👑 Du bist bereits Hashira — der höchste Rang des Korps. Es gibt nichts mehr zu erklimmen.');
+        return true;
+      }
+
+      const required = RANK_XP_REQUIRED(nextIdx);
+      if (player.xp < required) {
+        save(data);
+        await send(`❌ Noch nicht genug XP. Benötigt: ${required}, du hast: ${player.xp}.\nBekämpfe den Dämon mit ${P}daemonboss, um XP zu sammeln.`);
+        return true;
+      }
+
+      player.rankIndex = nextIdx;
+      save(data);
+      const newRank = RANKS[nextIdx];
+      await send(
+        `🎉 *AUFSTIEG!* 🎉\n` +
+        `@${senderJid.split('@')[0]} ist jetzt Rang *${newRank}*${newRank === 'Hashira' ? ' 👑' : ''}!`,
+        { mentions: [senderJid] }
+      );
+      return true;
+    }
+
+    // ---- DÄMONEN-BOSS-KAMPF ----
+    if (cmd === 'daemonboss' || cmd === 'demonboss') {
+      const data = load();
+      const player = ensurePlayer(data, senderJid);
+
+      if (!player.style) {
+        save(data);
+        await send(`❌ Du brauchst zuerst einen Atemstil! Nutze ${P}atemzug (${GACHA_COST} Coins).`);
+        return true;
+      }
+
+      const now = Date.now();
+      if (now - (player.lastBoss || 0) < BOSS_COOLDOWN_MS) {
+        save(data);
+        const remaining = Math.ceil((BOSS_COOLDOWN_MS - (now - player.lastBoss)) / 1000);
+        const min = Math.floor(remaining / 60), sec = remaining % 60;
+        await send(`⏰ Du musst dich noch ${min}:${sec.toString().padStart(2, '0')} min erholen, bevor du erneut angreifst.`);
+        return true;
+      }
+
+      const boss = spawnBossIfNeeded(data);
+      const style = BREATHING_STYLES[player.style];
+      const rankMultiplier = 1 + (player.rankIndex * 0.08);
+      const baseDamage = style.power * rankMultiplier;
+      const variance = randInt(80, 130) / 100;
+      const critChance = style.secret ? 0.25 : 0.1;
+      const isCrit = Math.random() < critChance;
+      let damage = Math.round(baseDamage * variance * (isCrit ? 2 : 1));
+
+      boss.hp = Math.max(0, boss.hp - damage);
+      player.lastBoss = now;
+      player.xp += randInt(5, 15);
+
+      let resultText =
+        `👹 *— ${boss.name} —* 👹\n` +
+        `${healthBar(boss.hp, boss.maxHp)}\n` +
+        `${boss.hp} / ${boss.maxHp} HP\n\n` +
+        `${isCrit ? '💥 *KRITISCHER TREFFER!* ' : ''}Mit ${style.name} fügst du ${damage} Schaden zu!`;
+
+      if (boss.hp <= 0) {
+        const xpReward = randInt(80, 200);
+        const coinReward = randInt(200, 600);
+        player.xp += xpReward;
+        player.wins += 1;
+        ctx.ensureUser(senderJid);
+        ctx.users[senderJid].coins = (ctx.users[senderJid].coins || 0) + coinReward;
+        ctx.save(ctx.FILES.users, ctx.users);
+
+        resultText +=
+          `\n\n☠️ *DER DÄMON WURDE BESIEGT!* ☠️\n` +
+          `+${xpReward} XP, +${coinReward} Coins für @${senderJid.split('@')[0]}!\n` +
+          `Ein neuer Dämon wird bald erscheinen...`;
+        data.boss = null;
+      }
+
+      save(data);
+      await send(resultText, boss.hp <= 0 ? { mentions: [senderJid] } : {});
+      return true;
+    }
+
+    return false;
+  }
+
+  const DS_COMMANDS = [
+    'dshelp', 'demonslayerhelp', 'atemzug', 'learnbreathing', 'atemstil', 'mybreathing',
+    'atemliste', 'breathinglist', 'daemonboss', 'demonboss', 'dsrang', 'dsrank',
+    'dsaufstieg', 'dspromote'
+  ];
+
+  const DS_HELP_TEXT =
+    `👹 *Dämonentöter-System*\n` +
+    `{P}atemzug — Atemstil erlernen\n` +
+    `{P}daemonboss — Dämon angreifen\n` +
+    `{P}dsrang — Rang anzeigen | {P}dsaufstieg — aufsteigen`;
+
+  return { handle, DS_COMMANDS, DS_HELP_TEXT };
+}
