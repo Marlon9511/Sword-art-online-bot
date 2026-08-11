@@ -44,6 +44,20 @@ const WAR_ATTACK_COOLDOWN_MS = 3 * 60 * 1000;
 const WAR_REWARD_COINS_PER_MEMBER = 250;
 const WAR_REWARD_XP_PER_MEMBER = 80;
 
+// ID der Owner-exklusiven Waffe (muss zu arena-system.mjs / index.js ITEM_DB passen)
+const EXCALIBUR_ITEM_ID = 'w_excalibur';
+// Excaliburs reguläre Power (10000) ist für normale Duelle gedacht.
+// Im Gildenkrieg wird der daraus resultierende Schaden gedrosselt, damit
+// eine einzelne Person eine Festung nicht in einem Schlag zerstören kann.
+const WAR_EXCALIBUR_DAMAGE_CAP = 5000;
+
+// ===== Verteidigung durch Rüstung =====
+// Die durchschnittliche Rüstungs-Power aller Gildenmitglieder (Mitglieder
+// ohne ausgerüstete Rüstung zählen als 0) reduziert eingehenden Festungs-
+// schaden. Gedeckelt, damit eine Festung nie komplett unverwundbar wird.
+const WAR_ARMOR_REDUCTION_PER_POWER = 0.004; // 0.4% Reduktion pro Ø-Rüstungs-Power
+const WAR_MAX_ARMOR_REDUCTION = 0.60;        // maximal 60% Reduktion
+
 export const GUILDWAR_COMMANDS = ['allianz', 'alliance', 'krieg', 'war', 'kriegsangriff', 'warattack'];
 
 export const GUILDWAR_HELP_TEXT =
@@ -81,6 +95,23 @@ function ensureGuildWarFields(guild) {
 function calculateWarHp(guild) {
   const memberCount = Array.isArray(guild?.members) ? guild.members.length : 1;
   return WAR_BASE_HP + memberCount * WAR_HP_PER_MEMBER;
+}
+
+// Durchschnittliche Rüstungs-Power der Gildenmitglieder -> Schadensreduktion (0 bis WAR_MAX_ARMOR_REDUCTION)
+function calculateGuildDefenseReduction(guild, users, ITEM_DB) {
+  const members = Array.isArray(guild?.members) ? guild.members : [];
+  if (!members.length) return 0;
+
+  let totalPower = 0;
+  for (const jid of members) {
+    const armorId = users[jid]?.equipped?.armor;
+    const armor = armorId ? ITEM_DB[armorId] : null;
+    totalPower += armor?.power || 0;
+  }
+
+  const avgPower = totalPower / members.length;
+  const reduction = avgPower * WAR_ARMOR_REDUCTION_PER_POWER;
+  return Math.min(WAR_MAX_ARMOR_REDUCTION, reduction);
 }
 
 function hpBar(hp, maxHp, len = 20) {
@@ -122,6 +153,13 @@ function calculateWeaponDamage({ users, ITEM_DB, ensureArenaFields, jid, randInt
 
   const isCrit = randInt(1, 100) <= critChance;
   if (isCrit) damage = Math.round(damage * 2);
+
+  // ===== Excalibur-Drosselung (nur im Gildenkrieg) =====
+  // Excaliburs reguläre Power (10000) ist für normale Duelle gedacht;
+  // gegen eine Festung wird der Schaden auf WAR_EXCALIBUR_DAMAGE_CAP gekappt.
+  if (weaponId === EXCALIBUR_ITEM_ID) {
+    damage = Math.min(damage, WAR_EXCALIBUR_DAMAGE_CAP);
+  }
 
   return {
     damage,
@@ -527,13 +565,17 @@ export function createGuildWarSystem(DATA_PATH) {
         const enemyHp = isA ? war.hpB : war.hpA;
         const enemyMaxHp = isA ? war.maxHpB : war.maxHpA;
         const enemyGid = isA ? war.guildB : war.guildA;
-        const enemyName = guilds[enemyGid]?.name || enemyGid;
+        const enemyGuild = guilds[enemyGid];
+        const enemyName = enemyGuild?.name || enemyGid;
         const timeLeft = formatTimeLeft(war.endsAt - Date.now());
+
+        const myDefense = Math.round(calculateGuildDefenseReduction(myGuild, users, ITEM_DB) * 100);
+        const enemyDefense = Math.round(calculateGuildDefenseReduction(enemyGuild, users, ITEM_DB) * 100);
 
         await send(
           `⚔️🏰 *— GILDENKRIEG-STATUS —* 🏰⚔️\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
-          `🏠 Deine Festung: ${Math.max(0, myHp)} / ${myMaxHp}\n${hpBar(myHp, myMaxHp)}\n\n` +
-          `🏴 Feindliche Festung (${enemyName}): ${Math.max(0, enemyHp)} / ${enemyMaxHp}\n${hpBar(enemyHp, enemyMaxHp)}\n\n` +
+          `🏠 Deine Festung: ${Math.max(0, myHp)} / ${myMaxHp}\n${hpBar(myHp, myMaxHp)}\n🛡️ Deine Verteidigung: -${myDefense}% eingehender Schaden\n\n` +
+          `🏴 Feindliche Festung (${enemyName}): ${Math.max(0, enemyHp)} / ${enemyMaxHp}\n${hpBar(enemyHp, enemyMaxHp)}\n🛡️ Ihre Verteidigung: -${enemyDefense}% eingehender Schaden\n\n` +
           `⏳ Verbleibend: ${timeLeft}\n\n` +
           `Nutze ${activePrefix}kriegsangriff, um die feindliche Festung anzugreifen!`
         );
@@ -567,9 +609,15 @@ export function createGuildWarSystem(DATA_PATH) {
       }
 
       const isA = war.guildA === myGuildId;
-      const { damage, weaponName, weaponEmoji, isCrit } = calculateWeaponDamage({
+      const { damage: rawDamage, weaponName, weaponEmoji, isCrit } = calculateWeaponDamage({
         users, ITEM_DB, ensureArenaFields, jid: normalizedSender, randInt
       });
+
+      const enemyGid = isA ? war.guildB : war.guildA;
+      const enemyGuild = guilds[enemyGid];
+      const defenseReduction = calculateGuildDefenseReduction(enemyGuild, users, ITEM_DB);
+      const damage = Math.max(1, Math.round(rawDamage * (1 - defenseReduction)));
+      const blocked = rawDamage - damage;
 
       if (isA) war.hpB = Math.max(0, war.hpB - damage);
       else war.hpA = Math.max(0, war.hpA - damage);
@@ -581,14 +629,14 @@ export function createGuildWarSystem(DATA_PATH) {
       users[normalizedSender].xp = (users[normalizedSender].xp || 0) + 5;
       save(FILES.users, users);
 
-      const enemyGid = isA ? war.guildB : war.guildA;
-      const enemyName = guilds[enemyGid]?.name || enemyGid;
+      const enemyName = enemyGuild?.name || enemyGid;
       const enemyHp = isA ? war.hpB : war.hpA;
       const enemyMaxHp = isA ? war.maxHpB : war.maxHpA;
       const critText = isCrit ? '💥 KRITISCHER TREFFER! ' : '';
+      const defenseLine = blocked > 0 ? `\n🛡️ Die Rüstung von *${enemyName}* blockt ${blocked} Schaden (-${Math.round(defenseReduction * 100)}%)!` : '';
 
       await send(
-        `⚔️ ${critText}Mit ${weaponEmoji ? weaponEmoji + ' ' : ''}*${weaponName}* fügst du der Festung von *${enemyName}* *${damage}* Schaden zu!\n` +
+        `⚔️ ${critText}Mit ${weaponEmoji ? weaponEmoji + ' ' : ''}*${weaponName}* fügst du der Festung von *${enemyName}* *${damage}* Schaden zu!${defenseLine}\n` +
         `🏴 ${enemyName}: ${Math.max(0, enemyHp)} / ${enemyMaxHp} HP\n` +
         `${hpBar(enemyHp, enemyMaxHp)}`
       );
