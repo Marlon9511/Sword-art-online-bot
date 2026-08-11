@@ -146,7 +146,7 @@ export function createDemonSlayerSystem(DATA_PATH) {
         `${P}atemzug — Atemstil erlernen (${GACHA_COST} Coins)\n` +
         `${P}atemstil — deinen aktuellen Atemstil anzeigen\n` +
         `${P}atemliste — alle bekannten Atemstile anzeigen\n` +
-        `${P}daemonboss — den Dämon angreifen\n` +
+        `${P}demonboss — den Dämon angreifen\n` +
         `${P}dsrang — deinen Korps-Rang anzeigen\n` +
         `${P}dsaufstieg — versuchen, im Rang aufzusteigen\n` +
         `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
@@ -204,7 +204,7 @@ export function createDemonSlayerSystem(DATA_PATH) {
         `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
         (isSecret
           ? `Ein Licht durchbricht den Nebel von Aincrad... du hast Geschichte geschrieben. 🔥`
-          : `Trainiere fleißig und stelle dich dem Dämon mit ${P}daemonboss!`)
+          : `Trainiere fleißig und stelle dich dem Dämon mit ${P}demonboss!`)
       );
       return true;
     }
@@ -277,7 +277,7 @@ export function createDemonSlayerSystem(DATA_PATH) {
     }
 
     // ---- DÄMONEN-BOSS-KAMPF ----
-    if (cmd === 'daemonboss' || cmd === 'demonboss') {
+    if (cmd === 'dämonenboss' || cmd === 'demonboss') {
       const data = load();
       const player = ensurePlayer(data, senderJid);
 
@@ -341,7 +341,7 @@ export function createDemonSlayerSystem(DATA_PATH) {
 
   const DS_COMMANDS = [
     'dshelp', 'demonslayerhelp', 'atemzug', 'learnbreathing', 'atemstil', 'mybreathing',
-    'atemliste', 'breathinglist', 'daemonboss', 'demonboss', 'dsrang', 'dsrank',
+    'atemliste', 'breathinglist', 'dämonenboss', 'demonboss', 'dsrang', 'dsrank',
     'dsaufstieg', 'dspromote'
   ];
 
