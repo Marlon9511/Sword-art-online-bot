@@ -1923,7 +1923,7 @@ if (cmd === 'help' || cmd === 'menu') {
     args, sender, activePrefix, PREFIX,
     isAuthorized, hasAdminPerms,
     ARENA_HELP_TEXT, GUILD_HELP_TEXT, TITLE_HELP_TEXT, POKEMON_HELP_TEXT,
-    GUILDWAR_HELP_TEXT
+    GUILDWAR_HELP_TEXT, demonSlayer.DS_COMMANDS
   });
 
   try {
