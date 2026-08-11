@@ -22,7 +22,7 @@ const BREATHING_STYLES = {
   insekt:    { name: '🦋 Insektenatmung',   rarity: 'rare',      power: 23, weight: 4  },
   schlange:  { name: '🐍 Schlangenatmung',  rarity: 'rare',      power: 24, weight: 4  },
 
-  // ---- SECRET / SEHR SELTEN ----
+  // ---- SECRET / SEHR SELTEN — NICHT KÄUFLICH, nur via ?atemzug ----
   sonne:     { name: '☀️ Sonnenatmung',     trueName: 'Atmung der Sonne — Hinokami Kagura', rarity: 'legendary', power: 100, weight: 0.05, ownerWeight: 3, secret: true },
   mond:      { name: '🌙 Mondatmung',       trueName: 'Atmung des Mondes', rarity: 'legendary', power: 95,  weight: 0.05, ownerWeight: 3, secret: true }
 };
@@ -32,6 +32,13 @@ const RARITY_LABEL = {
   uncommon: '🟢 Ungewöhnlich',
   rare: '🔵 Selten',
   legendary: '🟡 Legendär'
+};
+
+// Preise im Shop (nur nicht-secret Stile käuflich/verschenkbar)
+const SHOP_PRICE = {
+  common: 400,
+  uncommon: 700,
+  rare: 1200
 };
 
 // ---- RANG-SYSTEM (Dämonentöter-Korps-Ränge) ----
@@ -71,17 +78,27 @@ export function createDemonSlayerSystem(DATA_PATH) {
     fs.writeFileSync(FILE_PATH, JSON.stringify(data, null, 2));
   }
 
+  // Erstellt den Spieler bei Bedarf und migriert alte Speicherstände
+  // (früher: einzelnes "style"-Feld) automatisch in die neue Sammlung.
   function ensurePlayer(data, jid) {
     if (!data.players[jid]) {
       data.players[jid] = {
-        style: null,
+        styles: {},
+        activeStyle: null,
         rankIndex: 0,
         xp: 0,
         wins: 0,
         lastBoss: 0
       };
     }
-    return data.players[jid];
+    const p = data.players[jid];
+    if (!p.styles) p.styles = {};
+    if (p.style && !p.styles[p.style]) {
+      p.styles[p.style] = true;
+      if (!p.activeStyle) p.activeStyle = p.style;
+    }
+    if (p.activeStyle === undefined) p.activeStyle = null;
+    return p;
   }
 
   function spawnBossIfNeeded(data) {
@@ -125,7 +142,7 @@ export function createDemonSlayerSystem(DATA_PATH) {
 
   function styleLine(styleId) {
     const s = BREATHING_STYLES[styleId];
-    if (!s) return '— (kein Atemstil)';
+    if (!s) return '— (unbekannter Atemstil)';
     return `${s.name} ${RARITY_LABEL[s.rarity] || ''}`;
   }
 
@@ -143,14 +160,19 @@ export function createDemonSlayerSystem(DATA_PATH) {
       await send(
         `👹 *— DÄMONENTÖTER-SYSTEM —* 👹\n` +
         `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
-        `${P}atemzug — Atemstil erlernen (${GACHA_COST} Coins)\n` +
-        `${P}atemstil — deinen aktuellen Atemstil anzeigen\n` +
+        `${P}atemzug — zufälligen Atemstil erlernen (${GACHA_COST} Coins)\n` +
+        `${P}atemshop — Atemstile kaufen (feste Preise)\n` +
+        `${P}atemkaufen <id> — einen Stil aus dem Shop kaufen\n` +
+        `${P}atemschenken @user <id> — Stil an jemanden verschenken\n` +
+        `${P}atemsammlung — deine besessenen Stile anzeigen\n` +
+        `${P}atemausruesten <id> — aktiven Kampf-Stil wechseln\n` +
+        `${P}atemstil — deinen aktuell ausgerüsteten Stil anzeigen\n` +
         `${P}atemliste — alle bekannten Atemstile anzeigen\n` +
         `${P}demonboss — den Dämon angreifen\n` +
         `${P}dsrang — deinen Korps-Rang anzeigen\n` +
         `${P}dsaufstieg — versuchen, im Rang aufzusteigen\n` +
         `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
-        `☀️🌙 Sonnen- und Mondatmung sind extrem selten — nur wahre Legenden erlernen sie.`
+        `☀️🌙 Sonnen- und Mondatmung sind extrem selten & NICHT käuflich — nur ${P}atemzug kann sie hervorbringen.`
       );
       return true;
     }
@@ -164,21 +186,143 @@ export function createDemonSlayerSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- ATEMZUG (Gacha: Stil erlernen) ----
+    // ---- ATEMSHOP (Liste käuflicher Stile) ----
+    if (cmd === 'atemshop' || cmd === 'breathingshop') {
+      const lines = Object.entries(BREATHING_STYLES)
+        .filter(([, s]) => !s.secret)
+        .sort((a, b) => a[1].power - b[1].power)
+        .map(([id, s]) => `• \`${id}\` — ${s.name} ${RARITY_LABEL[s.rarity]} | Kraft: ${s.power} | 💰 ${SHOP_PRICE[s.rarity]} Coins`);
+      await send(
+        `🛒 *— ATEM-SHOP —* 🛒\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+        `${lines.join('\n')}\n` +
+        `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+        `Kaufen: ${P}atemkaufen <id>\n` +
+        `Verschenken: ${P}atemschenken @user <id>\n\n` +
+        `☀️🌙 Sonnen- & Mondatmung sind NICHT käuflich — nur durch ${P}atemzug erreichbar.`
+      );
+      return true;
+    }
+
+    // ---- ATEMKAUFEN (gezielt für sich selbst kaufen) ----
+    if (cmd === 'atemkaufen' || cmd === 'buybreathing') {
+      const wanted = (args[0] || '').toLowerCase();
+      const style = BREATHING_STYLES[wanted];
+
+      if (!wanted || !style) {
+        await send(`❌ Nutzung: ${P}atemkaufen <id>\nSieh dir ${P}atemshop für die Liste an.`);
+        return true;
+      }
+      if (style.secret) {
+        await send(`❌ ${style.name} ist nicht käuflich — dieser Stil kann nur durch ${P}atemzug erlangt werden.`);
+        return true;
+      }
+
+      const data = load();
+      const player = ensurePlayer(data, senderJid);
+
+      if (player.styles[wanted]) {
+        save(data);
+        await send(`ℹ️ Du beherrschst ${style.name} bereits.`);
+        return true;
+      }
+
+      const price = SHOP_PRICE[style.rarity];
+      const coins = ctx.users[senderJid]?.coins || 0;
+      if (coins < price) {
+        save(data);
+        await send(`❌ Du brauchst ${price} Coins für ${style.name}. (Du hast: ${coins})`);
+        return true;
+      }
+
+      ctx.users[senderJid].coins -= price;
+      ctx.save(ctx.FILES.users, ctx.users);
+
+      player.styles[wanted] = true;
+      if (!player.activeStyle) player.activeStyle = wanted;
+      save(data);
+
+      await send(
+        `✅ Du hast ${style.name} für ${price} Coins erworben!\n` +
+        (player.activeStyle === wanted
+          ? `Er ist jetzt automatisch dein aktiver Kampf-Stil.`
+          : `Nutze ${P}atemausruesten ${wanted}, um ihn auszurüsten.`)
+      );
+      return true;
+    }
+
+    // ---- ATEMSCHENKEN (an andere verschenken) ----
+    if (cmd === 'atemschenken' || cmd === 'giftbreathing') {
+      const mctx = ctx.m?.message?.extendedTextMessage?.contextInfo;
+      let target = args[0];
+      const wanted = (args[1] || '').toLowerCase();
+
+      if (mctx?.mentionedJid?.length) {
+        target = mctx.mentionedJid[0];
+      } else if (target?.startsWith('@')) {
+        target = target.slice(1);
+      }
+
+      const style = BREATHING_STYLES[wanted];
+
+      if (!target || !wanted || !style) {
+        await send(`❌ Nutzung: ${P}atemschenken @user <id>\nSieh dir ${P}atemshop für die Liste an.`);
+        return true;
+      }
+      if (style.secret) {
+        await send(`❌ ${style.name} ist nicht verschenkbar — dieser Stil kann nur durch ${P}atemzug erlangt werden.`);
+        return true;
+      }
+
+      const targetJid = normalizeJid(target);
+      if (!targetJid || (!targetJid.endsWith('@s.whatsapp.net') && !targetJid.endsWith('@lid'))) {
+        await send(`❌ Nutzung: ${P}atemschenken @user <id>`);
+        return true;
+      }
+      if (isSameJid(targetJid, senderJid)) {
+        await send(`❌ Du kannst dir nicht selbst einen Atemstil schenken. Nutze ${P}atemkaufen.`);
+        return true;
+      }
+
+      const data = load();
+      const targetPlayer = ensurePlayer(data, targetJid);
+
+      if (targetPlayer.styles[wanted]) {
+        save(data);
+        await send(`ℹ️ @${targetJid.split('@')[0]} beherrscht ${style.name} bereits.`, { mentions: [targetJid] });
+        return true;
+      }
+
+      const price = SHOP_PRICE[style.rarity];
+      const coins = ctx.users[senderJid]?.coins || 0;
+      if (coins < price) {
+        save(data);
+        await send(`❌ Du brauchst ${price} Coins, um ${style.name} zu verschenken. (Du hast: ${coins})`);
+        return true;
+      }
+
+      ctx.users[senderJid].coins -= price;
+      ctx.ensureUser(targetJid);
+      ctx.save(ctx.FILES.users, ctx.users);
+
+      targetPlayer.styles[wanted] = true;
+      if (!targetPlayer.activeStyle) targetPlayer.activeStyle = wanted;
+      save(data);
+
+      await send(
+        `🎁 @${senderJid.split('@')[0]} hat @${targetJid.split('@')[0]} den Atemstil ${style.name} geschenkt! (${price} Coins)`,
+        { mentions: [senderJid, targetJid] }
+      );
+      return true;
+    }
+
+    // ---- ATEMZUG (Gacha: zufälligen Stil erlernen) ----
     if (cmd === 'atemzug' || cmd === 'learnbreathing') {
       const data = load();
       const player = ensurePlayer(data, senderJid);
 
-      if (player.style) {
-        await send(
-          `⚔️ Du beherrschst bereits ${styleLine(player.style)}.\n` +
-          `Ein Schwertkämpfer kann nur einen Atemstil wahrhaft meistern.`
-        );
-        return true;
-      }
-
       const coins = ctx.users[senderJid]?.coins || 0;
       if (coins < GACHA_COST) {
+        save(data);
         await send(`❌ Du brauchst ${GACHA_COST} Coins, um einen Atemstil zu erlernen. (Du hast: ${coins})`);
         return true;
       }
@@ -189,7 +333,10 @@ export function createDemonSlayerSystem(DATA_PATH) {
       const ownerLike = isPrimaryOwner(senderJid);
       const styleId = rollStyle(ownerLike);
       const style = BREATHING_STYLES[styleId];
-      player.style = styleId;
+      const alreadyOwned = !!player.styles[styleId];
+
+      player.styles[styleId] = true;
+      if (!player.activeStyle) player.activeStyle = styleId;
       save(data);
 
       const isSecret = !!style.secret;
@@ -201,28 +348,91 @@ export function createDemonSlayerSystem(DATA_PATH) {
         `${header}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
         `${style.name}${isSecret ? `\n"${style.trueName}"` : ''}\n` +
         `${RARITY_LABEL[style.rarity]} | Kraft: ${style.power}\n` +
+        (alreadyOwned ? `\n_(Du beherrschst diesen Stil bereits — kein doppelter Eintrag in deiner Sammlung.)_\n` : '') +
         `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
         (isSecret
           ? `Ein Licht durchbricht den Nebel von Aincrad... du hast Geschichte geschrieben. 🔥`
-          : `Trainiere fleißig und stelle dich dem Dämon mit ${P}demonboss!`)
+          : `Trainiere fleißig und stelle dich dem Dämon mit ${P}demonboss!\nNutze ${P}atemausruesten, um zwischen deinen Stilen zu wechseln.`)
       );
       return true;
     }
 
-    // ---- EIGENER ATEMSTIL ----
+    // ---- ATEMSAMMLUNG (alle besessenen Stile) ----
+    if (cmd === 'atemsammlung' || cmd === 'mybreathings' || cmd === 'breathingcollection') {
+      const data = load();
+      const player = ensurePlayer(data, senderJid);
+      save(data);
+
+      const owned = Object.keys(player.styles);
+      if (!owned.length) {
+        await send(`❌ Du besitzt noch keinen Atemstil. Nutze ${P}atemzug oder ${P}atemshop.`);
+        return true;
+      }
+
+      const lines = owned
+        .sort((a, b) => (BREATHING_STYLES[a]?.power || 0) - (BREATHING_STYLES[b]?.power || 0))
+        .map(id => `${player.activeStyle === id ? '✅' : '•'} \`${id}\` — ${styleLine(id)}`);
+
+      await send(
+        `🎒 *— DEINE ATEM-SAMMLUNG —* 🎒\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+        `${lines.join('\n')}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+        `✅ = aktuell ausgerüstet | Wechseln: ${P}atemausrüsten <id>`
+      );
+      return true;
+    }
+
+    // ---- ATEMAUSRUESTEN (aktiven Kampf-Stil wechseln) ----
+    if (cmd === 'atemausrüsten' || cmd === 'equipbreathing') {
+      const data = load();
+      const player = ensurePlayer(data, senderJid);
+      const wanted = (args[0] || '').toLowerCase();
+
+      if (!wanted) {
+        const owned = Object.keys(player.styles);
+        save(data);
+        if (!owned.length) {
+          await send(`❌ Du besitzt noch keinen Atemstil. Nutze ${P}atemzug oder ${P}atemshop.`);
+          return true;
+        }
+        const lines = owned.map(id => `• \`${id}\` — ${styleLine(id)}${player.activeStyle === id ? ' ✅ (aktiv)' : ''}`);
+        await send(`🧘 *Nutzung:* ${P}atemausruesten <id>\n\nDeine Stile:\n${lines.join('\n')}`);
+        return true;
+      }
+
+      if (!BREATHING_STYLES[wanted]) {
+        save(data);
+        await send(`❌ Unbekannter Atemstil "${wanted}". Nutze ${P}atemliste.`);
+        return true;
+      }
+      if (!player.styles[wanted]) {
+        save(data);
+        await send(`❌ Du besitzt ${styleLine(wanted)} noch nicht.\nKaufen: ${P}atemkaufen ${wanted} | Gacha: ${P}atemzug`);
+        return true;
+      }
+
+      player.activeStyle = wanted;
+      save(data);
+      await send(`✅ Du kämpfst jetzt mit ${styleLine(wanted)}!`);
+      return true;
+    }
+
+    // ---- EIGENER (AKTIVER) ATEMSTIL ----
     if (cmd === 'atemstil' || cmd === 'mybreathing') {
       const data = load();
       const player = ensurePlayer(data, senderJid);
       save(data);
-      if (!player.style) {
-        await send(`❌ Du hast noch keinen Atemstil erlernt. Nutze ${P}atemzug (${GACHA_COST} Coins).`);
+
+      if (!player.activeStyle) {
+        await send(`❌ Du hast noch keinen aktiven Atemstil. Nutze ${P}atemzug (${GACHA_COST} Coins) oder ${P}atemshop.`);
         return true;
       }
-      const style = BREATHING_STYLES[player.style];
+      const style = BREATHING_STYLES[player.activeStyle];
+      const ownedCount = Object.keys(player.styles).length;
       await send(
-        `🧘 *Dein Atemstil*\n` +
+        `🧘 *Dein aktiver Atemstil*\n` +
         `${style.name}${style.secret ? `\n"${style.trueName}"` : ''}\n` +
-        `${RARITY_LABEL[style.rarity]} | Kraft: ${style.power}`
+        `${RARITY_LABEL[style.rarity]} | Kraft: ${style.power}\n\n` +
+        `📦 Du besitzt insgesamt ${ownedCount} Stil(e). Nutze ${P}atemsammlung für die volle Liste.`
       );
       return true;
     }
@@ -261,7 +471,7 @@ export function createDemonSlayerSystem(DATA_PATH) {
       const required = RANK_XP_REQUIRED(nextIdx);
       if (player.xp < required) {
         save(data);
-        await send(`❌ Noch nicht genug XP. Benötigt: ${required}, du hast: ${player.xp}.\nBekämpfe den Dämon mit ${P}daemonboss, um XP zu sammeln.`);
+        await send(`❌ Noch nicht genug XP. Benötigt: ${required}, du hast: ${player.xp}.\nBekämpfe den Dämon mit ${P}demonboss, um XP zu sammeln.`);
         return true;
       }
 
@@ -277,13 +487,13 @@ export function createDemonSlayerSystem(DATA_PATH) {
     }
 
     // ---- DÄMONEN-BOSS-KAMPF ----
-    if (cmd === 'dämonenboss' || cmd === 'demonboss') {
+    if (cmd === 'demonboss' || cmd === 'dämonenboss' || cmd === 'daemonboss') {
       const data = load();
       const player = ensurePlayer(data, senderJid);
 
-      if (!player.style) {
+      if (!player.activeStyle) {
         save(data);
-        await send(`❌ Du brauchst zuerst einen Atemstil! Nutze ${P}atemzug (${GACHA_COST} Coins).`);
+        await send(`❌ Du brauchst zuerst einen ausgerüsteten Atemstil! Nutze ${P}atemzug, ${P}atemshop oder ${P}atemausruesten.`);
         return true;
       }
 
@@ -297,7 +507,7 @@ export function createDemonSlayerSystem(DATA_PATH) {
       }
 
       const boss = spawnBossIfNeeded(data);
-      const style = BREATHING_STYLES[player.style];
+      const style = BREATHING_STYLES[player.activeStyle];
       const rankMultiplier = 1 + (player.rankIndex * 0.08);
       const baseDamage = style.power * rankMultiplier;
       const variance = randInt(80, 130) / 100;
@@ -340,16 +550,25 @@ export function createDemonSlayerSystem(DATA_PATH) {
   }
 
   const DS_COMMANDS = [
-    'dshelp', 'demonslayerhelp', 'atemzug', 'learnbreathing', 'atemstil', 'mybreathing',
-    'atemliste', 'breathinglist', 'dämonenboss', 'demonboss', 'dsrang', 'dsrank',
+    'dshelp', 'demonslayerhelp',
+    'atemzug', 'learnbreathing',
+    'atemshop', 'breathingshop',
+    'atemkaufen', 'buybreathing',
+    'atemschenken', 'giftbreathing',
+    'atemsammlung', 'mybreathings', 'breathingcollection',
+    'atemausruesten', 'equipbreathing',
+    'atemstil', 'mybreathing',
+    'atemliste', 'breathinglist',
+    'demonboss', 'dämonenboss', 'demonboss',
+    'dsrang', 'dsrank',
     'dsaufstieg', 'dspromote'
   ];
 
   const DS_HELP_TEXT =
     `👹 *Dämonentöter-System*\n` +
-    `{P}atemzug — Atemstil erlernen\n` +
-    `{P}dämonenboss — Dämon angreifen\n` +
-    `{P}dsrang — Rang anzeigen | {P}dsaufstieg — aufsteigen`;
+    `{P}atemzug — zufälligen Atemstil erlernen | {P}atemshop — gezielt kaufen\n` +
+    `{P}atemausrüsten — Kampf-Stil wechseln | {P}atemschenken — verschenken\n` +
+    `{P}demonboss — Dämon angreifen | {P}dsrang — Rang | {P}dsaufstieg — aufsteigen`;
 
   return { handle, DS_COMMANDS, DS_HELP_TEXT };
 }
