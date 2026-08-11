@@ -23,7 +23,6 @@ import crypto from 'crypto';
 import { createAuthTools } from './web-auth.js';
 import { createGameRoutes } from './web-games.js';
 import { createGuildBossSystem } from './guildboss-event.mjs';
-import { createGuildWarSystem } from './guildwars.mjs';
 import { createGuildWarSystem, GUILDWAR_COMMANDS, GUILDWAR_HELP_TEXT } from './guildwars.mjs';
 
 // ========== GLOBALE FEHLERABSICHERUNG ==========
