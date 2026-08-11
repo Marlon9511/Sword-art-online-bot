@@ -129,7 +129,8 @@ export function createGuildBossSystem(DATA_PATH) {
         weaponEmoji: '👊',
         isCrit: false,
         isSecret: false,
-        isRagnarok: false
+        isRagnarok: false,
+        isExcalibur: false
       };
     }
 
@@ -180,6 +181,16 @@ export function createGuildBossSystem(DATA_PATH) {
     }
 
     let rarityBonus = RARITY_DAMAGE_BONUS[weapon.rarity] || 0;
+    if (isSecretWeapon) rarityBonus += SECRET_WEAPON_BONUS;
+
+    const variance = 0.85 + (randInt(0, 30) / 100);
+    let damage = Math.round(basePower * (1 + rarityBonus) * variance);
+
+    let critChance = CRIT_CHANCE_BY_RARITY[weapon.rarity] || 5;
+    if (isSecretWeapon) critChance += SECRET_WEAPON_CRIT_BONUS;
+
+    const isCrit = randInt(1, 100) <= critChance;
+    if (isCrit) damage = Math.round(damage * 2);
 
     const viewerIsPrimaryOwner = isPrimaryOwner ? isPrimaryOwner(normalizedSender) : false;
     let weaponName = weapon.name;
@@ -192,7 +203,7 @@ export function createGuildBossSystem(DATA_PATH) {
       weaponEmoji = '❓';
     }
 
-    return { damage, weaponName, weaponEmoji, isCrit, isSecret: isSecretWeapon, isRagnarok };
+    return { damage, weaponName, weaponEmoji, isCrit, isSecret: isSecretWeapon, isRagnarok, isExcalibur };
   }
 
   // ===== Ragnarok-Vergabe nach Event-Ende =====
