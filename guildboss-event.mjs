@@ -460,19 +460,20 @@ export function createGuildBossSystem(DATA_PATH) {
           .map(([gid, dmg], i) => `${i + 1}. ${guilds[gid]?.name || gid} — ${dmg} DMG`)
           .join('\n') || '(noch kein Schaden)';
 
-        // Aktueller Top-Spieler (für Vorschau, wer aktuell auf Ragnarok-Kurs ist)
-        const currentTopEntry = Object.entries(state.damageByUser).sort((a, b) => b[1] - a[1])[0];
-        let topPlayerPreview = '';
-        if (currentTopEntry) {
-          const mention = await getNumberMention(currentTopEntry[0], sock);
-          topPlayerPreview = `\n⚔️ Aktuell führend: ${mention} (${currentTopEntry[1]} DMG)`;
+        // Aktuell führende Gilde (statt einzelner Top-Spieler)
+        const currentTopGuildEntry = getTopGuilds(1)[0];
+        let topGuildPreview = '';
+        if (currentTopGuildEntry) {
+          const [topGid, topDmg] = currentTopGuildEntry;
+          const topGuildName = guilds[topGid]?.name || topGid;
+          topGuildPreview = `\n🏆 Aktuell führend: *${topGuildName}* (${topDmg} DMG)`;
         }
 
         await send(
           `👹 *${state.name}*\n` +
           `❤️ HP: ${Math.max(0, state.hp)} / ${state.maxHp}\n` +
           `${hpBar(state.hp, state.maxHp)}\n` +
-          `⏳ Verbleibend: ${timeLeft}${topPlayerPreview}\n` +
+          `⏳ Verbleibend: ${timeLeft}${topGuildPreview}\n` +
           `⚫ Ragnarok-Chance bei Sieg (ganze Gilde): ${calculateRagnarokChance(state.maxHp)}%\n\n` +
           `📊 *Aktuelle Gilden-Rangliste:*\n${guildRanking}\n\n` +
           `Nutze ${activePrefix}bossattack, um mitzukämpfen!`
