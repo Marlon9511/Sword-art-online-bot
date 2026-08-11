@@ -1921,7 +1921,8 @@ if (cmd === 'help' || cmd === 'menu') {
   const helpText = menuSystem.buildMenuText({
     args, sender, activePrefix, PREFIX,
     isAuthorized, hasAdminPerms,
-    ARENA_HELP_TEXT, GUILD_HELP_TEXT, TITLE_HELP_TEXT, POKEMON_HELP_TEXT
+    ARENA_HELP_TEXT, GUILD_HELP_TEXT, TITLE_HELP_TEXT, POKEMON_HELP_TEXT,
+    GUILDWAR_HELP_TEXT
   });
 
   try {
