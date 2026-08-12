@@ -172,7 +172,7 @@ export function createDemonSlayerSystem(DATA_PATH) {
         `${P}atemkaufen <id> — einen Stil aus dem Shop kaufen\n` +
         `${P}atemschenken @user <id> — Stil an jemanden verschenken\n` +
         `${P}atemsammlung — deine besessenen Stile anzeigen\n` +
-        `${P}atemausrüsten <id> — aktiven Kampf-Stil wechseln\n` +
+        `${P}atemausruesten <id> — aktiven Kampf-Stil wechseln\n` +
         `${P}atemstil — deinen aktuell ausgerüsteten Stil anzeigen\n` +
         `${P}atemliste — alle bekannten Atemstile anzeigen\n` +
         `${P}demonboss — den Dämon angreifen\n` +
@@ -253,7 +253,7 @@ export function createDemonSlayerSystem(DATA_PATH) {
         `✅ Du hast ${style.name} für ${price} Coins erworben!\n` +
         (player.activeStyle === wanted
           ? `Er ist jetzt automatisch dein aktiver Kampf-Stil.`
-          : `Nutze ${P}atemausrüsten ${wanted}, um ihn auszurüsten.`)
+          : `Nutze ${P}atemausruesten ${wanted}, um ihn auszurüsten.`)
       );
       return true;
     }
@@ -365,7 +365,7 @@ export function createDemonSlayerSystem(DATA_PATH) {
           ? `Ein Puls dämonischen Blutes rast durch deine Adern... du hast eine Kraft erlangt, die eigentlich keinem Menschen zusteht. 🩸`
           : isSecret
             ? `Ein Licht durchbricht den Nebel von Aincrad... du hast Geschichte geschrieben. 🔥`
-            : `Trainiere fleißig und stelle dich dem Dämon mit ${P}demonboss!\nNutze ${P}atemausrüsten, um zwischen deinen Stilen zu wechseln.`)
+            : `Trainiere fleißig und stelle dich dem Dämon mit ${P}demonboss!\nNutze ${P}atemausruesten, um zwischen deinen Stilen zu wechseln.`)
       );
       return true;
     }
@@ -408,7 +408,7 @@ export function createDemonSlayerSystem(DATA_PATH) {
           return true;
         }
         const lines = owned.map(id => `• \`${id}\` — ${styleLine(id)}${player.activeStyle === id ? ' ✅ (aktiv)' : ''}`);
-        await send(`🧘 *Nutzung:* ${P}atemausrüsten <id>\n\nDeine Stile:\n${lines.join('\n')}`);
+        await send(`🧘 *Nutzung:* ${P}atemausruesten <id>\n\nDeine Stile:\n${lines.join('\n')}`);
         return true;
       }
 
