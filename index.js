@@ -4835,7 +4835,11 @@ function downloadPinterestVideo(url) {
   return new Promise((resolve, reject) => {
     fs.mkdirSync(PIN_CACHE_DIR, { recursive: true });
     const outPath = path.join(PIN_CACHE_DIR, `${Date.now()}.mp4`);
-    const cmd = `yt-dlp -f "mp4/best" --no-playlist -o "${outPath}" "${url}"`;
+
+    // -f bv*+ba/best -> beste Video+Audio-Spur (Pinterest liefert oft HLS/m3u8)
+    // --merge-output-format mp4 -> erzwingt sauberes mp4-Remuxing statt rohem Stream-Dump
+    // --postprocessor-args "ffmpeg:-movflags +faststart" -> macht die Datei WhatsApp-kompatibel
+    const cmd = `yt-dlp -f "bv*+ba/best" --merge-output-format mp4 --postprocessor-args "ffmpeg:-movflags +faststart" --no-playlist -o "${outPath}" "${url}"`;
 
     exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
       if (err) return reject(err);
@@ -4844,6 +4848,7 @@ function downloadPinterestVideo(url) {
     });
   });
 }
+
 // PINTEREST DOWNLOADER
 if (cmd === 'pin' || cmd === 'pinterest' || cmd === 'pindl') {
   const fullText = args.join(' ').trim();
