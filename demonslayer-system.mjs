@@ -24,13 +24,20 @@ const BREATHING_STYLES = {
 
   // ---- SECRET / SEHR SELTEN — NICHT KÄUFLICH, nur via ?atemzug ----
   sonne:     { name: '☀️ Sonnenatmung',     trueName: 'Atmung der Sonne — Hinokami Kagura', rarity: 'legendary', power: 100, weight: 0.05, ownerWeight: 3, secret: true },
-  mond:      { name: '🌙 Mondatmung',       trueName: 'Atmung des Mondes', rarity: 'legendary', power: 95,  weight: 0.05, ownerWeight: 3, secret: true }
+  mond:      { name: '🌙 Mondatmung',       trueName: 'Atmung des Mondes', rarity: 'legendary', power: 95,  weight: 0.05, ownerWeight: 3, secret: true },
+
+  // ---- DÄMONENKÜNSTE (Blood Demon Arts) — SEHR SELTEN, NICHT KÄUFLICH, nur via ?atemzug ----
+  douma:     { name: '❄️ Doumas Blutdämonenkunst',   trueName: 'Frostzirkel der Oberen Zwei — Ewiges Eis', rarity: 'epic',      power: 90,  weight: 0.07, ownerWeight: 3.5, secret: true, type: 'demonart' },
+  akaza:     { name: '👊 Akazas Vernichtungskunst',  trueName: 'Kompassnadel-Zerschlagung der Oberen Drei', rarity: 'epic',      power: 88,  weight: 0.07, ownerWeight: 3.5, secret: true, type: 'demonart' },
+  kokushibo: { name: '🗡️ Kokushibos Mondklingenkunst', trueName: 'Tsuki no Utsuroi — Tanz der Mondphasen', rarity: 'epic',      power: 92,  weight: 0.05, ownerWeight: 3.5, secret: true, type: 'demonart' },
+  muzan:     { name: '👑 Muzan Kibutsujis Königskunst', trueName: 'Blut des Dämonenkönigs — Unendliches Verderben', rarity: 'legendary', power: 120, weight: 0.015, ownerWeight: 2, secret: true, type: 'demonart' }
 };
 
 const RARITY_LABEL = {
   common: '⚪ Gewöhnlich',
   uncommon: '🟢 Ungewöhnlich',
   rare: '🔵 Selten',
+  epic: '🟣 Episch',
   legendary: '🟡 Legendär'
 };
 
@@ -172,7 +179,8 @@ export function createDemonSlayerSystem(DATA_PATH) {
         `${P}dsrang — deinen Korps-Rang anzeigen\n` +
         `${P}dsaufstieg — versuchen, im Rang aufzusteigen\n` +
         `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
-        `☀️🌙 Sonnen- und Mondatmung sind extrem selten & NICHT käuflich — nur ${P}atemzug kann sie hervorbringen.`
+        `🟣 Doumas, Akazas & Kokushibos Dämonenkünste sind episch selten.\n` +
+        `👑 Muzans Königskunst ist legendär — alle NICHT käuflich, nur ${P}atemzug kann sie hervorbringen.`
       );
       return true;
     }
@@ -181,8 +189,8 @@ export function createDemonSlayerSystem(DATA_PATH) {
     if (cmd === 'atemliste' || cmd === 'breathinglist') {
       const lines = Object.values(BREATHING_STYLES)
         .sort((a, b) => a.power - b.power)
-        .map(s => `${s.secret ? '❓' : '•'} ${s.secret ? '???' : s.name} ${RARITY_LABEL[s.rarity]}`);
-      await send(`📜 *— BEKANNTE ATEMSTILE —* 📜\n\n${lines.join('\n')}\n\n_Manche Stile sind so selten, dass sie als Gerücht gelten..._`);
+        .map(s => `${s.secret ? (s.type === 'demonart' ? '👹' : '❓') : '•'} ${s.secret ? '???' : s.name} ${RARITY_LABEL[s.rarity]}`);
+      await send(`📜 *— BEKANNTE ATEMSTILE & DÄMONENKÜNSTE —* 📜\n\n${lines.join('\n')}\n\n_Manche Kräfte sind so selten, dass sie als Gerücht gelten..._`);
       return true;
     }
 
@@ -198,7 +206,7 @@ export function createDemonSlayerSystem(DATA_PATH) {
         `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
         `Kaufen: ${P}atemkaufen <id>\n` +
         `Verschenken: ${P}atemschenken @user <id>\n\n` +
-        `☀️🌙 Sonnen- & Mondatmung sind NICHT käuflich — nur durch ${P}atemzug erreichbar.`
+        `🟣👑 Dämonenkünste (Douma, Akaza, Kokushibo, Muzan) sowie Sonnen- & Mondatmung sind NICHT käuflich — nur durch ${P}atemzug erreichbar.`
       );
       return true;
     }
@@ -315,7 +323,7 @@ export function createDemonSlayerSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- ATEMZUG (Gacha: zufälligen Stil erlernen) ----
+    // ---- ATEMZUG (Gacha: zufälligen Stil / Dämonenkunst erlernen) ----
     if (cmd === 'atemzug' || cmd === 'learnbreathing') {
       const data = load();
       const player = ensurePlayer(data, senderJid);
@@ -340,9 +348,12 @@ export function createDemonSlayerSystem(DATA_PATH) {
       save(data);
 
       const isSecret = !!style.secret;
-      const header = isSecret
-        ? `🌟🌟🌟 *— LEGENDÄRES ERWACHEN —* 🌟🌟🌟`
-        : `⚔️ *— ATEM ERLERNT —* ⚔️`;
+      const isDemonArt = style.type === 'demonart';
+      const header = isDemonArt
+        ? `🩸🩸🩸 *— ERWACHEN EINER DÄMONENKUNST —* 🩸🩸🩸`
+        : isSecret
+          ? `🌟🌟🌟 *— LEGENDÄRES ERWACHEN —* 🌟🌟🌟`
+          : `⚔️ *— ATEM ERLERNT —* ⚔️`;
 
       await send(
         `${header}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
@@ -350,9 +361,11 @@ export function createDemonSlayerSystem(DATA_PATH) {
         `${RARITY_LABEL[style.rarity]} | Kraft: ${style.power}\n` +
         (alreadyOwned ? `\n_(Du beherrschst diesen Stil bereits — kein doppelter Eintrag in deiner Sammlung.)_\n` : '') +
         `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
-        (isSecret
-          ? `Ein Licht durchbricht den Nebel von Aincrad... du hast Geschichte geschrieben. 🔥`
-          : `Trainiere fleißig und stelle dich dem Dämon mit ${P}demonboss!\nNutze ${P}atemausruesten, um zwischen deinen Stilen zu wechseln.`)
+        (isDemonArt
+          ? `Ein Puls dämonischen Blutes rast durch deine Adern... du hast eine Kraft erlangt, die eigentlich keinem Menschen zusteht. 🩸`
+          : isSecret
+            ? `Ein Licht durchbricht den Nebel von Aincrad... du hast Geschichte geschrieben. 🔥`
+            : `Trainiere fleißig und stelle dich dem Dämon mit ${P}demonboss!\nNutze ${P}atemausruesten, um zwischen deinen Stilen zu wechseln.`)
       );
       return true;
     }
