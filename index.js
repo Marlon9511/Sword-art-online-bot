@@ -4829,6 +4829,62 @@ if (cmd === 'nachtsperre' || cmd === 'quiethours') {
 
   return send('❌ Nutzung: ' + activePrefix + 'nachtsperre an/aus/status');
 }
+const PIN_CACHE_DIR = path.join(__dirname, 'cache', 'pinterest');
+
+function downloadPinterestVideo(url) {
+  return new Promise((resolve, reject) => {
+    fs.mkdirSync(PIN_CACHE_DIR, { recursive: true });
+    const outPath = path.join(PIN_CACHE_DIR, `${Date.now()}.mp4`);
+    const cmd = `yt-dlp -f "mp4/best" --no-playlist -o "${outPath}" "${url}"`;
+
+    exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
+      if (err) return reject(err);
+      if (!fs.existsSync(outPath)) return reject(new Error('Keine Videodatei erzeugt (evtl. ist der Pin ein Bild, kein Video).'));
+      resolve(outPath);
+    });
+  });
+}
+// PINTEREST DOWNLOADER
+if (cmd === 'pin' || cmd === 'pinterest' || cmd === 'pindl') {
+  const fullText = args.join(' ').trim();
+  const urlMatch = fullText.match(/(https?:\/\/)?(www\.)?(pinterest\.[a-z.]{2,}\/pin\/[\w-]+|pin\.it\/[\w-]+)/i);
+
+  if (!urlMatch) {
+    return send(`❌ Nutzung: ${activePrefix}pin <pinterest-link>\n\nBeispiel:\n${activePrefix}pin https://pin.it/abcd1234\noder\n${activePrefix}pin https://www.pinterest.com/pin/123456789/`);
+  }
+
+  let url = urlMatch[0];
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+
+  const cooldownMsg = checkCooldown(sender, 'pin');
+  if (cooldownMsg && !isOwner) return send(cooldownMsg);
+
+  await send('📌 Lade Pinterest-Video herunter, bitte warten...');
+
+  let videoPath;
+  try {
+    videoPath = await downloadPinterestVideo(url);
+    const stats = fs.statSync(videoPath);
+
+    if (stats.size > 95 * 1024 * 1024) {
+      fs.unlinkSync(videoPath);
+      return send('❌ Die Datei ist zu groß für WhatsApp (>95MB).');
+    }
+
+    await sock.sendMessage(from, {
+      video: fs.readFileSync(videoPath),
+      mimetype: 'video/mp4',
+      caption: '📌 Pinterest Video'
+    }, { quoted: m });
+
+    fs.unlinkSync(videoPath);
+  } catch (e) {
+    console.error('[pin] Fehler:', e?.message || e);
+    try { if (videoPath && fs.existsSync(videoPath)) fs.unlinkSync(videoPath); } catch {}
+    return send('❌ Download fehlgeschlagen. Prüfe den Link — er muss auf einen Pinterest-*Pin mit Video* zeigen (Bild-Pins funktionieren nicht), oder versuche es später erneut.');
+  }
+  return;
+}
 // ===== MURDER DRONES EDITS (automatische Suche) =====
 const MD_SEARCH_QUERIES = [
   'murder drones edit', 'murder drones amv', 'murder drones edit shorts',
