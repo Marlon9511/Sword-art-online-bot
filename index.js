@@ -1590,6 +1590,14 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
             try { await sock.sendMessage(from, { text: '⚠️ Ich bin kein Administrator in dieser Gruppe und kann keine Befehle ausführen.' }); } catch (e) {}
             return;
           }
+// 🔒 ADMIN-MODUS: nur Gruppenadmins + Supporter/Mod/CoOwner/Owner dürfen den Bot hier nutzen
+          if (groupSettings[from]?.adminMode?.enabled) {
+            const senderIsGroupAdmin = isGroupAdminJid(meta, sender);
+            const senderIsPrivileged = isAuthorized(sender, ['OWNER', 'COOWNER', 'MOD', 'SUPPORTER', 'TEST_SUPPORTER']);
+            if (!senderIsGroupAdmin && !senderIsPrivileged) {
+              return;
+            }
+          }
         } catch (e) {
           console.error('[permissions] Error:', e);
           try { await sock.sendMessage(from, { text: '⚠️ Ich konnte meine Administrator-Rechte nicht prüfen.' }); } catch (err) {}
@@ -2064,6 +2072,29 @@ if ((cmd === 'games-an' || cmd === 'games-aus') && isGroup) {
   groupSettings[from].games.enabled = false;
   save(FILES.groupSettings, groupSettings);
   return send('✅ Spiele-Befehle wurden in dieser Gruppe deaktiviert.');
+}
+// ADMIN-MODUS AN/AUS — nur Gruppenadmins/Owner/CoOwner dürfen umschalten
+if ((cmd === 'adminmodus-an' || cmd === 'adminmodus-aus') && isGroup) {
+  const groupMetadata = await getGroupMetaSafe(from);
+  const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
+  if (!isGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER'])) {
+    return send('❌ Du musst Admin in dieser Gruppe sein.');
+  }
+
+  if (!groupSettings[from]) {
+    groupSettings[from] = { welcome: { enabled: false, message: 'Willkommen in der Gruppe {user}! 👋' } };
+  }
+  if (!groupSettings[from].adminMode) groupSettings[from].adminMode = { enabled: false };
+
+  if (cmd === 'adminmodus-an') {
+    groupSettings[from].adminMode.enabled = true;
+    save(FILES.groupSettings, groupSettings);
+    return send('🔒 Admin-Modus aktiviert: Nur noch Gruppenadmins, Supporter, Moderatoren, Co-Owner und Owner können den Bot in dieser Gruppe nutzen.');
+  }
+
+  groupSettings[from].adminMode.enabled = false;
+  save(FILES.groupSettings, groupSettings);
+  return send('🔓 Admin-Modus deaktiviert. Der Bot reagiert wieder auf alle Mitglieder.');
 }
       // Ticket answer
       if (cmd === 'answer') {
