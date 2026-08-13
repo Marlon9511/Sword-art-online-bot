@@ -5124,6 +5124,13 @@ const demonSlayerHandled = await demonSlayer.handle({
   getNumberMention, randInt, sleep, isPrimaryOwner
 });
 if (demonSlayerHandled) return;
+const soloLevelingHandled = await soloLeveling.handle({
+  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
+  users, save, FILES, ensureUser, normalizeJid, isSameJid,
+  getNumberMention, randInt, sleep, isPrimaryOwner
+});
+if (soloLevelingHandled) return;
+
 // OWNERMODE
       if (cmd === 'ownermode' || cmd === 'om') {
         if (!isOwner) return send('❌ Nur der Inhaber/Co-Inhaber darf diesen Befehl nutzen.');
