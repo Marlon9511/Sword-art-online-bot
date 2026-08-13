@@ -1919,7 +1919,8 @@ if (cmd === 'help' || cmd === 'menu') {
   isAuthorized, hasAdminPerms,
   ARENA_HELP_TEXT, GUILD_HELP_TEXT, TITLE_HELP_TEXT, POKEMON_HELP_TEXT,
   GUILDWAR_HELP_TEXT,
-  DS_HELP_TEXT: demonSlayer.DS_HELP_TEXT   // <-- geändert
+  DS_HELP_TEXT: demonSlayer.DS_HELP_TEXT,
+  SL_HELP_TEXT: soloLeveling.SL_HELP_TEXT   // NEU
 });
   try {
     const videoPath = await downloadShortIfNeeded();
