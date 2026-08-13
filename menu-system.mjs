@@ -1,7 +1,7 @@
 // ============================================================
 // MENU-SYSTEM.MJS — Mehrschichtiges Hilfe-/Menü-System
 // Aufruf: {P}help / {P}menu [layer]
-// Beispiele: ?menu, ?menu owner, ?menu pokemon, ?menu arena, ?menu demonslayer
+// Beispiele: ?menu, ?menu owner, ?menu pokemon, ?menu arena, ?menu demonslayer, ?menu hunter
 // ============================================================
 
 export const MENU_COMMANDS = ['help', 'menu'];
@@ -11,7 +11,7 @@ const DIVIDER = '⚔️┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈⚔
 // Jede Layer bekommt (ctx) übergeben und liefert einen fertigen Text-String zurück.
 // ctx enthält: PREFIX, isAuthorized, hasAdminPerms, sender,
 //              ARENA_HELP_TEXT, GUILD_HELP_TEXT, TITLE_HELP_TEXT, POKEMON_HELP_TEXT,
-//              GUILDWAR_HELP_TEXT, DS_HELP_TEXT
+//              GUILDWAR_HELP_TEXT, DS_HELP_TEXT, SL_HELP_TEXT
 
 function buildMainLayer(ctx) {
   const { PREFIX, sender, isAuthorized, hasAdminPerms } = ctx;
@@ -39,6 +39,7 @@ function buildMainLayer(ctx) {
   t += `▸ ${PREFIX}menu titel — Titel & Erfolge\n`;
   t += `▸ ${PREFIX}menu pokemon — Pokémon-System\n`;
   t += `▸ ${PREFIX}menu demonslayer — Dämonentöter-System\n`;
+  t += `▸ ${PREFIX}menu hunter — Solo-Leveling Hunter-System\n`;
   t += `▸ ${PREFIX}menu social — Interaktions-Skills (hug, kiss, pat, ...)\n`;
   t += `▸ ${PREFIX}menu fun — Fun & Action Skills (kill, yeet, nuke, ...)\n`;
   t += `▸ ${PREFIX}menu chat — Gilden-Chat & Gruppeneinstellungen\n`;
@@ -104,6 +105,18 @@ function buildDemonSlayerLayer(ctx) {
     .map(l => l.replace(/\{P\}/g, PREFIX))
     .join('\n');
   t += `\n\n☀️🌙 _Sonnen- und Mondatmung sind extrem selten — nur wahre Legenden erlernen sie._`;
+  return t;
+}
+
+function buildSoloLevelingLayer(ctx) {
+  const { PREFIX, SL_HELP_TEXT } = ctx;
+  let t = `⚡ *HUNTER-SYSTEM* (Solo Leveling)\n${DIVIDER}\n`;
+  t += (SL_HELP_TEXT || '(keine Daten verfügbar)')
+    .split('\n')
+    .filter(Boolean)
+    .map(l => l.replace(/\{P\}/g, PREFIX))
+    .join('\n');
+  t += `\n\n🌑 _"Arise." — Nur wahre Hunter überleben die Gates._`;
   return t;
 }
 
@@ -245,6 +258,7 @@ const LAYERS = {
   titel:       { build: buildTitleLayer,       aliases: ['titles', 'achievements', 'erfolge'] },
   pokemon:     { build: buildPokemonLayer,     aliases: ['poke', 'pokedex'] },
   demonslayer: { build: buildDemonSlayerLayer, aliases: ['dämonentöter', 'daemonslayer', 'ds', 'atmung'] },
+  hunter:      { build: buildSoloLevelingLayer, aliases: ['solo', 'sololeveling', 'jaeger', 'hunter-system'] },
   social:      { build: buildSocialLayer,      aliases: ['interaktion', 'interaction'] },
   fun:         { build: buildFunLayer,         aliases: ['action', 'giphy'] },
   chat:        { build: buildChatLayer,        aliases: ['gruppe', 'group', 'gilden-chat'] },
@@ -276,6 +290,7 @@ function buildNavRows(ctx) {
     titel:       { title: '🎖️ Titel',          desc: 'Titel & Erfolge' },
     pokemon:     { title: '🐾 Pokémon',        desc: 'Fangen, Leveln, Kämpfen' },
     demonslayer: { title: '👹 Dämonentöter',   desc: 'Atemstile & Dämonen-Boss' },
+    hunter:      { title: '⚡ Hunter',          desc: 'Solo-Leveling System' },
     social:      { title: '💞 Social',         desc: 'Interaktions-Skills' },
     fun:         { title: '💀 Fun & Action',   desc: 'Giphy-Reactions' },
     chat:        { title: '💬 Gilden-Chat',    desc: 'Chat- & Gruppeneinstellungen' },
@@ -284,7 +299,7 @@ function buildNavRows(ctx) {
     owner:       { title: '👑 System-Admin',    desc: 'Kayaba-Rechte' }
   };
 
-  const order = ['main', 'arena', 'gilde', 'titel', 'pokemon', 'demonslayer', 'social', 'fun', 'chat', 'support', 'admin', 'owner'];
+  const order = ['main', 'arena', 'gilde', 'titel', 'pokemon', 'demonslayer', 'hunter', 'social', 'fun', 'chat', 'support', 'admin', 'owner'];
   const rows = [];
 
   for (const key of order) {
