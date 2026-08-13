@@ -25,6 +25,7 @@ import { createGameRoutes } from './web-games.js';
 import { createGuildBossSystem } from './guildboss-event.mjs';
 import { createGuildWarSystem, GUILDWAR_COMMANDS, GUILDWAR_HELP_TEXT } from './guildwars.mjs';
 import { createDemonSlayerSystem } from './demonslayer-system.mjs';
+import { createSoloLevelingSystem } from './sololeveling-system.mjs';
 
 // ========== GLOBALE FEHLERABSICHERUNG ==========
 process.on('unhandledRejection', (reason) => {
