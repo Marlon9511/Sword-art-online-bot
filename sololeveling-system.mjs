@@ -219,7 +219,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
           `str = Stärke, agi = Beweglichkeit, vit = Vitalität, int = Intelligenz, per = Wahrnehmung`
         ); return true;;
       }
-      if (amount > h.statPoints) await send(`❌ Du hast nur ${h.statPoints} freie Statuspunkte.`); return true;;
+      if (amount > h.statPoints) { await send(`❌ Du hast nur ${h.statPoints} freie Statuspunkte.`); return true; }
       h.stats[stat] += amount;
       h.statPoints -= amount;
       persist();
@@ -329,7 +329,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
 
     // ---- SHADOWS LIST ----
     if (cmd === 'shadows' || cmd === 'schattenarmee') {
-      if (!h.shadows.length) await send('🌑 Deine Schatten-Armee ist leer. Besiege Gate-Bosse und nutze ?extract.'); return true;;
+      if (!h.shadows.length) { await send('🌑 Deine Schatten-Armee ist leer. Besiege Gate-Bosse und nutze ?extract.'); return true; }
       const lines = h.shadows
         .sort((a, b) => b.power - a.power)
         .map((s, i) => `${i + 1}. ${s.name} — ⚔️ ${s.power} (aus: ${s.origin})`);
@@ -385,7 +385,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
         return cpB - cpA;
       }).slice(0, 10);
 
-      if (!entries.length) await send('📊 Es gibt noch keine erwachten Hunter.'); return true;;
+      if (!entries.length) { await send('📊 Es gibt noch keine erwachten Hunter.'); return true; }
 
       const medals = ['🥇', '🥈', '🥉'];
       const lines = await Promise.all(entries.map(async ([hjid, hu], i) => {
