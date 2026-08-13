@@ -377,23 +377,8 @@ function checkCooldown(userId, command) {
   return null;
 }
 
-const load = f => {
-  try { return JSON.parse(fs.readFileSync(path.join(DATA_PATH, f), 'utf8') || '{}'); } catch { return {}; }
-};
-
-const save = (f, d) => {
-  if (typeof f !== 'string') {
-    if (f?.file) {
-      f = f.file;
-    } else {
-      console.error('❌ INVALID FILE:', f);
-      console.trace();
-      return;
-    }
-  }
-  const filePath = path.join(DATA_PATH, f);
-  fs.writeFileSync(filePath, JSON.stringify(d, null, 2));
-};
+import { createStore } from './db.js';
+const { load, save } = createStore(DATA_PATH);
 
 const log = s => fs.appendFileSync(LOG_FILE, `[${new Date().toISOString()}] ${s}\n`);
 
