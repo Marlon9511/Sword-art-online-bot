@@ -4,12 +4,6 @@
 // Folgt dem selben Muster wie arena-system.mjs / guildboss-event.mjs:
 //   createSoloLevelingSystem(DATA_PATH) -> { handle, SL_COMMANDS, SL_HELP_TEXT }
 // Persistiert eigenständig in DATA_PATH/sololeveling.json
-//
-// FIX: Alle Handler-Zweige geben jetzt explizit `true` zurück,
-// nachdem send() ausgeführt wurde. Vorher wurde `return send(...)`
-// verwendet, dessen Rückgabewert vom Dispatcher als "nicht behandelt"
-// interpretiert werden konnte (falsy), wodurch der Befehl zusätzlich
-// als "gibt es nicht" gemeldet wurde, obwohl er bereits ausgeführt war.
 // ============================================================
 
 import fs from 'fs';
@@ -176,12 +170,11 @@ export function createSoloLevelingSystem(DATA_PATH) {
     // ---- AWAKEN ----
     if (cmd === 'awaken' || cmd === 'erwachen') {
       if (hunters[jid]) {
-        await send('⚡ Du bist bereits als Hunter erwacht. Nutze ?hunterinfo für deinen Status.');
-        return true;
+        return send('⚡ Du bist bereits als Hunter erwacht. Nutze ?hunterinfo für deinen Status.');
       }
       ensureHunter(jid);
       persist();
-      await send(
+      return send(
         `⚡ *— DAS SYSTEM HAT DICH ERWÄHLT —* ⚡\n${divider}\n` +
         `Eine Stimme hallt in deinem Kopf wider...\n\n` +
         `"Herzlichen Glückwunsch. Du wurdest als Spieler ausgewählt."\n\n` +
@@ -190,13 +183,11 @@ export function createSoloLevelingSystem(DATA_PATH) {
         `?gate um dein erstes Gate zu betreten,\n` +
         `und ?dailyquest für deine tägliche Systemaufgabe.\n${divider}`
       );
-      return true;
     }
 
     const h = hunters[jid];
     if (!h) {
-      await send('❓ Du bist noch kein Hunter. Erwache zuerst mit ?awaken.');
-      return true;
+      return send('❓ Du bist noch kein Hunter. Erwache zuerst mit ?awaken.');
     }
 
     // ---- HUNTERINFO / STATUS ----
@@ -207,7 +198,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
       const penaltyLine = isInPenalty(h)
         ? `\n☠️ *Strafquest aktiv!* Noch ${fmtDuration(h.dailyQuest.penaltyUntil - Date.now())}`
         : '';
-      await send(
+      return send(
         `📊 *— SYSTEM-FENSTER —* 📊\n${divider}\n` +
         `🎖️ Rang: ${rank.label}\n⭐ Level: ${h.level}\n✨ EXP: ${h.exp} / ${needed}\n` +
         `⚔️ Kampfkraft: ${combatPower(h)}\n🎯 Freie Statuspunkte: ${h.statPoints}\n💰 Gold: ${h.gold || 0}\n\n` +
@@ -215,7 +206,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
         `👥 Schatten-Armee: ${(h.shadows || []).length}\n` +
         `${penaltyLine}\n${divider}`
       );
-      return true;
     }
 
     // ---- STATPOINT ----
@@ -223,30 +213,24 @@ export function createSoloLevelingSystem(DATA_PATH) {
       const stat = (args[0] || '').toLowerCase();
       const amount = parseInt(args[1]);
       if (!STAT_KEYS.includes(stat) || isNaN(amount) || amount <= 0) {
-        await send(
+        return send(
           `❌ Nutzung: ?statpoint <str|agi|vit|int|per> <anzahl>\n` +
           `Verfügbare Punkte: ${h.statPoints}\n` +
           `str = Stärke, agi = Beweglichkeit, vit = Vitalität, int = Intelligenz, per = Wahrnehmung`
         );
-        return true;
       }
-      if (amount > h.statPoints) {
-        await send(`❌ Du hast nur ${h.statPoints} freie Statuspunkte.`);
-        return true;
-      }
+      if (amount > h.statPoints) return send(`❌ Du hast nur ${h.statPoints} freie Statuspunkte.`);
       h.stats[stat] += amount;
       h.statPoints -= amount;
       persist();
-      await send(`✅ ${STAT_LABELS[stat]} um ${amount} erhöht! Neuer Wert: ${h.stats[stat]}\nVerbleibende Punkte: ${h.statPoints}`);
-      return true;
+      return send(`✅ ${STAT_LABELS[stat]} um ${amount} erhöht! Neuer Wert: ${h.stats[stat]}\nVerbleibende Punkte: ${h.statPoints}`);
     }
 
     // ---- GATE ----
     if (cmd === 'gate' || cmd === 'dungeon') {
       const now = Date.now();
       if (now < (h.gateCooldownUntil || 0)) {
-        await send(`⏳ Das nächste Gate öffnet sich in ${fmtDuration(h.gateCooldownUntil - now)}.`);
-        return true;
+        return send(`⏳ Das nächste Gate öffnet sich in ${fmtDuration(h.gateCooldownUntil - now)}.`);
       }
 
       const tier = gateTierForLevel(h.level);
@@ -267,8 +251,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
         h.gold = Math.max(0, (h.gold || 0) - goldLoss);
         persist();
         out += `💥 Du wurdest zurückgedrängt und musstest fliehen!\n📉 -${goldLoss} Gold verloren.\n${divider}`;
-        await send(out);
-        return true;
+        return send(out);
       }
 
       const expGain = randInt(20, 40) + GATE_TIERS.indexOf(tier) * 15;
@@ -304,8 +287,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
 
       persist();
       out += divider;
-      await send(out);
-      return true;
+      return send(out);
     }
 
     // ---- EXTRACT ----
@@ -314,8 +296,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
       if (!pending || Date.now() > pending.expiresAt) {
         h.pendingExtraction = null;
         persist();
-        await send('❌ Es gibt derzeit keinen Schatten, den du extrahieren kannst. Besiege zuerst einen Gate-Boss.');
-        return true;
+        return send('❌ Es gibt derzeit keinen Schatten, den du extrahieren kannst. Besiege zuerst einen Gate-Boss.');
       }
 
       const extractChance = 0.55;
@@ -324,8 +305,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
 
       if (!success) {
         persist();
-        await send(`💨 "Arise" ... nichts geschah. Der Schatten des *${pending.bossName}* ist entkommen.`);
-        return true;
+        return send(`💨 "Arise" ... nichts geschah. Der Schatten des *${pending.bossName}* ist entkommen.`);
       }
 
       const template = SHADOW_NAMES[randInt(0, SHADOW_NAMES.length - 1)];
@@ -339,30 +319,25 @@ export function createSoloLevelingSystem(DATA_PATH) {
       h.shadows.push(shadow);
       persist();
 
-      await send(
+      return send(
         `🌑 *"ARISE!"* 🌑\n${divider}\n` +
         `Aus der Dunkelheit erhebt sich: *${shadow.name}*\n` +
         `⚔️ Kraft: ${shadow.power}\nHerkunft: ${pending.bossName}\n\n` +
         `Deine Schatten-Armee zählt nun ${h.shadows.length} Diener.\n${divider}`
       );
-      return true;
     }
 
     // ---- SHADOWS LIST ----
     if (cmd === 'shadows' || cmd === 'schattenarmee') {
-      if (!h.shadows.length) {
-        await send('🌑 Deine Schatten-Armee ist leer. Besiege Gate-Bosse und nutze ?extract.');
-        return true;
-      }
+      if (!h.shadows.length) return send('🌑 Deine Schatten-Armee ist leer. Besiege Gate-Bosse und nutze ?extract.');
       const lines = h.shadows
         .sort((a, b) => b.power - a.power)
         .map((s, i) => `${i + 1}. ${s.name} — ⚔️ ${s.power} (aus: ${s.origin})`);
       const totalPower = h.shadows.reduce((sum, s) => sum + s.power, 0);
-      await send(
+      return send(
         `🌑 *— DEINE SCHATTEN-ARMEE —* 🌑\n${divider}\n${lines.join('\n')}\n${divider}\n` +
         `Gesamtkraft der Armee: ${totalPower}`
       );
-      return true;
     }
 
     // ---- DAILY QUEST ----
@@ -372,8 +347,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
 
       if (now - last < DAILY_QUEST_COOLDOWN_MS) {
         const remaining = DAILY_QUEST_COOLDOWN_MS - (now - last);
-        await send(`📜 Du hast deine heutige Systemaufgabe bereits erledigt.\nNächste in ${fmtDuration(remaining)}.`);
-        return true;
+        return send(`📜 Du hast deine heutige Systemaufgabe bereits erledigt.\nNächste in ${fmtDuration(remaining)}.`);
       }
 
       // Strafe, falls die letzte Quest zu lange überfällig war (>48h seit letzter Erledigung, aber nicht beim allerersten Mal)
@@ -382,12 +356,11 @@ export function createSoloLevelingSystem(DATA_PATH) {
         h.stats.vit = Math.max(1, h.stats.vit - 1);
         h.dailyQuest.lastDone = now;
         persist();
-        await send(
+        return send(
           `☠️ *"Die tägliche Quest wurde nicht erfüllt."*\n${divider}\n` +
           `Das System verhängt eine Strafe: -1 Vitalität, 1h Debuff aktiv.\n` +
           `Erledige deine Quests in Zukunft pünktlich!\n${divider}`
         );
-        return true;
       }
 
       const rewardExp = randInt(15, 30);
@@ -397,12 +370,11 @@ export function createSoloLevelingSystem(DATA_PATH) {
       h.dailyQuest.lastDone = now;
       persist();
 
-      await send(
+      return send(
         `📜 *— TAGESQUEST ABGESCHLOSSEN —* 📜\n${divider}\n` +
         `100 Liegestütze. 100 Kniebeugen. 100 Sit-ups. 10km Lauf.\n\n` +
         `✅ Geschafft! ✨ +${rewardExp} EXP  ${STAT_LABELS[rewardStat]} +1\n${divider}`
       );
-      return true;
     }
 
     // ---- LEADERBOARD ----
@@ -413,10 +385,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
         return cpB - cpA;
       }).slice(0, 10);
 
-      if (!entries.length) {
-        await send('📊 Es gibt noch keine erwachten Hunter.');
-        return true;
-      }
+      if (!entries.length) return send('📊 Es gibt noch keine erwachten Hunter.');
 
       const medals = ['🥇', '🥈', '🥉'];
       const lines = await Promise.all(entries.map(async ([hjid, hu], i) => {
@@ -426,17 +395,15 @@ export function createSoloLevelingSystem(DATA_PATH) {
         return `${icon} ${name} — ${rank.label} | Lv.${hu.level} | ⚔️ ${combatPower(hu)}`;
       }));
 
-      await send(
+      return send(
         `🏆 *— HUNTER-RANGLISTE —* 🏆\n${divider}\n${lines.join('\n')}\n${divider}`,
         { mentions: entries.map(([hjid]) => hjid) }
       );
-      return true;
     }
 
     // ---- HELP ----
     if (cmd === 'sololevelinghelp' || cmd === 'jaegerhilfe') {
-      await send(SL_HELP_TEXT);
-      return true;
+      return send(SL_HELP_TEXT);
     }
 
     return false;
