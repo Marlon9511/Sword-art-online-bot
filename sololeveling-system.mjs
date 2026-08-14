@@ -15,7 +15,7 @@
 //     Gefahr, "eingeschlossen" zu werden, wenn man verliert.
 //
 // Bei erfolgreicher Schatten-Extraktion (?extract / ?arise) wird
-// zusätzlich zur Textnachricht ein fester YouTube-Sound als
+// zusätzlich zur Textnachricht ein fester Sound (von GitHub geladen) als
 // WhatsApp-Sprachnachricht (PTT) verschickt.
 // ============================================================
 
@@ -23,6 +23,7 @@ import fs from 'fs';
 import path from 'path';
 import { exec } from 'child_process';
 import { fileURLToPath } from 'url';
+import fetch from 'node-fetch';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,34 +31,45 @@ const __dirname = path.dirname(__filename);
 export function createSoloLevelingSystem(DATA_PATH) {
   const FILE_PATH = path.join(DATA_PATH, 'sololeveling.json');
 
-  // ---------- ARISE-Sound (fester YouTube-Link -> Sprachnachricht) ----------
-  // ⚠️ Hier deinen gewünschten YouTube-Link eintragen (z.B. der "Arise"-Soundeffekt).
-  const ARISE_SOUND_URL = 'https://youtube.com/shorts/-q-Ig29sxMA?is=zTlJNUzj2L5Alrmu'; // <-- ANPASSEN
+  // ---------- ARISE-Sound (Datei aus deinem GitHub-Repo -> Sprachnachricht) ----------
+  // ⚠️ Hier den RAW-Link zu deiner hochgeladenen Audiodatei eintragen.
+  // Wichtig: es muss der "raw" Link sein (nicht der normale github.com/.../blob/... Link)!
+  // Beispiel: Datei liegt im Repo unter /assets/arise.mp3 auf dem Branch "main":
+  //   https://raw.githubusercontent.com/<dein-user>/<dein-repo>/main/assets/arise.mp3
+  const ARISE_SOUND_URL = 'https://raw.githubusercontent.com/Marlon9511/Sword-art-online-bot/main/AUD-20260814-WA0954.mp3'; // <-- ggf. Ordner ergänzen, falls die Datei nicht im Repo-Root liegt
 
   const ARISE_CACHE_DIR = path.join(__dirname, 'cache', 'sololeveling-arise');
-  const ARISE_MP3_PATH = path.join(ARISE_CACHE_DIR, 'arise.mp3');
+  // Dateiendung wird automatisch aus der URL übernommen (z.B. .mp3, .ogg, .m4a, .wav ...)
+  const ARISE_SOURCE_EXT = (path.extname(new URL(ARISE_SOUND_URL).pathname) || '.mp3').toLowerCase();
+  const ARISE_SOURCE_PATH = path.join(ARISE_CACHE_DIR, `arise-source${ARISE_SOURCE_EXT}`);
   const ARISE_OGG_PATH = path.join(ARISE_CACHE_DIR, 'arise.ogg');
 
-  function downloadAriseMp3IfNeeded() {
-    return new Promise((resolve, reject) => {
-      if (fs.existsSync(ARISE_MP3_PATH)) return resolve(ARISE_MP3_PATH);
-      fs.mkdirSync(ARISE_CACHE_DIR, { recursive: true });
+  // Lädt die Audiodatei einmalig von GitHub herunter und cached sie lokal.
+  // Wenn du die Datei im Repo aktualisierst, musst du den lokalen Cache-Ordner
+  // (cache/sololeveling-arise) manuell leeren, damit die neue Version geladen wird.
+  async function downloadAriseSourceIfNeeded() {
+    if (fs.existsSync(ARISE_SOURCE_PATH)) return ARISE_SOURCE_PATH;
+    fs.mkdirSync(ARISE_CACHE_DIR, { recursive: true });
 
-      const cmd = `yt-dlp -x --audio-format mp3 --audio-quality 0 --no-playlist -o "${ARISE_MP3_PATH}" "${ARISE_SOUND_URL}"`;
-      exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
-        if (err) return reject(err);
-        if (!fs.existsSync(ARISE_MP3_PATH)) return reject(new Error('Keine MP3-Datei erzeugt.'));
-        resolve(ARISE_MP3_PATH);
-      });
-    });
+    const res = await fetch(ARISE_SOUND_URL);
+    if (!res.ok) {
+      throw new Error(`Arise-Sound-Download fehlgeschlagen: HTTP ${res.status} (${ARISE_SOUND_URL})`);
+    }
+    const arrBuf = await res.arrayBuffer();
+    fs.writeFileSync(ARISE_SOURCE_PATH, Buffer.from(arrBuf));
+
+    if (!fs.existsSync(ARISE_SOURCE_PATH) || fs.statSync(ARISE_SOURCE_PATH).size === 0) {
+      throw new Error('Heruntergeladene Arise-Datei ist leer oder fehlt.');
+    }
+    return ARISE_SOURCE_PATH;
   }
 
-  function convertToOggOpusIfNeeded(mp3Path) {
+  function convertToOggOpusIfNeeded(sourcePath) {
     return new Promise((resolve, reject) => {
       if (fs.existsSync(ARISE_OGG_PATH)) return resolve(ARISE_OGG_PATH);
       // -c:a libopus + .ogg-Container = das Format, das WhatsApp für
       // "echte" Sprachnachrichten (ptt: true) mit Wellenform-Anzeige erwartet.
-      const cmd = `ffmpeg -y -i "${mp3Path}" -c:a libopus -b:a 64k -vn "${ARISE_OGG_PATH}"`;
+      const cmd = `ffmpeg -y -i "${sourcePath}" -c:a libopus -b:a 64k -vn "${ARISE_OGG_PATH}"`;
       exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
         if (err) return reject(err);
         if (!fs.existsSync(ARISE_OGG_PATH)) return reject(new Error('Keine OGG-Datei erzeugt.'));
@@ -67,8 +79,8 @@ export function createSoloLevelingSystem(DATA_PATH) {
   }
 
   async function getAriseVoiceBuffer() {
-    const mp3 = await downloadAriseMp3IfNeeded();
-    const ogg = await convertToOggOpusIfNeeded(mp3);
+    const source = await downloadAriseSourceIfNeeded();
+    const ogg = await convertToOggOpusIfNeeded(source);
     return fs.readFileSync(ogg);
   }
 
