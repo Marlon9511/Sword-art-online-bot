@@ -182,7 +182,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
   const RED_GATE_BOSSES = ['Blutmond-Ogerfürst', 'Verschlungener Wächter', 'Herold des Roten Tores', 'Abyssaler Flammenkoloss'];
 
   // ---------- Waffen ----------
-  // Normale Waffen: jederzeit im Waffenladen kaufbar (?shop / ?buyweapon).
+  // Normale Waffen: jederzeit im Waffenladen kaufbar (?huntershop / ?buyweapon).
   const SHOP_WEAPONS = [
     { key: 'rostiges_schwert', name: 'Rostiges Schwert', price: 50, power: 8, rarity: 'Gewöhnlich' },
     { key: 'stahlschwert', name: 'Stahlschwert', price: 150, power: 18, rarity: 'Gewöhnlich' },
@@ -439,7 +439,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
         out += `\n🏆 *${boss}* fällt! Das Rote Tor bricht zusammen und gibt dich frei.\n`;
         out += `✨ +${expGain} EXP  💰 +${goldGain} Gold\n`;
         out += `🌑 Ein besonders mächtiger Schatten hat sich vom Boss gelöst... Nutze *?extract* innerhalb von 5 Minuten!\n`;
-        out += `🕶️ Ein Schwarzhändler taucht kurz aus dem Schatten auf und bietet dir seltene Waffen an — nutze *?shop* innerhalb von 5 Minuten!\n`;
+        out += `🕶️ Ein Schwarzhändler taucht kurz aus dem Schatten auf und bietet dir seltene Waffen an — nutze *?huntershop* innerhalb von 5 Minuten!\n`;
 
         if (leveledUp) {
           const newRank = rankForLevel(h.level);
@@ -600,7 +600,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
     }
 
     // ---- SHOP (Waffenladen + ggf. Schwarzhändler) ----
-    if (cmd === 'shop' || cmd === 'waffenladen') {
+    if (cmd === 'huntershop' || cmd === 'waffenladen') {
       const lines = SHOP_WEAPONS.map(w =>
         `• ${w.name} (${w.rarity}) — ⚔️ +${w.power} — 💰 ${w.price} — Code: \`${w.key}\``
       );
@@ -625,7 +625,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
     if (cmd === 'buyweapon' || cmd === 'waffekaufen' || cmd === 'kaufen') {
       const key = (args[0] || '').toLowerCase();
       if (!key) {
-        await send('❌ Nutzung: ?buyweapon <code> — siehe ?shop für verfügbare Waffen.');
+        await send('❌ Nutzung: ?buyweapon <code> — siehe ?huntershop für verfügbare Waffen.');
         return true;
       }
 
@@ -677,7 +677,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
     // ---- WEAPONS INVENTORY ----
     if (cmd === 'weapons' || cmd === 'waffen' || cmd === 'inventar') {
       if (!h.weapons || !h.weapons.length) {
-        await send('🗡️ Du besitzt noch keine Waffen. Schau im ?shop vorbei.');
+        await send('🗡️ Du besitzt noch keine Waffen. Schau im ?huntershop vorbei.');
         return true;
       }
       const lines = h.weapons.map(w => {
@@ -786,7 +786,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
     'gate', 'dungeon',
     'extract', 'arise',
     'shadows', 'schattenarmee',
-    'shop', 'waffenladen',
+    'huntershop', 'waffenladen',
     'buyweapon', 'waffekaufen', 'kaufen',
     'weapons', 'waffen', 'inventar',
     'equip', 'ausruesten',
@@ -803,7 +803,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
     `?gate — ein Gate betreten (Kampf, Loot, Boss-Chance, seltenes 🔴 Rotes Tor)\n` +
     `?extract — Schatten eines besiegten Bosses extrahieren\n` +
     `?shadows — deine Schatten-Armee ansehen (inkl. Gate-Kampfbonus)\n` +
-    `?shop — Waffenladen ansehen (+ Schwarzhändler, falls aktiv)\n` +
+    `?huntershop — Waffenladen ansehen (+ Schwarzhändler, falls aktiv)\n` +
     `?buyweapon <code> — Waffe kaufen\n` +
     `?weapons — deine Waffen ansehen\n` +
     `?equip <code> — Waffe ausrüsten\n` +
