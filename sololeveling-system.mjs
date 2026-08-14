@@ -8,63 +8,6 @@
 
 import fs from 'fs';
 import path from 'path';
-import fetch from 'node-fetch';
-import { exec } from 'child_process';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const TTS_CACHE_DIR = path.join(__dirname, 'cache', 'sololeveling-tts');
-
-// Eigener, nicht-copyrighted "Arise"-Spruch (keine Original-Anime-Audiospur!)
-const ARISE_LINE = 'Arise. Erhebe dich aus der Dunkelheit, Schatten, und diene deinem Meister.';
-
-// Holt eine per Text-to-Speech generierte MP3 (Google Translate TTS, kein API-Key nötig)
-async function fetchTtsMp3(text, lang = 'de') {
-  const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=${lang}&client=tw-ob`;
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Referer': 'https://translate.google.com/'
-    }
-  });
-  if (!res.ok) throw new Error(`TTS-API-Fehler: ${res.status}`);
-  const arrBuf = await res.arrayBuffer();
-  return Buffer.from(arrBuf);
-}
-
-// Wandelt die MP3 in eine WhatsApp-kompatible Opus/OGG-Sprachnachricht um
-function convertToVoiceNote(mp3Buffer) {
-  return new Promise((resolve, reject) => {
-    fs.mkdirSync(TTS_CACHE_DIR, { recursive: true });
-    const stamp = Date.now();
-    const inPath = path.join(TTS_CACHE_DIR, `${stamp}.mp3`);
-    const outPath = path.join(TTS_CACHE_DIR, `${stamp}.ogg`);
-    fs.writeFileSync(inPath, mp3Buffer);
-
-    const cmd = `ffmpeg -y -i "${inPath}" -c:a libopus -b:a 32k -ar 48000 -ac 1 "${outPath}"`;
-    exec(cmd, { maxBuffer: 1024 * 1024 * 20 }, (err) => {
-      try { fs.unlinkSync(inPath); } catch (e) {}
-      if (err) return reject(err);
-      try {
-        const buf = fs.readFileSync(outPath);
-        fs.unlinkSync(outPath);
-        resolve(buf);
-      } catch (e) { reject(e); }
-    });
-  });
-}
-
-// Sendet die "Arise"-Sprachnachricht als echte WhatsApp-Voice-Note (ptt)
-async function sendAriseVoiceNote(sock, from, quoted) {
-  const mp3 = await fetchTtsMp3(ARISE_LINE, 'de');
-  const oggBuffer = await convertToVoiceNote(mp3);
-  await sock.sendMessage(from, {
-    audio: oggBuffer,
-    mimetype: 'audio/ogg; codecs=opus',
-    ptt: true
-  }, quoted ? { quoted } : {});
-}
 
 export function createSoloLevelingSystem(DATA_PATH) {
   const FILE_PATH = path.join(DATA_PATH, 'sololeveling.json');
@@ -216,7 +159,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
   async function handle(ctx) {
     const {
       cmd, args, sender, send, users, ensureUser, normalizeJid,
-      getNumberMention, randInt, sock, from, m
+      getNumberMention, randInt
     } = ctx;
 
     if (!SL_COMMANDS.includes(cmd)) return false;
@@ -227,11 +170,11 @@ export function createSoloLevelingSystem(DATA_PATH) {
     // ---- AWAKEN ----
     if (cmd === 'awaken' || cmd === 'erwachen') {
       if (hunters[jid]) {
-        await send('⚡ Du bist bereits als Hunter erwacht. Nutze ?hunterinfo für deinen Status.'); return true;
+        return send('⚡ Du bist bereits als Hunter erwacht. Nutze ?hunterinfo für deinen Status.');
       }
       ensureHunter(jid);
       persist();
-      await send(
+      return send(
         `⚡ *— DAS SYSTEM HAT DICH ERWÄHLT —* ⚡\n${divider}\n` +
         `Eine Stimme hallt in deinem Kopf wider...\n\n` +
         `"Herzlichen Glückwunsch. Du wurdest als Spieler ausgewählt."\n\n` +
@@ -239,12 +182,12 @@ export function createSoloLevelingSystem(DATA_PATH) {
         `Nutze ?statpoint <str|agi|vit|int|per> <anzahl>, um sie zu verteilen,\n` +
         `?gate um dein erstes Gate zu betreten,\n` +
         `und ?dailyquest für deine tägliche Systemaufgabe.\n${divider}`
-      ); return true;
+      );
     }
 
     const h = hunters[jid];
     if (!h) {
-      await send('❓ Du bist noch kein Hunter. Erwache zuerst mit ?awaken.'); return true;
+      return send('❓ Du bist noch kein Hunter. Erwache zuerst mit ?awaken.');
     }
 
     // ---- HUNTERINFO / STATUS ----
@@ -255,14 +198,14 @@ export function createSoloLevelingSystem(DATA_PATH) {
       const penaltyLine = isInPenalty(h)
         ? `\n☠️ *Strafquest aktiv!* Noch ${fmtDuration(h.dailyQuest.penaltyUntil - Date.now())}`
         : '';
-      await send(
+      return send(
         `📊 *— SYSTEM-FENSTER —* 📊\n${divider}\n` +
         `🎖️ Rang: ${rank.label}\n⭐ Level: ${h.level}\n✨ EXP: ${h.exp} / ${needed}\n` +
         `⚔️ Kampfkraft: ${combatPower(h)}\n🎯 Freie Statuspunkte: ${h.statPoints}\n💰 Gold: ${h.gold || 0}\n\n` +
         `*Attribute:*\n${statLines}\n\n` +
         `👥 Schatten-Armee: ${(h.shadows || []).length}\n` +
         `${penaltyLine}\n${divider}`
-      ); return true;
+      );
     }
 
     // ---- STATPOINT ----
@@ -270,24 +213,24 @@ export function createSoloLevelingSystem(DATA_PATH) {
       const stat = (args[0] || '').toLowerCase();
       const amount = parseInt(args[1]);
       if (!STAT_KEYS.includes(stat) || isNaN(amount) || amount <= 0) {
-        await send(
+        return send(
           `❌ Nutzung: ?statpoint <str|agi|vit|int|per> <anzahl>\n` +
           `Verfügbare Punkte: ${h.statPoints}\n` +
           `str = Stärke, agi = Beweglichkeit, vit = Vitalität, int = Intelligenz, per = Wahrnehmung`
-        ); return true;
+        );
       }
-      if (amount > h.statPoints) { await send(`❌ Du hast nur ${h.statPoints} freie Statuspunkte.`); return true; }
+      if (amount > h.statPoints) return send(`❌ Du hast nur ${h.statPoints} freie Statuspunkte.`);
       h.stats[stat] += amount;
       h.statPoints -= amount;
       persist();
-      await send(`✅ ${STAT_LABELS[stat]} um ${amount} erhöht! Neuer Wert: ${h.stats[stat]}\nVerbleibende Punkte: ${h.statPoints}`); return true;
+      return send(`✅ ${STAT_LABELS[stat]} um ${amount} erhöht! Neuer Wert: ${h.stats[stat]}\nVerbleibende Punkte: ${h.statPoints}`);
     }
 
     // ---- GATE ----
     if (cmd === 'gate' || cmd === 'dungeon') {
       const now = Date.now();
       if (now < (h.gateCooldownUntil || 0)) {
-        await send(`⏳ Das nächste Gate öffnet sich in ${fmtDuration(h.gateCooldownUntil - now)}.`); return true;
+        return send(`⏳ Das nächste Gate öffnet sich in ${fmtDuration(h.gateCooldownUntil - now)}.`);
       }
 
       const tier = gateTierForLevel(h.level);
@@ -308,7 +251,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
         h.gold = Math.max(0, (h.gold || 0) - goldLoss);
         persist();
         out += `💥 Du wurdest zurückgedrängt und musstest fliehen!\n📉 -${goldLoss} Gold verloren.\n${divider}`;
-        await send(out); return true;
+        return send(out);
       }
 
       const expGain = randInt(20, 40) + GATE_TIERS.indexOf(tier) * 15;
@@ -344,7 +287,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
 
       persist();
       out += divider;
-      await send(out); return true;
+      return send(out);
     }
 
     // ---- EXTRACT ----
@@ -353,14 +296,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
       if (!pending || Date.now() > pending.expiresAt) {
         h.pendingExtraction = null;
         persist();
-        await send('❌ Es gibt derzeit keinen Schatten, den du extrahieren kannst. Besiege zuerst einen Gate-Boss.'); return true;
-      }
-
-      // Sprachnachricht mit der Beschwörungsformel senden (fehlerresistent, blockt den Rest nicht)
-      try {
-        await sendAriseVoiceNote(sock, from, m);
-      } catch (e) {
-        console.error('[sololeveling] Arise-Sprachnachricht fehlgeschlagen:', e?.message || e);
+        return send('❌ Es gibt derzeit keinen Schatten, den du extrahieren kannst. Besiege zuerst einen Gate-Boss.');
       }
 
       const extractChance = 0.55;
@@ -369,7 +305,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
 
       if (!success) {
         persist();
-        await send(`💨 "Arise" ... nichts geschah. Der Schatten des *${pending.bossName}* ist entkommen.`); return true;
+        return send(`💨 "Arise" ... nichts geschah. Der Schatten des *${pending.bossName}* ist entkommen.`);
       }
 
       const template = SHADOW_NAMES[randInt(0, SHADOW_NAMES.length - 1)];
@@ -383,25 +319,25 @@ export function createSoloLevelingSystem(DATA_PATH) {
       h.shadows.push(shadow);
       persist();
 
-      await send(
+      return send(
         `🌑 *"ARISE!"* 🌑\n${divider}\n` +
         `Aus der Dunkelheit erhebt sich: *${shadow.name}*\n` +
         `⚔️ Kraft: ${shadow.power}\nHerkunft: ${pending.bossName}\n\n` +
         `Deine Schatten-Armee zählt nun ${h.shadows.length} Diener.\n${divider}`
-      ); return true;
+      );
     }
 
     // ---- SHADOWS LIST ----
     if (cmd === 'shadows' || cmd === 'schattenarmee') {
-      if (!h.shadows.length) { await send('🌑 Deine Schatten-Armee ist leer. Besiege Gate-Bosse und nutze ?extract.'); return true; }
+      if (!h.shadows.length) return send('🌑 Deine Schatten-Armee ist leer. Besiege Gate-Bosse und nutze ?extract.');
       const lines = h.shadows
         .sort((a, b) => b.power - a.power)
         .map((s, i) => `${i + 1}. ${s.name} — ⚔️ ${s.power} (aus: ${s.origin})`);
       const totalPower = h.shadows.reduce((sum, s) => sum + s.power, 0);
-      await send(
+      return send(
         `🌑 *— DEINE SCHATTEN-ARMEE —* 🌑\n${divider}\n${lines.join('\n')}\n${divider}\n` +
         `Gesamtkraft der Armee: ${totalPower}`
-      ); return true;
+      );
     }
 
     // ---- DAILY QUEST ----
@@ -411,7 +347,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
 
       if (now - last < DAILY_QUEST_COOLDOWN_MS) {
         const remaining = DAILY_QUEST_COOLDOWN_MS - (now - last);
-        await send(`📜 Du hast deine heutige Systemaufgabe bereits erledigt.\nNächste in ${fmtDuration(remaining)}.`); return true;
+        return send(`📜 Du hast deine heutige Systemaufgabe bereits erledigt.\nNächste in ${fmtDuration(remaining)}.`);
       }
 
       // Strafe, falls die letzte Quest zu lange überfällig war (>48h seit letzter Erledigung, aber nicht beim allerersten Mal)
@@ -420,11 +356,11 @@ export function createSoloLevelingSystem(DATA_PATH) {
         h.stats.vit = Math.max(1, h.stats.vit - 1);
         h.dailyQuest.lastDone = now;
         persist();
-        await send(
+        return send(
           `☠️ *"Die tägliche Quest wurde nicht erfüllt."*\n${divider}\n` +
           `Das System verhängt eine Strafe: -1 Vitalität, 1h Debuff aktiv.\n` +
           `Erledige deine Quests in Zukunft pünktlich!\n${divider}`
-        ); return true;
+        );
       }
 
       const rewardExp = randInt(15, 30);
@@ -434,11 +370,11 @@ export function createSoloLevelingSystem(DATA_PATH) {
       h.dailyQuest.lastDone = now;
       persist();
 
-      await send(
+      return send(
         `📜 *— TAGESQUEST ABGESCHLOSSEN —* 📜\n${divider}\n` +
         `100 Liegestütze. 100 Kniebeugen. 100 Sit-ups. 10km Lauf.\n\n` +
         `✅ Geschafft! ✨ +${rewardExp} EXP  ${STAT_LABELS[rewardStat]} +1\n${divider}`
-      ); return true;
+      );
     }
 
     // ---- LEADERBOARD ----
@@ -449,7 +385,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
         return cpB - cpA;
       }).slice(0, 10);
 
-      if (!entries.length) { await send('📊 Es gibt noch keine erwachten Hunter.'); return true; }
+      if (!entries.length) return send('📊 Es gibt noch keine erwachten Hunter.');
 
       const medals = ['🥇', '🥈', '🥉'];
       const lines = await Promise.all(entries.map(async ([hjid, hu], i) => {
@@ -459,15 +395,15 @@ export function createSoloLevelingSystem(DATA_PATH) {
         return `${icon} ${name} — ${rank.label} | Lv.${hu.level} | ⚔️ ${combatPower(hu)}`;
       }));
 
-      await send(
+      return send(
         `🏆 *— HUNTER-RANGLISTE —* 🏆\n${divider}\n${lines.join('\n')}\n${divider}`,
         { mentions: entries.map(([hjid]) => hjid) }
-      ); return true;
+      );
     }
 
     // ---- HELP ----
     if (cmd === 'sololevelinghelp' || cmd === 'jaegerhilfe') {
-      await send(SL_HELP_TEXT); return true;
+      return send(SL_HELP_TEXT);
     }
 
     return false;
