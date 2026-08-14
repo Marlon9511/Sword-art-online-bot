@@ -4,73 +4,13 @@
 // Folgt dem selben Muster wie arena-system.mjs / guildboss-event.mjs:
 //   createSoloLevelingSystem(DATA_PATH) -> { handle, SL_COMMANDS, SL_HELP_TEXT }
 // Persistiert eigenständig in DATA_PATH/sololeveling.json
-//
-// NEU (diese Version):
-//   - Schatten-Armee zählt jetzt sichtbar & spürbar im Gate-Kampf mit
-//     (eigener Bonus auf Sieg-Chance, nicht nur auf die Kampfkraft-Zahl).
-//   - Es können jetzt auch höhere Gates auftauchen, als das eigene Level
-//     eigentlich hergibt ("Überraschungs-Gate") – riskanter, aber lohnender.
-//   - Neu: 🔴 Rotes Tor (Red Gate) – seltenes, isoliertes Spezial-Gate mit
-//     deutlich höherem Risiko & höherer Belohnung, garantiertem Boss und
-//     Gefahr, "eingeschlossen" zu werden, wenn man verliert.
-//
-// Bei erfolgreicher Schatten-Extraktion (?extract / ?arise) wird
-// zusätzlich zur Textnachricht ein fester YouTube-Sound als
-// WhatsApp-Sprachnachricht (PTT) verschickt.
 // ============================================================
 
 import fs from 'fs';
 import path from 'path';
-import { exec } from 'child_process';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 export function createSoloLevelingSystem(DATA_PATH) {
   const FILE_PATH = path.join(DATA_PATH, 'sololeveling.json');
-
-  // ---------- ARISE-Sound (fester YouTube-Link -> Sprachnachricht) ----------
-  // ⚠️ Hier deinen gewünschten YouTube-Link eintragen (z.B. der "Arise"-Soundeffekt).
-  const ARISE_SOUND_URL = 'https://youtube.com/shorts/-q-Ig29sxMA?is=zTlJNUzj2L5Alrmu'; // <-- ANPASSEN
-
-  const ARISE_CACHE_DIR = path.join(__dirname, 'cache', 'sololeveling-arise');
-  const ARISE_MP3_PATH = path.join(ARISE_CACHE_DIR, 'arise.mp3');
-  const ARISE_OGG_PATH = path.join(ARISE_CACHE_DIR, 'arise.ogg');
-
-  function downloadAriseMp3IfNeeded() {
-    return new Promise((resolve, reject) => {
-      if (fs.existsSync(ARISE_MP3_PATH)) return resolve(ARISE_MP3_PATH);
-      fs.mkdirSync(ARISE_CACHE_DIR, { recursive: true });
-
-      const cmd = `yt-dlp -x --audio-format mp3 --audio-quality 0 --no-playlist -o "${ARISE_MP3_PATH}" "${ARISE_SOUND_URL}"`;
-      exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
-        if (err) return reject(err);
-        if (!fs.existsSync(ARISE_MP3_PATH)) return reject(new Error('Keine MP3-Datei erzeugt.'));
-        resolve(ARISE_MP3_PATH);
-      });
-    });
-  }
-
-  function convertToOggOpusIfNeeded(mp3Path) {
-    return new Promise((resolve, reject) => {
-      if (fs.existsSync(ARISE_OGG_PATH)) return resolve(ARISE_OGG_PATH);
-      // -c:a libopus + .ogg-Container = das Format, das WhatsApp für
-      // "echte" Sprachnachrichten (ptt: true) mit Wellenform-Anzeige erwartet.
-      const cmd = `ffmpeg -y -i "${mp3Path}" -c:a libopus -b:a 64k -vn "${ARISE_OGG_PATH}"`;
-      exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
-        if (err) return reject(err);
-        if (!fs.existsSync(ARISE_OGG_PATH)) return reject(new Error('Keine OGG-Datei erzeugt.'));
-        resolve(ARISE_OGG_PATH);
-      });
-    });
-  }
-
-  async function getAriseVoiceBuffer() {
-    const mp3 = await downloadAriseMp3IfNeeded();
-    const ogg = await convertToOggOpusIfNeeded(mp3);
-    return fs.readFileSync(ogg);
-  }
 
   function ensureFile() {
     if (!fs.existsSync(FILE_PATH)) {
@@ -127,32 +67,9 @@ export function createSoloLevelingSystem(DATA_PATH) {
     { key: 'S', label: 'S-Rang Gate', minLevel: 68, maxLevel: 999, monsters: ['Drachenritter', 'Titan der Tiefe', 'Alptraumherold'], boss: 'Monarch der Verwüstung' }
   ];
 
-  // Chance, dass pro ?gate-Versuch ein Tier über dem eigentlich für das
-  // Level vorgesehenen Gate erscheint ("Überraschungs-Gate"). Wird pro
-  // Stufe erneut gewürfelt, kann sich also theoretisch mehrfach hochschaukeln.
-  const HIGHER_GATE_CHANCE = 0.16;
-
-  function baseGateTierIndexForLevel(level) {
-    let idx = 0;
-    GATE_TIERS.forEach((g, i) => {
-      if (level >= g.minLevel) idx = i;
-    });
-    return idx;
-  }
-
-  // Wählt das Gate für diesen Versuch: Grundlage ist das Level, aber mit
-  // steigender (aber abnehmender) Wahrscheinlichkeit kann auch ein höheres,
-  // eigentlich noch "zu starkes" Gate auftauchen.
-  function pickGateTier(level, randFn) {
-    let idx = baseGateTierIndexForLevel(level);
-    while (idx < GATE_TIERS.length - 1 && randFn() < HIGHER_GATE_CHANCE) {
-      idx += 1;
-    }
-    return { tier: GATE_TIERS[idx], tierIndex: idx, wasBoosted: idx > baseGateTierIndexForLevel(level) };
-  }
-
   function gateTierForLevel(level) {
-    return GATE_TIERS[baseGateTierIndexForLevel(level)];
+    const eligible = GATE_TIERS.filter(g => level >= g.minLevel);
+    return eligible.length ? eligible[eligible.length - 1] : GATE_TIERS[0];
   }
 
   const SHADOW_NAMES = [
@@ -172,44 +89,8 @@ export function createSoloLevelingSystem(DATA_PATH) {
   const STAT_LABELS = { str: '💪 Stärke', agi: '💨 Beweglichkeit', vit: '❤️ Vitalität', int: '🧠 Intelligenz', per: '👁️ Wahrnehmung' };
 
   const GATE_COOLDOWN_MS = 10 * 60 * 1000; // 10 Minuten
-  const RED_GATE_COOLDOWN_MS = 25 * 60 * 1000; // Rotes Tor: längere Sperre bei Niederlage
   const DAILY_QUEST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
   const EXTRACT_WINDOW_MS = 5 * 60 * 1000; // 5 Minuten nach Bosskill
-
-  // Rotes Tor: seltenes Spezial-Gate, ab Level 5 möglich.
-  const RED_GATE_MIN_LEVEL = 5;
-  const RED_GATE_CHANCE = 0.06; // 6% pro ?gate-Versuch
-  const RED_GATE_BOSSES = ['Blutmond-Ogerfürst', 'Verschlungener Wächter', 'Herold des Roten Tores', 'Abyssaler Flammenkoloss'];
-
-  // ---------- Waffen ----------
-  // Normale Waffen: jederzeit im Waffenladen kaufbar (?huntershop / ?buyweapon).
-  const SHOP_WEAPONS = [
-    { key: 'rostiges_schwert', name: 'Rostiges Schwert', price: 50, power: 8, rarity: 'Gewöhnlich' },
-    { key: 'stahlschwert', name: 'Stahlschwert', price: 150, power: 18, rarity: 'Gewöhnlich' },
-    { key: 'kriegsaxt', name: 'Kriegsaxt', price: 320, power: 30, rarity: 'Selten' },
-    { key: 'enchantierter_dolch', name: 'Enchantierter Dolch', price: 600, power: 45, rarity: 'Selten' },
-    { key: 'runenschwert', name: 'Runenschwert', price: 1000, power: 65, rarity: 'Episch' }
-  ];
-
-  // Seltene Waffen: NICHT im normalen Laden erhältlich, sondern nur bei
-  // einem "Schwarzhändler", der nach einem gewonnenen Roten Tor kurzzeitig
-  // erscheint (siehe pendingBlackMarket).
-  const RARE_WEAPONS = [
-    { key: 'daemonenklinge', name: 'Dämonenklinge', price: 800, power: 90, rarity: 'Episch' },
-    { key: 'frostfangschwert', name: 'Frostfangschwert', price: 1200, power: 120, rarity: 'Episch' },
-    { key: 'drachentoeter', name: 'Drachentöter', price: 2000, power: 160, rarity: 'Legendär' },
-    { key: 'klinge_des_monarchen', name: 'Klinge des Monarchen', price: 3500, power: 220, rarity: 'Legendär' }
-  ];
-
-  function findWeaponDef(key) {
-    return SHOP_WEAPONS.find(w => w.key === key) || RARE_WEAPONS.find(w => w.key === key) || null;
-  }
-
-  function equippedWeaponPower(h) {
-    if (!h.equippedWeaponKey) return 0;
-    const owned = (h.weapons || []).find(w => w.key === h.equippedWeaponKey);
-    return owned ? owned.power : 0;
-  }
 
   // ---------- Helper ----------
 
@@ -225,9 +106,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
         gateCooldownUntil: 0,
         dailyQuest: { lastDone: 0, penaltyUntil: 0 },
         pendingExtraction: null, // { bossName, tier, expiresAt }
-        pendingBlackMarket: null, // { offers: [weaponKey,...], expiresAt }
-        weapons: [],
-        equippedWeaponKey: null,
         gold: 0
       };
       persist();
@@ -251,31 +129,12 @@ export function createSoloLevelingSystem(DATA_PATH) {
     return leveledUp;
   }
 
-  function shadowArmyPower(h) {
-    return (h.shadows || []).reduce((sum, sh) => sum + sh.power, 0);
-  }
-
-  // "Rohe" Kampfkraft-Anzeige (Stats + Level + Schatten + Waffe), wie gehabt.
   function combatPower(h) {
     const s = h.stats;
-    const shadowPower = shadowArmyPower(h);
-    const weaponPower = equippedWeaponPower(h);
+    const shadowPower = (h.shadows || []).reduce((sum, sh) => sum + sh.power, 0);
     return Math.round(
-      s.str * 2.2 + s.agi * 1.6 + s.vit * 1.4 + s.int * 1.1 + s.per * 1.0 + h.level * 3 + shadowPower * 0.8 + weaponPower
+      s.str * 2.2 + s.agi * 1.6 + s.vit * 1.4 + s.int * 1.1 + s.per * 1.0 + h.level * 3 + shadowPower * 0.8
     );
-  }
-
-  // Kampfkraft für Gate-Kämpfe: Basis-Stats/Level zählen normal, die
-  // Schatten-Armee steuert zusätzlich einen eigenen, spürbaren Kampfanteil
-  // bei (deine Diener kämpfen aktiv mit), die ausgerüstete Waffe zählt voll.
-  function gateEffectivePower(h) {
-    const s = h.stats;
-    const basePower = s.str * 2.2 + s.agi * 1.6 + s.vit * 1.4 + s.int * 1.1 + s.per * 1.0 + h.level * 3;
-    const shadowPower = shadowArmyPower(h);
-    // Diminishing Returns, damit eine riesige Armee ein Gate nicht komplett trivialisiert.
-    const shadowContribution = Math.sqrt(Math.max(0, shadowPower)) * 6;
-    const weaponPower = equippedWeaponPower(h);
-    return { basePower, shadowPower, shadowContribution, weaponPower, total: basePower + shadowContribution + weaponPower };
   }
 
   function isInPenalty(h) {
@@ -299,7 +158,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
 
   async function handle(ctx) {
     const {
-      cmd, args, sender, from, send, sock, users, ensureUser, normalizeJid,
+      cmd, args, sender, send, users, ensureUser, normalizeJid,
       getNumberMention, randInt
     } = ctx;
 
@@ -311,12 +170,11 @@ export function createSoloLevelingSystem(DATA_PATH) {
     // ---- AWAKEN ----
     if (cmd === 'awaken' || cmd === 'erwachen') {
       if (hunters[jid]) {
-        await send('⚡ Du bist bereits als Hunter erwacht. Nutze ?hunterinfo für deinen Status.');
-        return true;
+        return send('⚡ Du bist bereits als Hunter erwacht. Nutze ?hunterinfo für deinen Status.');
       }
       ensureHunter(jid);
       persist();
-      await send(
+      return send(
         `⚡ *— DAS SYSTEM HAT DICH ERWÄHLT —* ⚡\n${divider}\n` +
         `Eine Stimme hallt in deinem Kopf wider...\n\n` +
         `"Herzlichen Glückwunsch. Du wurdest als Spieler ausgewählt."\n\n` +
@@ -325,13 +183,11 @@ export function createSoloLevelingSystem(DATA_PATH) {
         `?gate um dein erstes Gate zu betreten,\n` +
         `und ?dailyquest für deine tägliche Systemaufgabe.\n${divider}`
       );
-      return true;
     }
 
     const h = hunters[jid];
     if (!h) {
-      await send('❓ Du bist noch kein Hunter. Erwache zuerst mit ?awaken.');
-      return true;
+      return send('❓ Du bist noch kein Hunter. Erwache zuerst mit ?awaken.');
     }
 
     // ---- HUNTERINFO / STATUS ----
@@ -342,20 +198,14 @@ export function createSoloLevelingSystem(DATA_PATH) {
       const penaltyLine = isInPenalty(h)
         ? `\n☠️ *Strafquest aktiv!* Noch ${fmtDuration(h.dailyQuest.penaltyUntil - Date.now())}`
         : '';
-      const equippedDef = h.equippedWeaponKey ? findWeaponDef(h.equippedWeaponKey) : null;
-      const weaponLine = equippedDef
-        ? `🗡️ Waffe: ${equippedDef.name} (⚔️ +${equippedDef.power}, ${equippedDef.rarity})`
-        : `🗡️ Waffe: keine ausgerüstet`;
-      await send(
+      return send(
         `📊 *— SYSTEM-FENSTER —* 📊\n${divider}\n` +
         `🎖️ Rang: ${rank.label}\n⭐ Level: ${h.level}\n✨ EXP: ${h.exp} / ${needed}\n` +
         `⚔️ Kampfkraft: ${combatPower(h)}\n🎯 Freie Statuspunkte: ${h.statPoints}\n💰 Gold: ${h.gold || 0}\n\n` +
         `*Attribute:*\n${statLines}\n\n` +
-        `👥 Schatten-Armee: ${(h.shadows || []).length} (⚔️ ${shadowArmyPower(h)} Rohkraft)\n` +
-        `${weaponLine}\n` +
+        `👥 Schatten-Armee: ${(h.shadows || []).length}\n` +
         `${penaltyLine}\n${divider}`
       );
-      return true;
     }
 
     // ---- STATPOINT ----
@@ -363,114 +213,33 @@ export function createSoloLevelingSystem(DATA_PATH) {
       const stat = (args[0] || '').toLowerCase();
       const amount = parseInt(args[1]);
       if (!STAT_KEYS.includes(stat) || isNaN(amount) || amount <= 0) {
-        await send(
+        return send(
           `❌ Nutzung: ?statpoint <str|agi|vit|int|per> <anzahl>\n` +
           `Verfügbare Punkte: ${h.statPoints}\n` +
           `str = Stärke, agi = Beweglichkeit, vit = Vitalität, int = Intelligenz, per = Wahrnehmung`
         );
-        return true;
       }
-      if (amount > h.statPoints) {
-        await send(`❌ Du hast nur ${h.statPoints} freie Statuspunkte.`);
-        return true;
-      }
+      if (amount > h.statPoints) return send(`❌ Du hast nur ${h.statPoints} freie Statuspunkte.`);
       h.stats[stat] += amount;
       h.statPoints -= amount;
       persist();
-      await send(`✅ ${STAT_LABELS[stat]} um ${amount} erhöht! Neuer Wert: ${h.stats[stat]}\nVerbleibende Punkte: ${h.statPoints}`);
-      return true;
+      return send(`✅ ${STAT_LABELS[stat]} um ${amount} erhöht! Neuer Wert: ${h.stats[stat]}\nVerbleibende Punkte: ${h.statPoints}`);
     }
 
     // ---- GATE ----
     if (cmd === 'gate' || cmd === 'dungeon') {
       const now = Date.now();
       if (now < (h.gateCooldownUntil || 0)) {
-        await send(`⏳ Das nächste Gate öffnet sich in ${fmtDuration(h.gateCooldownUntil - now)}.`);
-        return true;
+        return send(`⏳ Das nächste Gate öffnet sich in ${fmtDuration(h.gateCooldownUntil - now)}.`);
       }
 
-      const rollRed = h.level >= RED_GATE_MIN_LEVEL && Math.random() < RED_GATE_CHANCE;
-
-      // ================= ROTES TOR =================
-      if (rollRed) {
-        const { total: cp, shadowContribution, weaponPower } = gateEffectivePower(h);
-        const boss = RED_GATE_BOSSES[randInt(0, RED_GATE_BOSSES.length - 1)];
-        const difficulty = 140 + (baseGateTierIndexForLevel(h.level) * 30) + randInt(-10, 25);
-
-        let out = `🔴 *— EIN ROTES TOR ÖFFNET SICH! —* 🔴\n${divider}\n`;
-        out += `Der Boden unter dir bricht weg... du wirst in eine isolierte, blutrote Dimension gesogen!\n`;
-        out += `Erst wenn *${boss}* fällt, öffnet sich der Ausgang wieder.\n\n`;
-
-        const shadowLine = shadowContribution > 0
-          ? `🌑 Deine Schatten-Armee kämpft an deiner Seite! (+${Math.round(shadowContribution)} Kampfkraft)\n`
-          : '';
-        out += shadowLine;
-        if (weaponPower > 0) {
-          out += `🗡️ Deine Waffe verstärkt deinen Angriff! (+${weaponPower} Kampfkraft)\n`;
-        }
-
-        const winChance = Math.min(0.7, Math.max(0.08, cp / (cp + difficulty)));
-        const won = Math.random() < winChance;
-
-        if (!won) {
-          h.gateCooldownUntil = now + RED_GATE_COOLDOWN_MS;
-          const goldLoss = randInt(60, 150);
-          h.gold = Math.max(0, (h.gold || 0) - goldLoss);
-          persist();
-          out += `\n💀 *${boss}* überwältigt dich! Du entkommst nur knapp, bevor sich das Tor schließt.\n`;
-          out += `📉 -${goldLoss} Gold verloren. Das nächste Gate braucht länger, um sich zu öffnen (${fmtDuration(RED_GATE_COOLDOWN_MS)}).\n${divider}`;
-          await send(out);
-          return true;
-        }
-
-        h.gateCooldownUntil = now + GATE_COOLDOWN_MS;
-        const expGain = randInt(120, 220);
-        const goldGain = randInt(250, 500);
-        const leveledUp = addExp(h, expGain);
-        h.gold = (h.gold || 0) + goldGain;
-        h.pendingExtraction = { bossName: boss, tier: 'Rot', expiresAt: now + EXTRACT_WINDOW_MS };
-
-        // Schwarzhändler erscheint kurzzeitig mit 2 zufälligen seltenen Waffen,
-        // die sonst nirgendwo kaufbar sind.
-        const shuffled = [...RARE_WEAPONS].sort(() => Math.random() - 0.5);
-        const offerKeys = shuffled.slice(0, 2).map(w => w.key);
-        h.pendingBlackMarket = { offers: offerKeys, expiresAt: now + EXTRACT_WINDOW_MS };
-
-        out += `\n🏆 *${boss}* fällt! Das Rote Tor bricht zusammen und gibt dich frei.\n`;
-        out += `✨ +${expGain} EXP  💰 +${goldGain} Gold\n`;
-        out += `🌑 Ein besonders mächtiger Schatten hat sich vom Boss gelöst... Nutze *?extract* innerhalb von 5 Minuten!\n`;
-        out += `🕶️ Ein Schwarzhändler taucht kurz aus dem Schatten auf und bietet dir seltene Waffen an — nutze *?huntershop* innerhalb von 5 Minuten!\n`;
-
-        if (leveledUp) {
-          const newRank = rankForLevel(h.level);
-          out += `\n🎉 *LEVEL UP!* Du bist jetzt Level ${h.level} (${newRank.label})! +3 Statuspunkte.\n`;
-        }
-
-        persist();
-        out += divider;
-        await send(out);
-        return true;
-      }
-
-      // ================= NORMALES GATE =================
-      const { tier, wasBoosted } = pickGateTier(h.level, Math.random);
-      const { total: cp, shadowContribution, weaponPower } = gateEffectivePower(h);
-      const tierIdx = GATE_TIERS.indexOf(tier);
-      const difficulty = 40 + (tierIdx * 25) + randInt(-15, 15);
+      const tier = gateTierForLevel(h.level);
+      const cp = combatPower(h);
+      const difficulty = 40 + (GATE_TIERS.indexOf(tier) * 25) + randInt(-15, 15);
       const monster = tier.monsters[randInt(0, tier.monsters.length - 1)];
 
       let out = `🚪 *— ${tier.label} BETRETEN —* 🚪\n${divider}\n`;
-      if (wasBoosted) {
-        out += `⚠️ Dieses Gate ist stärker, als dein Level eigentlich hergibt!\n`;
-      }
       out += `Du dringst tiefer in den Nebel vor... ein *${monster}* stellt sich dir in den Weg!\n\n`;
-      if (shadowContribution > 0) {
-        out += `🌑 Deine Schatten unterstützen dich im Kampf! (+${Math.round(shadowContribution)} Kampfkraft)\n`;
-      }
-      if (weaponPower > 0) {
-        out += `🗡️ Deine Waffe verstärkt deinen Angriff! (+${weaponPower} Kampfkraft)\n`;
-      }
-      out += `\n`;
 
       const winChance = Math.min(0.92, Math.max(0.15, cp / (cp + difficulty)));
       const won = Math.random() < winChance;
@@ -482,12 +251,11 @@ export function createSoloLevelingSystem(DATA_PATH) {
         h.gold = Math.max(0, (h.gold || 0) - goldLoss);
         persist();
         out += `💥 Du wurdest zurückgedrängt und musstest fliehen!\n📉 -${goldLoss} Gold verloren.\n${divider}`;
-        await send(out);
-        return true;
+        return send(out);
       }
 
-      const expGain = randInt(20, 40) + tierIdx * 15;
-      const goldGain = randInt(30, 90) + tierIdx * 20;
+      const expGain = randInt(20, 40) + GATE_TIERS.indexOf(tier) * 15;
+      const goldGain = randInt(30, 90) + GATE_TIERS.indexOf(tier) * 20;
       const leveledUp = addExp(h, expGain);
       h.gold = (h.gold || 0) + goldGain;
 
@@ -500,8 +268,8 @@ export function createSoloLevelingSystem(DATA_PATH) {
         const bossWon = Math.random() < bossWinChance;
         out += `\n👹 Der Gate-Boss *${tier.boss}* erscheint!\n`;
         if (bossWon) {
-          const bossExp = randInt(50, 90) + tierIdx * 25;
-          const bossGold = randInt(80, 200) + tierIdx * 40;
+          const bossExp = randInt(50, 90) + GATE_TIERS.indexOf(tier) * 25;
+          const bossGold = randInt(80, 200) + GATE_TIERS.indexOf(tier) * 40;
           addExp(h, bossExp);
           h.gold += bossGold;
           h.pendingExtraction = { bossName: tier.boss, tier: tier.key, expiresAt: now + EXTRACT_WINDOW_MS };
@@ -519,8 +287,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
 
       persist();
       out += divider;
-      await send(out);
-      return true;
+      return send(out);
     }
 
     // ---- EXTRACT ----
@@ -529,23 +296,20 @@ export function createSoloLevelingSystem(DATA_PATH) {
       if (!pending || Date.now() > pending.expiresAt) {
         h.pendingExtraction = null;
         persist();
-        await send('❌ Es gibt derzeit keinen Schatten, den du extrahieren kannst. Besiege zuerst einen Gate-Boss.');
-        return true;
+        return send('❌ Es gibt derzeit keinen Schatten, den du extrahieren kannst. Besiege zuerst einen Gate-Boss.');
       }
 
-      const isRed = pending.tier === 'Rot';
-      const extractChance = isRed ? 0.4 : 0.55;
+      const extractChance = 0.55;
       const success = Math.random() < extractChance;
       h.pendingExtraction = null;
 
       if (!success) {
         persist();
-        await send(`💨 "Arise" ... nichts geschah. Der Schatten des *${pending.bossName}* ist entkommen.`);
-        return true;
+        return send(`💨 "Arise" ... nichts geschah. Der Schatten des *${pending.bossName}* ist entkommen.`);
       }
 
       const template = SHADOW_NAMES[randInt(0, SHADOW_NAMES.length - 1)];
-      const powerBonus = isRed ? randInt(10, 25) : randInt(0, 6);
+      const powerBonus = randInt(0, 6);
       const shadow = {
         id: `sh_${Date.now()}_${randInt(100, 999)}`,
         name: template.name,
@@ -555,151 +319,25 @@ export function createSoloLevelingSystem(DATA_PATH) {
       h.shadows.push(shadow);
       persist();
 
-      await send(
+      return send(
         `🌑 *"ARISE!"* 🌑\n${divider}\n` +
         `Aus der Dunkelheit erhebt sich: *${shadow.name}*\n` +
         `⚔️ Kraft: ${shadow.power}\nHerkunft: ${pending.bossName}\n\n` +
         `Deine Schatten-Armee zählt nun ${h.shadows.length} Diener.\n${divider}`
       );
-
-      // ---- Sound als Sprachnachricht senden (best effort, blockiert den
-      // Befehl nicht, falls Download/Konvertierung fehlschlägt) ----
-      if (sock && from) {
-        try {
-          const voiceBuffer = await getAriseVoiceBuffer();
-          await sock.sendMessage(from, {
-            audio: voiceBuffer,
-            mimetype: 'audio/ogg; codecs=opus',
-            ptt: true
-          });
-        } catch (e) {
-          console.error('[sololeveling] Arise-Sound fehlgeschlagen:', e?.message || e);
-        }
-      }
-
-      return true;
     }
 
     // ---- SHADOWS LIST ----
     if (cmd === 'shadows' || cmd === 'schattenarmee') {
-      if (!h.shadows.length) {
-        await send('🌑 Deine Schatten-Armee ist leer. Besiege Gate-Bosse und nutze ?extract.');
-        return true;
-      }
+      if (!h.shadows.length) return send('🌑 Deine Schatten-Armee ist leer. Besiege Gate-Bosse und nutze ?extract.');
       const lines = h.shadows
         .sort((a, b) => b.power - a.power)
         .map((s, i) => `${i + 1}. ${s.name} — ⚔️ ${s.power} (aus: ${s.origin})`);
       const totalPower = h.shadows.reduce((sum, s) => sum + s.power, 0);
-      const { shadowContribution } = gateEffectivePower(h);
-      await send(
+      return send(
         `🌑 *— DEINE SCHATTEN-ARMEE —* 🌑\n${divider}\n${lines.join('\n')}\n${divider}\n` +
-        `Gesamtkraft der Armee: ${totalPower}\n` +
-        `Bonus im Gate-Kampf: +${Math.round(shadowContribution)} Kampfkraft`
+        `Gesamtkraft der Armee: ${totalPower}`
       );
-      return true;
-    }
-
-    // ---- SHOP (Waffenladen + ggf. Schwarzhändler) ----
-    if (cmd === 'huntershop' || cmd === 'waffenladen') {
-      const lines = SHOP_WEAPONS.map(w =>
-        `• ${w.name} (${w.rarity}) — ⚔️ +${w.power} — 💰 ${w.price} — Code: \`${w.key}\``
-      );
-      let out = `🛒 *— WAFFENLADEN —* 🛒\n${divider}\n${lines.join('\n')}\n${divider}\n`;
-      out += `Kaufen: ?buyweapon <code>\nAusrüsten: ?hunterequip <code>\n`;
-
-      const bm = h.pendingBlackMarket;
-      if (bm && Date.now() <= bm.expiresAt) {
-        const bmLines = bm.offers
-          .map(k => RARE_WEAPONS.find(w => w.key === k))
-          .filter(Boolean)
-          .map(w => `• ${w.name} (${w.rarity}) — ⚔️ +${w.power} — 💰 ${w.price} — Code: \`${w.key}\``);
-        out += `\n🕶️ *SCHWARZHÄNDLER (nur jetzt verfügbar!)*\n${bmLines.join('\n')}\n`;
-        out += `Noch ${fmtDuration(bm.expiresAt - Date.now())} verfügbar!\n`;
-      }
-
-      await send(out);
-      return true;
-    }
-
-    // ---- BUY WEAPON ----
-    if (cmd === 'buyweapon' || cmd === 'waffekaufen' || cmd === 'kaufen') {
-      const key = (args[0] || '').toLowerCase();
-      if (!key) {
-        await send('❌ Nutzung: ?buyweapon <code> — siehe ?huntershop für verfügbare Waffen.');
-        return true;
-      }
-
-      // Zuerst prüfen, ob es eine reguläre Ladenwaffe ist.
-      let def = SHOP_WEAPONS.find(w => w.key === key);
-      let isRareBuy = false;
-
-      // Sonst prüfen, ob es ein aktives Schwarzhändler-Angebot ist.
-      if (!def) {
-        const bm = h.pendingBlackMarket;
-        if (bm && Date.now() <= bm.expiresAt && bm.offers.includes(key)) {
-          def = RARE_WEAPONS.find(w => w.key === key);
-          isRareBuy = true;
-        }
-      }
-
-      if (!def) {
-        await send('❌ Diese Waffe ist gerade nicht erhältlich. Seltene Waffen gibt es nur kurz nach einem gewonnenen 🔴 Roten Tor beim Schwarzhändler.');
-        return true;
-      }
-
-      if ((h.weapons || []).some(w => w.key === def.key)) {
-        await send(`❌ Du besitzt *${def.name}* bereits.`);
-        return true;
-      }
-
-      if ((h.gold || 0) < def.price) {
-        await send(`❌ Nicht genug Gold. *${def.name}* kostet 💰 ${def.price}, du hast 💰 ${h.gold || 0}.`);
-        return true;
-      }
-
-      h.gold -= def.price;
-      h.weapons = h.weapons || [];
-      h.weapons.push({ key: def.key, name: def.name, power: def.power, rarity: def.rarity });
-
-      if (isRareBuy && h.pendingBlackMarket) {
-        h.pendingBlackMarket.offers = h.pendingBlackMarket.offers.filter(k => k !== def.key);
-        if (!h.pendingBlackMarket.offers.length) h.pendingBlackMarket = null;
-      }
-
-      persist();
-      await send(
-        `✅ *${def.name}* (${def.rarity}) gekauft! ⚔️ +${def.power} Kampfkraft, wenn ausgerüstet.\n` +
-        `Nutze ?hunterequip ${def.key}, um sie auszurüsten.`
-      );
-      return true;
-    }
-
-    // ---- WEAPONS INVENTORY ----
-    if (cmd === 'weapons' || cmd === 'waffen' || cmd === 'inventar') {
-      if (!h.weapons || !h.weapons.length) {
-        await send('🗡️ Du besitzt noch keine Waffen. Schau im ?huntershop vorbei.');
-        return true;
-      }
-      const lines = h.weapons.map(w => {
-        const eq = h.equippedWeaponKey === w.key ? ' ✅ (ausgerüstet)' : '';
-        return `• ${w.name} (${w.rarity}) — ⚔️ +${w.power} — Code: \`${w.key}\`${eq}`;
-      });
-      await send(`🗡️ *— DEINE WAFFEN —* 🗡️\n${divider}\n${lines.join('\n')}\n${divider}\nAusrüsten: ?hunterequip <code>`);
-      return true;
-    }
-
-    // ---- EQUIP WEAPON ----
-    if (cmd === 'hunterequip' || cmd === 'ausruesten') {
-      const key = (args[0] || '').toLowerCase();
-      const owned = (h.weapons || []).find(w => w.key === key);
-      if (!owned) {
-        await send('❌ Diese Waffe besitzt du nicht. Nutze ?weapons für deine Übersicht.');
-        return true;
-      }
-      h.equippedWeaponKey = owned.key;
-      persist();
-      await send(`✅ *${owned.name}* ausgerüstet! ⚔️ +${owned.power} Kampfkraft.`);
-      return true;
     }
 
     // ---- DAILY QUEST ----
@@ -709,8 +347,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
 
       if (now - last < DAILY_QUEST_COOLDOWN_MS) {
         const remaining = DAILY_QUEST_COOLDOWN_MS - (now - last);
-        await send(`📜 Du hast deine heutige Systemaufgabe bereits erledigt.\nNächste in ${fmtDuration(remaining)}.`);
-        return true;
+        return send(`📜 Du hast deine heutige Systemaufgabe bereits erledigt.\nNächste in ${fmtDuration(remaining)}.`);
       }
 
       // Strafe, falls die letzte Quest zu lange überfällig war (>48h seit letzter Erledigung, aber nicht beim allerersten Mal)
@@ -719,12 +356,11 @@ export function createSoloLevelingSystem(DATA_PATH) {
         h.stats.vit = Math.max(1, h.stats.vit - 1);
         h.dailyQuest.lastDone = now;
         persist();
-        await send(
+        return send(
           `☠️ *"Die tägliche Quest wurde nicht erfüllt."*\n${divider}\n` +
           `Das System verhängt eine Strafe: -1 Vitalität, 1h Debuff aktiv.\n` +
           `Erledige deine Quests in Zukunft pünktlich!\n${divider}`
         );
-        return true;
       }
 
       const rewardExp = randInt(15, 30);
@@ -734,12 +370,11 @@ export function createSoloLevelingSystem(DATA_PATH) {
       h.dailyQuest.lastDone = now;
       persist();
 
-      await send(
+      return send(
         `📜 *— TAGESQUEST ABGESCHLOSSEN —* 📜\n${divider}\n` +
         `100 Liegestütze. 100 Kniebeugen. 100 Sit-ups. 10km Lauf.\n\n` +
         `✅ Geschafft! ✨ +${rewardExp} EXP  ${STAT_LABELS[rewardStat]} +1\n${divider}`
       );
-      return true;
     }
 
     // ---- LEADERBOARD ----
@@ -750,10 +385,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
         return cpB - cpA;
       }).slice(0, 10);
 
-      if (!entries.length) {
-        await send('📊 Es gibt noch keine erwachten Hunter.');
-        return true;
-      }
+      if (!entries.length) return send('📊 Es gibt noch keine erwachten Hunter.');
 
       const medals = ['🥇', '🥈', '🥉'];
       const lines = await Promise.all(entries.map(async ([hjid, hu], i) => {
@@ -763,17 +395,15 @@ export function createSoloLevelingSystem(DATA_PATH) {
         return `${icon} ${name} — ${rank.label} | Lv.${hu.level} | ⚔️ ${combatPower(hu)}`;
       }));
 
-      await send(
+      return send(
         `🏆 *— HUNTER-RANGLISTE —* 🏆\n${divider}\n${lines.join('\n')}\n${divider}`,
         { mentions: entries.map(([hjid]) => hjid) }
       );
-      return true;
     }
 
     // ---- HELP ----
     if (cmd === 'sololevelinghelp' || cmd === 'jaegerhilfe') {
-      await send(SL_HELP_TEXT);
-      return true;
+      return send(SL_HELP_TEXT);
     }
 
     return false;
@@ -786,10 +416,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
     'gate', 'dungeon',
     'extract', 'arise',
     'shadows', 'schattenarmee',
-    'huntershop', 'waffenladen',
-    'buyweapon', 'waffekaufen', 'kaufen',
-    'weapons', 'waffen', 'inventar',
-    'hunterequip', 'ausruesten',
     'dailyquest', 'tagesquest',
     'hunterrank', 'hunterleaderboard', 'jaegerrangliste',
     'sololevelinghelp', 'jaegerhilfe'
@@ -800,21 +426,11 @@ export function createSoloLevelingSystem(DATA_PATH) {
     `?awaken — als Hunter erwachen\n` +
     `?hunterinfo — dein System-Fenster (Stats, Rang, Schatten)\n` +
     `?statpoint <str|agi|vit|int|per> <n> — Statuspunkte verteilen\n` +
-    `?gate — ein Gate betreten (Kampf, Loot, Boss-Chance, seltenes 🔴 Rotes Tor)\n` +
+    `?gate — ein Gate betreten (Kampf, Loot, Boss-Chance)\n` +
     `?extract — Schatten eines besiegten Bosses extrahieren\n` +
-    `?shadows — deine Schatten-Armee ansehen (inkl. Gate-Kampfbonus)\n` +
-    `?huntershop — Waffenladen ansehen (+ Schwarzhändler, falls aktiv)\n` +
-    `?buyweapon <code> — Waffe kaufen\n` +
-    `?weapons — deine Waffen ansehen\n` +
-    `?hunterequip <code> — Waffe ausrüsten\n` +
+    `?shadows — deine Schatten-Armee ansehen\n` +
     `?dailyquest — tägliche Systemaufgabe (Vorsicht bei Strafquests!)\n` +
     `?hunterrank — Hunter-Rangliste nach Kampfkraft\n` +
-    `${divider}\n` +
-    `🌑 Deine Schatten-Armee kämpft bei jedem Gate aktiv mit und erhöht deine Sieg-Chance.\n` +
-    `🗡️ Waffen aus dem Laden erhöhen deine Kampfkraft dauerhaft, wenn ausgerüstet.\n` +
-    `⚠️ Gelegentlich erscheinen Gates, die stärker sind als dein Level – riskant, aber lohnend.\n` +
-    `🔴 Ab Level ${RED_GATE_MIN_LEVEL} kann selten ein Rotes Tor auftauchen: hohes Risiko, hohe Belohnung, garantierter Boss —\n` +
-    `   und ein Schwarzhändler mit seltenen Waffen, die es sonst nirgendwo zu kaufen gibt!\n` +
     `${divider}`;
 
   return { handle, SL_COMMANDS, SL_HELP_TEXT };
