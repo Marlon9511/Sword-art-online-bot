@@ -605,7 +605,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
         `• ${w.name} (${w.rarity}) — ⚔️ +${w.power} — 💰 ${w.price} — Code: \`${w.key}\``
       );
       let out = `🛒 *— WAFFENLADEN —* 🛒\n${divider}\n${lines.join('\n')}\n${divider}\n`;
-      out += `Kaufen: ?buyweapon <code>\nAusrüsten: ?equip <code>\n`;
+      out += `Kaufen: ?buyweapon <code>\nAusrüsten: ?hunterequip <code>\n`;
 
       const bm = h.pendingBlackMarket;
       if (bm && Date.now() <= bm.expiresAt) {
@@ -669,7 +669,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
       persist();
       await send(
         `✅ *${def.name}* (${def.rarity}) gekauft! ⚔️ +${def.power} Kampfkraft, wenn ausgerüstet.\n` +
-        `Nutze ?equip ${def.key}, um sie auszurüsten.`
+        `Nutze ?hunterequip ${def.key}, um sie auszurüsten.`
       );
       return true;
     }
@@ -684,12 +684,12 @@ export function createSoloLevelingSystem(DATA_PATH) {
         const eq = h.equippedWeaponKey === w.key ? ' ✅ (ausgerüstet)' : '';
         return `• ${w.name} (${w.rarity}) — ⚔️ +${w.power} — Code: \`${w.key}\`${eq}`;
       });
-      await send(`🗡️ *— DEINE WAFFEN —* 🗡️\n${divider}\n${lines.join('\n')}\n${divider}\nAusrüsten: ?equip <code>`);
+      await send(`🗡️ *— DEINE WAFFEN —* 🗡️\n${divider}\n${lines.join('\n')}\n${divider}\nAusrüsten: ?hunterequip <code>`);
       return true;
     }
 
     // ---- EQUIP WEAPON ----
-    if (cmd === 'equip' || cmd === 'ausruesten') {
+    if (cmd === 'hunterequip' || cmd === 'ausruesten') {
       const key = (args[0] || '').toLowerCase();
       const owned = (h.weapons || []).find(w => w.key === key);
       if (!owned) {
@@ -789,7 +789,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
     'huntershop', 'waffenladen',
     'buyweapon', 'waffekaufen', 'kaufen',
     'weapons', 'waffen', 'inventar',
-    'equip', 'ausruesten',
+    'hunterequip', 'ausruesten',
     'dailyquest', 'tagesquest',
     'hunterrank', 'hunterleaderboard', 'jaegerrangliste',
     'sololevelinghelp', 'jaegerhilfe'
@@ -806,7 +806,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
     `?huntershop — Waffenladen ansehen (+ Schwarzhändler, falls aktiv)\n` +
     `?buyweapon <code> — Waffe kaufen\n` +
     `?weapons — deine Waffen ansehen\n` +
-    `?equip <code> — Waffe ausrüsten\n` +
+    `?hunterequip <code> — Waffe ausrüsten\n` +
     `?dailyquest — tägliche Systemaufgabe (Vorsicht bei Strafquests!)\n` +
     `?hunterrank — Hunter-Rangliste nach Kampfkraft\n` +
     `${divider}\n` +
