@@ -181,6 +181,36 @@ export function createSoloLevelingSystem(DATA_PATH) {
   const RED_GATE_CHANCE = 0.06; // 6% pro ?gate-Versuch
   const RED_GATE_BOSSES = ['Blutmond-Ogerfürst', 'Verschlungener Wächter', 'Herold des Roten Tores', 'Abyssaler Flammenkoloss'];
 
+  // ---------- Waffen ----------
+  // Normale Waffen: jederzeit im Waffenladen kaufbar (?shop / ?buyweapon).
+  const SHOP_WEAPONS = [
+    { key: 'rostiges_schwert', name: 'Rostiges Schwert', price: 50, power: 8, rarity: 'Gewöhnlich' },
+    { key: 'stahlschwert', name: 'Stahlschwert', price: 150, power: 18, rarity: 'Gewöhnlich' },
+    { key: 'kriegsaxt', name: 'Kriegsaxt', price: 320, power: 30, rarity: 'Selten' },
+    { key: 'enchantierter_dolch', name: 'Enchantierter Dolch', price: 600, power: 45, rarity: 'Selten' },
+    { key: 'runenschwert', name: 'Runenschwert', price: 1000, power: 65, rarity: 'Episch' }
+  ];
+
+  // Seltene Waffen: NICHT im normalen Laden erhältlich, sondern nur bei
+  // einem "Schwarzhändler", der nach einem gewonnenen Roten Tor kurzzeitig
+  // erscheint (siehe pendingBlackMarket).
+  const RARE_WEAPONS = [
+    { key: 'daemonenklinge', name: 'Dämonenklinge', price: 800, power: 90, rarity: 'Episch' },
+    { key: 'frostfangschwert', name: 'Frostfangschwert', price: 1200, power: 120, rarity: 'Episch' },
+    { key: 'drachentoeter', name: 'Drachentöter', price: 2000, power: 160, rarity: 'Legendär' },
+    { key: 'klinge_des_monarchen', name: 'Klinge des Monarchen', price: 3500, power: 220, rarity: 'Legendär' }
+  ];
+
+  function findWeaponDef(key) {
+    return SHOP_WEAPONS.find(w => w.key === key) || RARE_WEAPONS.find(w => w.key === key) || null;
+  }
+
+  function equippedWeaponPower(h) {
+    if (!h.equippedWeaponKey) return 0;
+    const owned = (h.weapons || []).find(w => w.key === h.equippedWeaponKey);
+    return owned ? owned.power : 0;
+  }
+
   // ---------- Helper ----------
 
   function ensureHunter(jid) {
@@ -195,6 +225,9 @@ export function createSoloLevelingSystem(DATA_PATH) {
         gateCooldownUntil: 0,
         dailyQuest: { lastDone: 0, penaltyUntil: 0 },
         pendingExtraction: null, // { bossName, tier, expiresAt }
+        pendingBlackMarket: null, // { offers: [weaponKey,...], expiresAt }
+        weapons: [],
+        equippedWeaponKey: null,
         gold: 0
       };
       persist();
@@ -222,25 +255,27 @@ export function createSoloLevelingSystem(DATA_PATH) {
     return (h.shadows || []).reduce((sum, sh) => sum + sh.power, 0);
   }
 
-  // "Rohe" Kampfkraft-Anzeige (Stats + Level + Schatten), wie gehabt.
+  // "Rohe" Kampfkraft-Anzeige (Stats + Level + Schatten + Waffe), wie gehabt.
   function combatPower(h) {
     const s = h.stats;
     const shadowPower = shadowArmyPower(h);
+    const weaponPower = equippedWeaponPower(h);
     return Math.round(
-      s.str * 2.2 + s.agi * 1.6 + s.vit * 1.4 + s.int * 1.1 + s.per * 1.0 + h.level * 3 + shadowPower * 0.8
+      s.str * 2.2 + s.agi * 1.6 + s.vit * 1.4 + s.int * 1.1 + s.per * 1.0 + h.level * 3 + shadowPower * 0.8 + weaponPower
     );
   }
 
   // Kampfkraft für Gate-Kämpfe: Basis-Stats/Level zählen normal, die
   // Schatten-Armee steuert zusätzlich einen eigenen, spürbaren Kampfanteil
-  // bei (deine Diener kämpfen aktiv mit), statt nur die Anzeigezahl zu heben.
+  // bei (deine Diener kämpfen aktiv mit), die ausgerüstete Waffe zählt voll.
   function gateEffectivePower(h) {
     const s = h.stats;
     const basePower = s.str * 2.2 + s.agi * 1.6 + s.vit * 1.4 + s.int * 1.1 + s.per * 1.0 + h.level * 3;
     const shadowPower = shadowArmyPower(h);
     // Diminishing Returns, damit eine riesige Armee ein Gate nicht komplett trivialisiert.
     const shadowContribution = Math.sqrt(Math.max(0, shadowPower)) * 6;
-    return { basePower, shadowPower, shadowContribution, total: basePower + shadowContribution };
+    const weaponPower = equippedWeaponPower(h);
+    return { basePower, shadowPower, shadowContribution, weaponPower, total: basePower + shadowContribution + weaponPower };
   }
 
   function isInPenalty(h) {
@@ -307,12 +342,17 @@ export function createSoloLevelingSystem(DATA_PATH) {
       const penaltyLine = isInPenalty(h)
         ? `\n☠️ *Strafquest aktiv!* Noch ${fmtDuration(h.dailyQuest.penaltyUntil - Date.now())}`
         : '';
+      const equippedDef = h.equippedWeaponKey ? findWeaponDef(h.equippedWeaponKey) : null;
+      const weaponLine = equippedDef
+        ? `🗡️ Waffe: ${equippedDef.name} (⚔️ +${equippedDef.power}, ${equippedDef.rarity})`
+        : `🗡️ Waffe: keine ausgerüstet`;
       await send(
         `📊 *— SYSTEM-FENSTER —* 📊\n${divider}\n` +
         `🎖️ Rang: ${rank.label}\n⭐ Level: ${h.level}\n✨ EXP: ${h.exp} / ${needed}\n` +
         `⚔️ Kampfkraft: ${combatPower(h)}\n🎯 Freie Statuspunkte: ${h.statPoints}\n💰 Gold: ${h.gold || 0}\n\n` +
         `*Attribute:*\n${statLines}\n\n` +
         `👥 Schatten-Armee: ${(h.shadows || []).length} (⚔️ ${shadowArmyPower(h)} Rohkraft)\n` +
+        `${weaponLine}\n` +
         `${penaltyLine}\n${divider}`
       );
       return true;
@@ -353,7 +393,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
 
       // ================= ROTES TOR =================
       if (rollRed) {
-        const { total: cp, shadowContribution } = gateEffectivePower(h);
+        const { total: cp, shadowContribution, weaponPower } = gateEffectivePower(h);
         const boss = RED_GATE_BOSSES[randInt(0, RED_GATE_BOSSES.length - 1)];
         const difficulty = 140 + (baseGateTierIndexForLevel(h.level) * 30) + randInt(-10, 25);
 
@@ -365,6 +405,9 @@ export function createSoloLevelingSystem(DATA_PATH) {
           ? `🌑 Deine Schatten-Armee kämpft an deiner Seite! (+${Math.round(shadowContribution)} Kampfkraft)\n`
           : '';
         out += shadowLine;
+        if (weaponPower > 0) {
+          out += `🗡️ Deine Waffe verstärkt deinen Angriff! (+${weaponPower} Kampfkraft)\n`;
+        }
 
         const winChance = Math.min(0.7, Math.max(0.08, cp / (cp + difficulty)));
         const won = Math.random() < winChance;
@@ -387,9 +430,16 @@ export function createSoloLevelingSystem(DATA_PATH) {
         h.gold = (h.gold || 0) + goldGain;
         h.pendingExtraction = { bossName: boss, tier: 'Rot', expiresAt: now + EXTRACT_WINDOW_MS };
 
+        // Schwarzhändler erscheint kurzzeitig mit 2 zufälligen seltenen Waffen,
+        // die sonst nirgendwo kaufbar sind.
+        const shuffled = [...RARE_WEAPONS].sort(() => Math.random() - 0.5);
+        const offerKeys = shuffled.slice(0, 2).map(w => w.key);
+        h.pendingBlackMarket = { offers: offerKeys, expiresAt: now + EXTRACT_WINDOW_MS };
+
         out += `\n🏆 *${boss}* fällt! Das Rote Tor bricht zusammen und gibt dich frei.\n`;
         out += `✨ +${expGain} EXP  💰 +${goldGain} Gold\n`;
         out += `🌑 Ein besonders mächtiger Schatten hat sich vom Boss gelöst... Nutze *?extract* innerhalb von 5 Minuten!\n`;
+        out += `🕶️ Ein Schwarzhändler taucht kurz aus dem Schatten auf und bietet dir seltene Waffen an — nutze *?shop* innerhalb von 5 Minuten!\n`;
 
         if (leveledUp) {
           const newRank = rankForLevel(h.level);
@@ -404,7 +454,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
 
       // ================= NORMALES GATE =================
       const { tier, wasBoosted } = pickGateTier(h.level, Math.random);
-      const { total: cp, shadowContribution } = gateEffectivePower(h);
+      const { total: cp, shadowContribution, weaponPower } = gateEffectivePower(h);
       const tierIdx = GATE_TIERS.indexOf(tier);
       const difficulty = 40 + (tierIdx * 25) + randInt(-15, 15);
       const monster = tier.monsters[randInt(0, tier.monsters.length - 1)];
@@ -415,8 +465,12 @@ export function createSoloLevelingSystem(DATA_PATH) {
       }
       out += `Du dringst tiefer in den Nebel vor... ein *${monster}* stellt sich dir in den Weg!\n\n`;
       if (shadowContribution > 0) {
-        out += `🌑 Deine Schatten unterstützen dich im Kampf! (+${Math.round(shadowContribution)} Kampfkraft)\n\n`;
+        out += `🌑 Deine Schatten unterstützen dich im Kampf! (+${Math.round(shadowContribution)} Kampfkraft)\n`;
       }
+      if (weaponPower > 0) {
+        out += `🗡️ Deine Waffe verstärkt deinen Angriff! (+${weaponPower} Kampfkraft)\n`;
+      }
+      out += `\n`;
 
       const winChance = Math.min(0.92, Math.max(0.15, cp / (cp + difficulty)));
       const won = Math.random() < winChance;
@@ -545,6 +599,109 @@ export function createSoloLevelingSystem(DATA_PATH) {
       return true;
     }
 
+    // ---- SHOP (Waffenladen + ggf. Schwarzhändler) ----
+    if (cmd === 'shop' || cmd === 'waffenladen') {
+      const lines = SHOP_WEAPONS.map(w =>
+        `• ${w.name} (${w.rarity}) — ⚔️ +${w.power} — 💰 ${w.price} — Code: \`${w.key}\``
+      );
+      let out = `🛒 *— WAFFENLADEN —* 🛒\n${divider}\n${lines.join('\n')}\n${divider}\n`;
+      out += `Kaufen: ?buyweapon <code>\nAusrüsten: ?equip <code>\n`;
+
+      const bm = h.pendingBlackMarket;
+      if (bm && Date.now() <= bm.expiresAt) {
+        const bmLines = bm.offers
+          .map(k => RARE_WEAPONS.find(w => w.key === k))
+          .filter(Boolean)
+          .map(w => `• ${w.name} (${w.rarity}) — ⚔️ +${w.power} — 💰 ${w.price} — Code: \`${w.key}\``);
+        out += `\n🕶️ *SCHWARZHÄNDLER (nur jetzt verfügbar!)*\n${bmLines.join('\n')}\n`;
+        out += `Noch ${fmtDuration(bm.expiresAt - Date.now())} verfügbar!\n`;
+      }
+
+      await send(out);
+      return true;
+    }
+
+    // ---- BUY WEAPON ----
+    if (cmd === 'buyweapon' || cmd === 'waffekaufen' || cmd === 'kaufen') {
+      const key = (args[0] || '').toLowerCase();
+      if (!key) {
+        await send('❌ Nutzung: ?buyweapon <code> — siehe ?shop für verfügbare Waffen.');
+        return true;
+      }
+
+      // Zuerst prüfen, ob es eine reguläre Ladenwaffe ist.
+      let def = SHOP_WEAPONS.find(w => w.key === key);
+      let isRareBuy = false;
+
+      // Sonst prüfen, ob es ein aktives Schwarzhändler-Angebot ist.
+      if (!def) {
+        const bm = h.pendingBlackMarket;
+        if (bm && Date.now() <= bm.expiresAt && bm.offers.includes(key)) {
+          def = RARE_WEAPONS.find(w => w.key === key);
+          isRareBuy = true;
+        }
+      }
+
+      if (!def) {
+        await send('❌ Diese Waffe ist gerade nicht erhältlich. Seltene Waffen gibt es nur kurz nach einem gewonnenen 🔴 Roten Tor beim Schwarzhändler.');
+        return true;
+      }
+
+      if ((h.weapons || []).some(w => w.key === def.key)) {
+        await send(`❌ Du besitzt *${def.name}* bereits.`);
+        return true;
+      }
+
+      if ((h.gold || 0) < def.price) {
+        await send(`❌ Nicht genug Gold. *${def.name}* kostet 💰 ${def.price}, du hast 💰 ${h.gold || 0}.`);
+        return true;
+      }
+
+      h.gold -= def.price;
+      h.weapons = h.weapons || [];
+      h.weapons.push({ key: def.key, name: def.name, power: def.power, rarity: def.rarity });
+
+      if (isRareBuy && h.pendingBlackMarket) {
+        h.pendingBlackMarket.offers = h.pendingBlackMarket.offers.filter(k => k !== def.key);
+        if (!h.pendingBlackMarket.offers.length) h.pendingBlackMarket = null;
+      }
+
+      persist();
+      await send(
+        `✅ *${def.name}* (${def.rarity}) gekauft! ⚔️ +${def.power} Kampfkraft, wenn ausgerüstet.\n` +
+        `Nutze ?equip ${def.key}, um sie auszurüsten.`
+      );
+      return true;
+    }
+
+    // ---- WEAPONS INVENTORY ----
+    if (cmd === 'weapons' || cmd === 'waffen' || cmd === 'inventar') {
+      if (!h.weapons || !h.weapons.length) {
+        await send('🗡️ Du besitzt noch keine Waffen. Schau im ?shop vorbei.');
+        return true;
+      }
+      const lines = h.weapons.map(w => {
+        const eq = h.equippedWeaponKey === w.key ? ' ✅ (ausgerüstet)' : '';
+        return `• ${w.name} (${w.rarity}) — ⚔️ +${w.power} — Code: \`${w.key}\`${eq}`;
+      });
+      await send(`🗡️ *— DEINE WAFFEN —* 🗡️\n${divider}\n${lines.join('\n')}\n${divider}\nAusrüsten: ?equip <code>`);
+      return true;
+    }
+
+    // ---- EQUIP WEAPON ----
+    if (cmd === 'equip' || cmd === 'ausruesten') {
+      const key = (args[0] || '').toLowerCase();
+      const owned = (h.weapons || []).find(w => w.key === key);
+      if (!owned) {
+        await send('❌ Diese Waffe besitzt du nicht. Nutze ?weapons für deine Übersicht.');
+        return true;
+      }
+      h.equippedWeaponKey = owned.key;
+      persist();
+      await send(`✅ *${owned.name}* ausgerüstet! ⚔️ +${owned.power} Kampfkraft.`);
+      return true;
+    }
+
     // ---- DAILY QUEST ----
     if (cmd === 'dailyquest' || cmd === 'tagesquest') {
       const now = Date.now();
@@ -629,6 +786,10 @@ export function createSoloLevelingSystem(DATA_PATH) {
     'gate', 'dungeon',
     'extract', 'arise',
     'shadows', 'schattenarmee',
+    'shop', 'waffenladen',
+    'buyweapon', 'waffekaufen', 'kaufen',
+    'weapons', 'waffen', 'inventar',
+    'equip', 'ausruesten',
     'dailyquest', 'tagesquest',
     'hunterrank', 'hunterleaderboard', 'jaegerrangliste',
     'sololevelinghelp', 'jaegerhilfe'
@@ -642,12 +803,18 @@ export function createSoloLevelingSystem(DATA_PATH) {
     `?gate — ein Gate betreten (Kampf, Loot, Boss-Chance, seltenes 🔴 Rotes Tor)\n` +
     `?extract — Schatten eines besiegten Bosses extrahieren\n` +
     `?shadows — deine Schatten-Armee ansehen (inkl. Gate-Kampfbonus)\n` +
+    `?shop — Waffenladen ansehen (+ Schwarzhändler, falls aktiv)\n` +
+    `?buyweapon <code> — Waffe kaufen\n` +
+    `?weapons — deine Waffen ansehen\n` +
+    `?equip <code> — Waffe ausrüsten\n` +
     `?dailyquest — tägliche Systemaufgabe (Vorsicht bei Strafquests!)\n` +
     `?hunterrank — Hunter-Rangliste nach Kampfkraft\n` +
     `${divider}\n` +
     `🌑 Deine Schatten-Armee kämpft bei jedem Gate aktiv mit und erhöht deine Sieg-Chance.\n` +
+    `🗡️ Waffen aus dem Laden erhöhen deine Kampfkraft dauerhaft, wenn ausgerüstet.\n` +
     `⚠️ Gelegentlich erscheinen Gates, die stärker sind als dein Level – riskant, aber lohnend.\n` +
-    `🔴 Ab Level ${RED_GATE_MIN_LEVEL} kann selten ein Rotes Tor auftauchen: hohes Risiko, hohe Belohnung, garantierter Boss.\n` +
+    `🔴 Ab Level ${RED_GATE_MIN_LEVEL} kann selten ein Rotes Tor auftauchen: hohes Risiko, hohe Belohnung, garantierter Boss —\n` +
+    `   und ein Schwarzhändler mit seltenen Waffen, die es sonst nirgendwo zu kaufen gibt!\n` +
     `${divider}`;
 
   return { handle, SL_COMMANDS, SL_HELP_TEXT };
