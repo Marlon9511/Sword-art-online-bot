@@ -5,7 +5,16 @@
 //   createSoloLevelingSystem(DATA_PATH) -> { handle, SL_COMMANDS, SL_HELP_TEXT }
 // Persistiert eigenständig in DATA_PATH/sololeveling.json
 //
-// NEU: Bei erfolgreicher Schatten-Extraktion (?extract / ?arise) wird
+// NEU (diese Version):
+//   - Schatten-Armee zählt jetzt sichtbar & spürbar im Gate-Kampf mit
+//     (eigener Bonus auf Sieg-Chance, nicht nur auf die Kampfkraft-Zahl).
+//   - Es können jetzt auch höhere Gates auftauchen, als das eigene Level
+//     eigentlich hergibt ("Überraschungs-Gate") – riskanter, aber lohnender.
+//   - Neu: 🔴 Rotes Tor (Red Gate) – seltenes, isoliertes Spezial-Gate mit
+//     deutlich höherem Risiko & höherer Belohnung, garantiertem Boss und
+//     Gefahr, "eingeschlossen" zu werden, wenn man verliert.
+//
+// Bei erfolgreicher Schatten-Extraktion (?extract / ?arise) wird
 // zusätzlich zur Textnachricht ein fester YouTube-Sound als
 // WhatsApp-Sprachnachricht (PTT) verschickt.
 // ============================================================
@@ -118,9 +127,32 @@ export function createSoloLevelingSystem(DATA_PATH) {
     { key: 'S', label: 'S-Rang Gate', minLevel: 68, maxLevel: 999, monsters: ['Drachenritter', 'Titan der Tiefe', 'Alptraumherold'], boss: 'Monarch der Verwüstung' }
   ];
 
+  // Chance, dass pro ?gate-Versuch ein Tier über dem eigentlich für das
+  // Level vorgesehenen Gate erscheint ("Überraschungs-Gate"). Wird pro
+  // Stufe erneut gewürfelt, kann sich also theoretisch mehrfach hochschaukeln.
+  const HIGHER_GATE_CHANCE = 0.16;
+
+  function baseGateTierIndexForLevel(level) {
+    let idx = 0;
+    GATE_TIERS.forEach((g, i) => {
+      if (level >= g.minLevel) idx = i;
+    });
+    return idx;
+  }
+
+  // Wählt das Gate für diesen Versuch: Grundlage ist das Level, aber mit
+  // steigender (aber abnehmender) Wahrscheinlichkeit kann auch ein höheres,
+  // eigentlich noch "zu starkes" Gate auftauchen.
+  function pickGateTier(level, randFn) {
+    let idx = baseGateTierIndexForLevel(level);
+    while (idx < GATE_TIERS.length - 1 && randFn() < HIGHER_GATE_CHANCE) {
+      idx += 1;
+    }
+    return { tier: GATE_TIERS[idx], tierIndex: idx, wasBoosted: idx > baseGateTierIndexForLevel(level) };
+  }
+
   function gateTierForLevel(level) {
-    const eligible = GATE_TIERS.filter(g => level >= g.minLevel);
-    return eligible.length ? eligible[eligible.length - 1] : GATE_TIERS[0];
+    return GATE_TIERS[baseGateTierIndexForLevel(level)];
   }
 
   const SHADOW_NAMES = [
@@ -140,8 +172,14 @@ export function createSoloLevelingSystem(DATA_PATH) {
   const STAT_LABELS = { str: '💪 Stärke', agi: '💨 Beweglichkeit', vit: '❤️ Vitalität', int: '🧠 Intelligenz', per: '👁️ Wahrnehmung' };
 
   const GATE_COOLDOWN_MS = 10 * 60 * 1000; // 10 Minuten
+  const RED_GATE_COOLDOWN_MS = 25 * 60 * 1000; // Rotes Tor: längere Sperre bei Niederlage
   const DAILY_QUEST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
   const EXTRACT_WINDOW_MS = 5 * 60 * 1000; // 5 Minuten nach Bosskill
+
+  // Rotes Tor: seltenes Spezial-Gate, ab Level 5 möglich.
+  const RED_GATE_MIN_LEVEL = 5;
+  const RED_GATE_CHANCE = 0.06; // 6% pro ?gate-Versuch
+  const RED_GATE_BOSSES = ['Blutmond-Ogerfürst', 'Verschlungener Wächter', 'Herold des Roten Tores', 'Abyssaler Flammenkoloss'];
 
   // ---------- Helper ----------
 
@@ -180,12 +218,29 @@ export function createSoloLevelingSystem(DATA_PATH) {
     return leveledUp;
   }
 
+  function shadowArmyPower(h) {
+    return (h.shadows || []).reduce((sum, sh) => sum + sh.power, 0);
+  }
+
+  // "Rohe" Kampfkraft-Anzeige (Stats + Level + Schatten), wie gehabt.
   function combatPower(h) {
     const s = h.stats;
-    const shadowPower = (h.shadows || []).reduce((sum, sh) => sum + sh.power, 0);
+    const shadowPower = shadowArmyPower(h);
     return Math.round(
       s.str * 2.2 + s.agi * 1.6 + s.vit * 1.4 + s.int * 1.1 + s.per * 1.0 + h.level * 3 + shadowPower * 0.8
     );
+  }
+
+  // Kampfkraft für Gate-Kämpfe: Basis-Stats/Level zählen normal, die
+  // Schatten-Armee steuert zusätzlich einen eigenen, spürbaren Kampfanteil
+  // bei (deine Diener kämpfen aktiv mit), statt nur die Anzeigezahl zu heben.
+  function gateEffectivePower(h) {
+    const s = h.stats;
+    const basePower = s.str * 2.2 + s.agi * 1.6 + s.vit * 1.4 + s.int * 1.1 + s.per * 1.0 + h.level * 3;
+    const shadowPower = shadowArmyPower(h);
+    // Diminishing Returns, damit eine riesige Armee ein Gate nicht komplett trivialisiert.
+    const shadowContribution = Math.sqrt(Math.max(0, shadowPower)) * 6;
+    return { basePower, shadowPower, shadowContribution, total: basePower + shadowContribution };
   }
 
   function isInPenalty(h) {
@@ -257,7 +312,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
         `🎖️ Rang: ${rank.label}\n⭐ Level: ${h.level}\n✨ EXP: ${h.exp} / ${needed}\n` +
         `⚔️ Kampfkraft: ${combatPower(h)}\n🎯 Freie Statuspunkte: ${h.statPoints}\n💰 Gold: ${h.gold || 0}\n\n` +
         `*Attribute:*\n${statLines}\n\n` +
-        `👥 Schatten-Armee: ${(h.shadows || []).length}\n` +
+        `👥 Schatten-Armee: ${(h.shadows || []).length} (⚔️ ${shadowArmyPower(h)} Rohkraft)\n` +
         `${penaltyLine}\n${divider}`
       );
       return true;
@@ -294,13 +349,74 @@ export function createSoloLevelingSystem(DATA_PATH) {
         return true;
       }
 
-      const tier = gateTierForLevel(h.level);
-      const cp = combatPower(h);
-      const difficulty = 40 + (GATE_TIERS.indexOf(tier) * 25) + randInt(-15, 15);
+      const rollRed = h.level >= RED_GATE_MIN_LEVEL && Math.random() < RED_GATE_CHANCE;
+
+      // ================= ROTES TOR =================
+      if (rollRed) {
+        const { total: cp, shadowContribution } = gateEffectivePower(h);
+        const boss = RED_GATE_BOSSES[randInt(0, RED_GATE_BOSSES.length - 1)];
+        const difficulty = 140 + (baseGateTierIndexForLevel(h.level) * 30) + randInt(-10, 25);
+
+        let out = `🔴 *— EIN ROTES TOR ÖFFNET SICH! —* 🔴\n${divider}\n`;
+        out += `Der Boden unter dir bricht weg... du wirst in eine isolierte, blutrote Dimension gesogen!\n`;
+        out += `Erst wenn *${boss}* fällt, öffnet sich der Ausgang wieder.\n\n`;
+
+        const shadowLine = shadowContribution > 0
+          ? `🌑 Deine Schatten-Armee kämpft an deiner Seite! (+${Math.round(shadowContribution)} Kampfkraft)\n`
+          : '';
+        out += shadowLine;
+
+        const winChance = Math.min(0.7, Math.max(0.08, cp / (cp + difficulty)));
+        const won = Math.random() < winChance;
+
+        if (!won) {
+          h.gateCooldownUntil = now + RED_GATE_COOLDOWN_MS;
+          const goldLoss = randInt(60, 150);
+          h.gold = Math.max(0, (h.gold || 0) - goldLoss);
+          persist();
+          out += `\n💀 *${boss}* überwältigt dich! Du entkommst nur knapp, bevor sich das Tor schließt.\n`;
+          out += `📉 -${goldLoss} Gold verloren. Das nächste Gate braucht länger, um sich zu öffnen (${fmtDuration(RED_GATE_COOLDOWN_MS)}).\n${divider}`;
+          await send(out);
+          return true;
+        }
+
+        h.gateCooldownUntil = now + GATE_COOLDOWN_MS;
+        const expGain = randInt(120, 220);
+        const goldGain = randInt(250, 500);
+        const leveledUp = addExp(h, expGain);
+        h.gold = (h.gold || 0) + goldGain;
+        h.pendingExtraction = { bossName: boss, tier: 'Rot', expiresAt: now + EXTRACT_WINDOW_MS };
+
+        out += `\n🏆 *${boss}* fällt! Das Rote Tor bricht zusammen und gibt dich frei.\n`;
+        out += `✨ +${expGain} EXP  💰 +${goldGain} Gold\n`;
+        out += `🌑 Ein besonders mächtiger Schatten hat sich vom Boss gelöst... Nutze *?extract* innerhalb von 5 Minuten!\n`;
+
+        if (leveledUp) {
+          const newRank = rankForLevel(h.level);
+          out += `\n🎉 *LEVEL UP!* Du bist jetzt Level ${h.level} (${newRank.label})! +3 Statuspunkte.\n`;
+        }
+
+        persist();
+        out += divider;
+        await send(out);
+        return true;
+      }
+
+      // ================= NORMALES GATE =================
+      const { tier, wasBoosted } = pickGateTier(h.level, Math.random);
+      const { total: cp, shadowContribution } = gateEffectivePower(h);
+      const tierIdx = GATE_TIERS.indexOf(tier);
+      const difficulty = 40 + (tierIdx * 25) + randInt(-15, 15);
       const monster = tier.monsters[randInt(0, tier.monsters.length - 1)];
 
       let out = `🚪 *— ${tier.label} BETRETEN —* 🚪\n${divider}\n`;
+      if (wasBoosted) {
+        out += `⚠️ Dieses Gate ist stärker, als dein Level eigentlich hergibt!\n`;
+      }
       out += `Du dringst tiefer in den Nebel vor... ein *${monster}* stellt sich dir in den Weg!\n\n`;
+      if (shadowContribution > 0) {
+        out += `🌑 Deine Schatten unterstützen dich im Kampf! (+${Math.round(shadowContribution)} Kampfkraft)\n\n`;
+      }
 
       const winChance = Math.min(0.92, Math.max(0.15, cp / (cp + difficulty)));
       const won = Math.random() < winChance;
@@ -316,8 +432,8 @@ export function createSoloLevelingSystem(DATA_PATH) {
         return true;
       }
 
-      const expGain = randInt(20, 40) + GATE_TIERS.indexOf(tier) * 15;
-      const goldGain = randInt(30, 90) + GATE_TIERS.indexOf(tier) * 20;
+      const expGain = randInt(20, 40) + tierIdx * 15;
+      const goldGain = randInt(30, 90) + tierIdx * 20;
       const leveledUp = addExp(h, expGain);
       h.gold = (h.gold || 0) + goldGain;
 
@@ -330,8 +446,8 @@ export function createSoloLevelingSystem(DATA_PATH) {
         const bossWon = Math.random() < bossWinChance;
         out += `\n👹 Der Gate-Boss *${tier.boss}* erscheint!\n`;
         if (bossWon) {
-          const bossExp = randInt(50, 90) + GATE_TIERS.indexOf(tier) * 25;
-          const bossGold = randInt(80, 200) + GATE_TIERS.indexOf(tier) * 40;
+          const bossExp = randInt(50, 90) + tierIdx * 25;
+          const bossGold = randInt(80, 200) + tierIdx * 40;
           addExp(h, bossExp);
           h.gold += bossGold;
           h.pendingExtraction = { bossName: tier.boss, tier: tier.key, expiresAt: now + EXTRACT_WINDOW_MS };
@@ -363,7 +479,8 @@ export function createSoloLevelingSystem(DATA_PATH) {
         return true;
       }
 
-      const extractChance = 0.55;
+      const isRed = pending.tier === 'Rot';
+      const extractChance = isRed ? 0.4 : 0.55;
       const success = Math.random() < extractChance;
       h.pendingExtraction = null;
 
@@ -374,7 +491,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
       }
 
       const template = SHADOW_NAMES[randInt(0, SHADOW_NAMES.length - 1)];
-      const powerBonus = randInt(0, 6);
+      const powerBonus = isRed ? randInt(10, 25) : randInt(0, 6);
       const shadow = {
         id: `sh_${Date.now()}_${randInt(100, 999)}`,
         name: template.name,
@@ -419,9 +536,11 @@ export function createSoloLevelingSystem(DATA_PATH) {
         .sort((a, b) => b.power - a.power)
         .map((s, i) => `${i + 1}. ${s.name} — ⚔️ ${s.power} (aus: ${s.origin})`);
       const totalPower = h.shadows.reduce((sum, s) => sum + s.power, 0);
+      const { shadowContribution } = gateEffectivePower(h);
       await send(
         `🌑 *— DEINE SCHATTEN-ARMEE —* 🌑\n${divider}\n${lines.join('\n')}\n${divider}\n` +
-        `Gesamtkraft der Armee: ${totalPower}`
+        `Gesamtkraft der Armee: ${totalPower}\n` +
+        `Bonus im Gate-Kampf: +${Math.round(shadowContribution)} Kampfkraft`
       );
       return true;
     }
@@ -520,11 +639,15 @@ export function createSoloLevelingSystem(DATA_PATH) {
     `?awaken — als Hunter erwachen\n` +
     `?hunterinfo — dein System-Fenster (Stats, Rang, Schatten)\n` +
     `?statpoint <str|agi|vit|int|per> <n> — Statuspunkte verteilen\n` +
-    `?gate — ein Gate betreten (Kampf, Loot, Boss-Chance)\n` +
+    `?gate — ein Gate betreten (Kampf, Loot, Boss-Chance, seltenes 🔴 Rotes Tor)\n` +
     `?extract — Schatten eines besiegten Bosses extrahieren\n` +
-    `?shadows — deine Schatten-Armee ansehen\n` +
+    `?shadows — deine Schatten-Armee ansehen (inkl. Gate-Kampfbonus)\n` +
     `?dailyquest — tägliche Systemaufgabe (Vorsicht bei Strafquests!)\n` +
     `?hunterrank — Hunter-Rangliste nach Kampfkraft\n` +
+    `${divider}\n` +
+    `🌑 Deine Schatten-Armee kämpft bei jedem Gate aktiv mit und erhöht deine Sieg-Chance.\n` +
+    `⚠️ Gelegentlich erscheinen Gates, die stärker sind als dein Level – riskant, aber lohnend.\n` +
+    `🔴 Ab Level ${RED_GATE_MIN_LEVEL} kann selten ein Rotes Tor auftauchen: hohes Risiko, hohe Belohnung, garantierter Boss.\n` +
     `${divider}`;
 
   return { handle, SL_COMMANDS, SL_HELP_TEXT };
