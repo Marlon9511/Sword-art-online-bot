@@ -1,30 +1,11 @@
 import TelegramBot from 'node-telegram-bot-api';
 
-// ============================================================
-// telegram-connect.js
-// Steuert BELIEBIG VIELE WhatsApp-Sessions (Pairing-Code / QR-Code)
-// über Telegram — kein eigenes Befehlssystem, keine eigene
-// Economy. Nur du (Owner) kannst damit interagieren.
-//
-// SETUP:
-// 1. npm install node-telegram-bot-api
-// 2. Umgebungsvariablen setzen (NICHT hart in den Code schreiben):
-//      TELEGRAM_BOT_TOKEN=dein_bot_token
-//      OWNER_TELEGRAM_ID=deine_eigene_telegram_user_id
-//    -> Deine Telegram-User-ID bekommst du z.B. von @userinfobot
-// 3. Start z.B. mit: node --env-file=.env index.js
-//
-// WICHTIG: index.js muss beim Start initTelegramConnect(sessionManager)
-// mit einem sessionManager-Objekt aufrufen (siehe unten im Kommentar
-// am Ende der Datei für ein Beispiel, wie das aussehen muss).
-// ============================================================
-
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8614468465:AAHP7693iiKX56Sp-9TRNa3q2gGMBXOQ-ms';
 const OWNER_TELEGRAM_ID = process.env.OWNER_TELEGRAM_ID ? Number(process.env.OWNER_TELEGRAM_ID) : 8598584607;
 
 let telegramBot = null;
 let sessionManager = null;
-let activeSock = null; // optional: "aktuell aktive" Session, falls index.js das braucht
+let activeSock = null;
 
 function isOwnerChat(msg) {
   return OWNER_TELEGRAM_ID && msg.from && msg.from.id === OWNER_TELEGRAM_ID;
@@ -38,14 +19,6 @@ function requireManager(chatId) {
   return true;
 }
 
-/**
- * @param {object} manager - Muss folgende Methoden bereitstellen:
- *   - startSession(name, hooks) -> Promise<sock>   // hooks: { onQr(qrBuffer), onOpen(jid) }
- *   - getSession(name) -> sock | undefined
- *   - listSessions() -> Array<{ name, connected, jid }>
- *   - stopSession(name) -> Promise<void>
- *   - deleteSession(name) -> Promise<void>          // stoppt + löscht Login-Daten
- */
 export function initTelegramConnect(manager) {
   sessionManager = manager || null;
 
@@ -75,7 +48,6 @@ export function initTelegramConnect(manager) {
       { parse_mode: 'Markdown' });
   });
 
-  // ---- Neue Session starten (QR-Code-Flow) ----
   telegramBot.onText(/\/newsession\s+(\S+)/, async (msg, match) => {
     if (!isOwnerChat(msg)) return telegramBot.sendMessage(msg.chat.id, '❌ Kein Zugriff.');
     if (!requireManager(msg.chat.id)) return;
@@ -111,7 +83,6 @@ export function initTelegramConnect(manager) {
     }
   });
 
-  // ---- Pairing-Code statt QR anfordern ----
   telegramBot.onText(/\/pair\s+(\S+)\s+(\d+)/, async (msg, match) => {
     if (!isOwnerChat(msg)) return telegramBot.sendMessage(msg.chat.id, '❌ Kein Zugriff.');
     if (!requireManager(msg.chat.id)) return;
@@ -120,7 +91,6 @@ export function initTelegramConnect(manager) {
     let sock = sessionManager.getSession(name);
     let justCreated = false;
 
-    // Falls die Session noch gar nicht existiert, gleich mit erstellen
     if (!sock) {
       telegramBot.sendMessage(msg.chat.id, `⏳ Session "${name}" existiert noch nicht — erstelle sie...`);
       try {
@@ -140,15 +110,10 @@ export function initTelegramConnect(manager) {
       return telegramBot.sendMessage(msg.chat.id, `✅ Session "${name}" ist bereits verbunden.`);
     }
 
-    // WICHTIG: Bei einem frisch erstellten Socket ist der WebSocket-Handshake
-    // noch nicht abgeschlossen. requestPairingCode() zu früh aufzurufen führt
-    // zu "Connection Closed". Kurz warten, bevor der Code angefordert wird —
-    // genau wie es die alte connectBot()-Funktion in index.js schon macht.
     if (justCreated) {
       await new Promise(resolve => setTimeout(resolve, 3000));
     }
 
-    // Bis zu 3 Versuche, falls die Verbindung beim ersten Mal noch nicht bereit war
     const maxAttempts = 3;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
@@ -169,7 +134,6 @@ export function initTelegramConnect(manager) {
     }
   });
 
-  // ---- Alle Sessions auflisten ----
   telegramBot.onText(/\/sessions/, (msg) => {
     if (!isOwnerChat(msg)) return;
     if (!requireManager(msg.chat.id)) return;
@@ -182,7 +146,6 @@ export function initTelegramConnect(manager) {
     telegramBot.sendMessage(msg.chat.id, `📋 *Aktive Sessions* (${list.length}):\n\n${text}`, { parse_mode: 'Markdown' });
   });
 
-  // ---- Status einer einzelnen Session ----
   telegramBot.onText(/\/status(?:\s+(\S+))?/, (msg, match) => {
     if (!isOwnerChat(msg)) return;
     if (!requireManager(msg.chat.id)) return;
@@ -202,7 +165,6 @@ export function initTelegramConnect(manager) {
       : `⚠️ "${name}" ist aktuell nicht verbunden.`);
   });
 
-  // ---- Session trennen (Login-Daten bleiben erhalten) ----
   telegramBot.onText(/\/unpair\s+(\S+)/, async (msg, match) => {
     if (!isOwnerChat(msg)) return telegramBot.sendMessage(msg.chat.id, '❌ Kein Zugriff.');
     if (!requireManager(msg.chat.id)) return;
@@ -219,7 +181,6 @@ export function initTelegramConnect(manager) {
     }
   });
 
-  // ---- Session komplett löschen (inkl. Login-Daten) ----
   telegramBot.onText(/\/deletesession\s+(\S+)/, async (msg, match) => {
     if (!isOwnerChat(msg)) return telegramBot.sendMessage(msg.chat.id, '❌ Kein Zugriff.');
     if (!requireManager(msg.chat.id)) return;
@@ -241,26 +202,14 @@ export function initTelegramConnect(manager) {
   return telegramBot;
 }
 
-/**
- * Setzt/aktualisiert die "aktive" WhatsApp-Session (sock-Referenz).
- * Nützlich, falls index.js eine Standard-/zuletzt verbundene Session
- * braucht, ohne jedes Mal den sessionManager abzufragen.
- */
 export function setActiveSock(sock) {
   activeSock = sock;
 }
 
-/**
- * Gibt die aktuell gesetzte "aktive" Session zurück (oder null).
- */
 export function getActiveSock() {
   return activeSock;
 }
 
-/**
- * Optional: Für Sonderfälle, in denen du außerhalb des normalen
- * startSession-Hooks einen QR-Code an Telegram schicken willst.
- */
 export async function sendQrToTelegram(qrBuffer, caption = '📱 WhatsApp QR-Code zum Scannen') {
   if (!telegramBot || !OWNER_TELEGRAM_ID) return;
   try {
