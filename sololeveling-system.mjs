@@ -110,6 +110,19 @@ export function createSoloLevelingSystem(DATA_PATH) {
   const persist = () => saveHunters(hunters);
   setInterval(persist, 60_000);
 
+  // ---------- Globale Einstellungen (z.B. Gruppen-Cooldown-Override) ----------
+  // Wird unter einem reservierten Key im selben JSON gespeichert. Kollidiert nicht
+  // mit echten Hunter-Einträgen, da deren Keys immer WhatsApp-JIDs sind.
+  function getSettings() {
+    if (!hunters._settings) hunters._settings = { noCooldownGroups: {} };
+    if (!hunters._settings.noCooldownGroups) hunters._settings.noCooldownGroups = {};
+    return hunters._settings;
+  }
+
+  function isGroupCooldownDisabled(groupJid) {
+    return !!getSettings().noCooldownGroups[groupJid];
+  }
+
   // ---------- Konfiguration ----------
 
   const RANKS = [
@@ -311,7 +324,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
 
   async function handle(ctx) {
     const {
-      cmd, args, sender, from, send, sock, users, ensureUser, normalizeJid,
+      cmd, args, sender, from, isGroup, send, sock, users, ensureUser, normalizeJid,
       getNumberMention, randInt, isPrimaryOwner
     } = ctx;
 
@@ -320,6 +333,8 @@ export function createSoloLevelingSystem(DATA_PATH) {
     const jid = normalizeJid(sender);
     if (ensureUser) ensureUser(jid);
     const ownerBypass = typeof isPrimaryOwner === 'function' && isPrimaryOwner(jid);
+    const groupBypass = !!(isGroup && from && isGroupCooldownDisabled(from));
+    const cooldownBypass = ownerBypass || groupBypass;
 
     // ---- AWAKEN ----
     if (cmd === 'awaken' || cmd === 'erwachen') {
@@ -339,6 +354,41 @@ export function createSoloLevelingSystem(DATA_PATH) {
         `und ?dailyquest für deine tägliche Systemaufgabe.\n${divider}`
       );
       return true;
+    }
+
+    // ---- SLCOOLDOWN — Gate-Cooldown für diese Gruppe an/aus (nur Owner) ----
+    if (cmd === 'slcooldown' || cmd === 'gatecooldown') {
+      if (!isGroup) {
+        return send('❌ Dieser Befehl funktioniert nur innerhalb einer Gruppe.');
+      }
+      if (!ownerBypass) {
+        return send('❌ Nur der Bot-Inhaber darf den Gate-Cooldown für eine Gruppe umschalten.');
+      }
+
+      const sub = (args[0] || '').toLowerCase();
+      const settings = getSettings();
+
+      if (!sub || sub === 'status') {
+        const active = isGroupCooldownDisabled(from);
+        return send(
+          `⏳ Gate-Cooldown in dieser Gruppe: ${active ? 'AUS ❌ (kein Cooldown für alle Hunter hier)' : 'AN ✅ (normaler Cooldown)'}\n` +
+          `Umschalten: ?slcooldown an | ?slcooldown aus`
+        );
+      }
+
+      if (sub === 'aus' || sub === 'off') {
+        settings.noCooldownGroups[from] = true;
+        persist();
+        return send('✅ Gate-Cooldown für diese Gruppe DEAKTIVIERT. Alle Hunter hier können ?gate ohne Wartezeit nutzen.');
+      }
+
+      if (sub === 'an' || sub === 'on') {
+        delete settings.noCooldownGroups[from];
+        persist();
+        return send('✅ Gate-Cooldown für diese Gruppe wieder AKTIVIERT (normale Wartezeit gilt wieder).');
+      }
+
+      return send('❌ Nutzung: ?slcooldown an | aus | status');
     }
 
     const h = hunters[jid];
@@ -397,7 +447,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
     // ---- GATE ----
     if (cmd === 'gate' || cmd === 'dungeon') {
       const now = Date.now();
-      if (!ownerBypass && now < (h.gateCooldownUntil || 0)) {
+      if (!cooldownBypass && now < (h.gateCooldownUntil || 0)) {
         await send(`⏳ Das nächste Gate öffnet sich in ${fmtDuration(h.gateCooldownUntil - now)}.`);
         return true;
       }
@@ -426,7 +476,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
         const won = Math.random() < winChance;
 
         if (!won) {
-          if (!ownerBypass) h.gateCooldownUntil = now + RED_GATE_COOLDOWN_MS;
+          if (!cooldownBypass) h.gateCooldownUntil = now + RED_GATE_COOLDOWN_MS;
           const goldLoss = randInt(60, 150);
           h.gold = Math.max(0, (h.gold || 0) - goldLoss);
           persist();
@@ -436,7 +486,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
           return true;
         }
 
-        if (!ownerBypass) h.gateCooldownUntil = now + GATE_COOLDOWN_MS;
+        if (!cooldownBypass) h.gateCooldownUntil = now + GATE_COOLDOWN_MS;
         const expGain = randInt(120, 220);
         const goldGain = randInt(250, 500);
         const leveledUp = addExp(h, expGain);
@@ -488,7 +538,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
       const winChance = Math.min(0.92, Math.max(0.15, cp / (cp + difficulty)));
       const won = Math.random() < winChance;
 
-      if (!ownerBypass) h.gateCooldownUntil = now + GATE_COOLDOWN_MS;
+      if (!cooldownBypass) h.gateCooldownUntil = now + GATE_COOLDOWN_MS;
 
       if (!won) {
         const goldLoss = randInt(10, 40);
@@ -805,6 +855,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
     'hunterequip', 'ausruesten',
     'dailyquest', 'tagesquest',
     'hunterrank', 'hunterleaderboard', 'jaegerrangliste',
+    'slcooldown', 'gatecooldown',
     'sololevelinghelp', 'jaegerhilfe'
   ];
 
@@ -822,6 +873,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
     `?hunterequip <code> — Waffe ausrüsten\n` +
     `?dailyquest — tägliche Systemaufgabe (Vorsicht bei Strafquests!)\n` +
     `?hunterrank — Hunter-Rangliste nach Kampfkraft\n` +
+    `?slcooldown an|aus|status — Gate-Cooldown für die Gruppe umschalten (nur Owner)\n` +
     `${divider}\n` +
     `🌑 Deine Schatten-Armee kämpft bei jedem Gate aktiv mit und erhöht deine Sieg-Chance.\n` +
     `🗡️ Waffen aus dem Laden erhöhen deine Kampfkraft dauerhaft, wenn ausgerüstet.\n` +
