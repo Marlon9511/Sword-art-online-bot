@@ -1,17 +1,6 @@
-// ============================================================
-// MENU-SYSTEM.MJS — Mehrschichtiges Hilfe-/Menü-System
-// Aufruf: {P}help / {P}menu [layer]
-// Beispiele: ?menu, ?menu owner, ?menu pokemon, ?menu arena, ?menu demonslayer, ?menu hunter
-// ============================================================
-
 export const MENU_COMMANDS = ['help', 'menu'];
 
 const DIVIDER = '⚔️┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈⚔️';
-
-// Jede Layer bekommt (ctx) übergeben und liefert einen fertigen Text-String zurück.
-// ctx enthält: PREFIX, isAuthorized, hasAdminPerms, sender,
-//              ARENA_HELP_TEXT, GUILD_HELP_TEXT, TITLE_HELP_TEXT, POKEMON_HELP_TEXT,
-//              GUILDWAR_HELP_TEXT, DS_HELP_TEXT, SL_HELP_TEXT
 
 function buildMainLayer(ctx) {
   const { PREFIX, sender, isAuthorized, hasAdminPerms } = ctx;
@@ -200,7 +189,7 @@ function buildChatLayer(ctx) {
 function buildSupportLayer(ctx) {
   const { PREFIX, sender, isAuthorized } = ctx;
   if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'MOD', 'SUPPORTER', 'TEST_SUPPORTER'])) {
-    return null; // Zugriff verweigert
+    return null;
   }
   let t = `🎫 *KNIGHTS OF THE BLOOD SUPPORT* (Ticket-System)\n${DIVIDER}\n`;
   t += `▸ ${PREFIX}support <nachricht> — Notfall-Ticket erstellen\n`;
@@ -226,7 +215,7 @@ function buildAdminLayer(ctx) {
 function buildOwnerLayer(ctx) {
   const { PREFIX, sender, hasAdminPerms } = ctx;
   if (!hasAdminPerms(sender)) {
-    return null; // Zugriff verweigert
+    return null;
   }
   let t = `👑 *SYSTEM ADMINISTRATOR* (Kayaba-Rechte)\n${DIVIDER}\n`;
   t += `▸ ${PREFIX}broadcast <text> — Serverweite Ansage an alle Gilden\n`;
@@ -249,7 +238,6 @@ function buildOwnerLayer(ctx) {
   return t;
 }
 
-// key -> { build, aliases }
 const LAYERS = {
   main:        { build: buildMainLayer,        aliases: [] },
   system:      { build: buildMainLayer,        aliases: ['start', 'basis'] },
@@ -277,8 +265,6 @@ function resolveLayerKey(input) {
   return null;
 }
 
-// Baut die Navigations-Buttons (als WhatsApp-Listenzeilen) für alle Ebenen,
-// die der jeweilige Nutzer öffnen darf.
 function buildNavRows(ctx) {
   const { activePrefix, PREFIX, sender, isAuthorized, hasAdminPerms } = ctx;
   const prefix = activePrefix || PREFIX;
@@ -317,8 +303,6 @@ function buildNavRows(ctx) {
 }
 
 export function createMenuSystem() {
-  // Baut den fertigen Menütext für die angeforderte Ebene.
-  // Gibt bei unbekannter/verwehrter Ebene ebenfalls einen sinnvollen Text zurück.
   function buildMenuText(ctx) {
     const requested = (ctx.args && ctx.args[0]) || '';
     const layerKey = resolveLayerKey(requested);
