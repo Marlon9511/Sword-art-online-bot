@@ -813,11 +813,13 @@ export function createSoloLevelingSystem(DATA_PATH) {
 
     // ---- LEADERBOARD ----
     if (cmd === 'hunterrank' || cmd === 'hunterleaderboard' || cmd === 'jaegerrangliste') {
-      const entries = Object.entries(hunters).sort((a, b) => {
-        const cpA = combatPower(a[1]);
-        const cpB = combatPower(b[1]);
-        return cpB - cpA;
-      }).slice(0, 10);
+      const entries = Object.entries(hunters)
+        .filter(([hjid]) => !hjid.startsWith('_'))
+        .sort((a, b) => {
+          const cpA = combatPower(a[1]);
+          const cpB = combatPower(b[1]);
+          return cpB - cpA;
+        }).slice(0, 10);
 
       if (!entries.length) {
         await send('📊 Es gibt noch keine erwachten Hunter.');
@@ -825,17 +827,15 @@ export function createSoloLevelingSystem(DATA_PATH) {
       }
 
       const medals = ['🥇', '🥈', '🥉'];
-      const lines = await Promise.all(entries.map(async ([hjid, hu], i) => {
-        const name = await getNumberMention(hjid, ctx.sock);
+      const lines = entries.map(([hjid, hu], i) => {
+        const u = users?.[hjid];
+        const name = u?.name || u?.registrationName || hjid.split('@')[0];
         const rank = rankForLevel(hu.level);
         const icon = medals[i] || `${i + 1}.`;
         return `${icon} ${name} — ${rank.label} | Lv.${hu.level} | ⚔️ ${combatPower(hu)}`;
-      }));
+      });
 
-      await send(
-        `🏆 *— HUNTER-RANGLISTE —* 🏆\n${divider}\n${lines.join('\n')}\n${divider}`,
-        { mentions: entries.map(([hjid]) => hjid) }
-      );
+      await send(`🏆 *— HUNTER-RANGLISTE —* 🏆\n${divider}\n${lines.join('\n')}\n${divider}`);
       return true;
     }
 
