@@ -1,8 +1,4 @@
-// web-owner.js
-// Owner-Dashboard-API: Nutzer verwalten, Ränge setzen, bannen/entbannen,
-// Coins/XP vergeben, Broadcasts senden.
-// Nutzt dieselben In-Memory-Objekte wie der Bot (users, ranks, bans),
-// damit Web und WhatsApp immer synchron bleiben.
+
 
 import express from 'express';
 
@@ -30,8 +26,7 @@ export function createOwnerRoutes({ users, ranks, bans, save, FILES, normalizeJi
     return rank === 'OWNER' || rank === 'COOWNER';
   }
 
-  // Jede Route hier erfordert: eingeloggt (authenticateToken, kommt aus index.js)
-  // UND Rang OWNER/COOWNER.
+  
   router.use((req, res, next) => {
     const entry = findUserByWebId(req.webId);
     if (!entry) return res.status(404).json({ success: false, error: 'Nutzer nicht gefunden.' });
@@ -133,7 +128,7 @@ export function createOwnerRoutes({ users, ranks, bans, save, FILES, normalizeJi
     return res.json({ success: true, jid: target, xp: users[target].xp });
   });
 
-  // ---- Broadcast an alle Gruppen einer Session ----
+  
   router.post('/broadcast', async (req, res) => {
     const { text, session } = req.body || {};
     if (!text || !text.trim()) return res.status(400).json({ success: false, error: 'text erforderlich.' });
