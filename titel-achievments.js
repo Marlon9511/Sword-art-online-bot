@@ -1,75 +1,3 @@
-/* =====================================================================
-   🎖️ SAO TITEL- & ACHIEVEMENT-SYSTEM — Modul
-   =====================================================================
-   Verwaltet: Freischaltbare Titel (?title), Erfolge/Meilensteine
-   (?achievements) und einen kosmetischen HP-Balken (?hpbar).
-
-   Speichert direkt in users[jid] (kein eigenes File nötig):
-     users[jid].unlockedTitles   -> string[] (Titel-IDs)
-     users[jid].activeTitle      -> string | null (Titel-ID)
-     users[jid].unlockedAchievements -> { [achievementId]: timestamp }
-     users[jid].showHpBar        -> boolean (Anzeige-Präferenz)
-
-   WICHTIG: Nutzt eure echten Stat-Felder aus dem Arena-System:
-     users[jid].duel.wins       -> Anzahl gewonnener Duelle
-     users[jid].duel.losses     -> Anzahl verlorener Duelle
-     users[jid].duel.fights     -> Gesamtanzahl Duelle
-     users[jid].duel.earnings   -> Netto-Coins aus Duellen
-     users[jid].duel.winStreak  -> aktuelle Siegesserie (NEU, optional)
-     users[jid].coins           -> aktuelle Coins (statt "gold")
-     users[jid].level           -> Level
-     users[jid].floor           -> aktuelle Etage/Floor
-
-   OPTIONALE FLAGS (von euch in anderen Modulen gesetzt, analog zu
-   __isOwner / __survivedLowHp / __isGuildLeader):
-     users[jid].__clearedGame        -> true, wenn Floor 100 gecleart wurde
-     users[jid].__isBetaTester       -> true für Beta-Test-Teilnehmer
-     users[jid].__soloClearedBoss    -> true, wenn ein Boss solo gelegt wurde
-     users[jid].__wonWithoutDamage   -> true, wenn ein Duell ohne Schaden gewonnen wurde
-     users[jid].__eventParticipant   -> true für Event-Teilnahme
-     users[jid].__isGuildLeader      -> true, wenn Gildenleiter (wird automatisch gesetzt)
-     users[jid].__perfectFloorClear  -> true, wenn eine Etage ohne Schaden gecleart wurde
-     users[jid].__speedCleared       -> true, wenn das Spiel in Rekordzeit gecleart wurde
-     users[jid].__defeatedRival      -> true, wenn ein festgelegter Rivale besiegt wurde
-     users[jid].__firstToClearFloor  -> true, wenn ein Spieler als Erster eine Etage cleart
-     users[jid].__allSkillsMaxed     -> true, wenn alle Skills maximiert wurden
-     users[jid].__itemCollectorComplete -> true, wenn alle seltenen Items gesammelt wurden
-     users[jid].__helpedNewbie       -> true, wenn einem neuen Spieler geholfen wurde
-     users[jid].__isMarried          -> true, wenn im Spiel geheiratet wurde
-
-   POKÉMON-FELDER (aus pokemon-system.mjs, users[jid].poke):
-     users[jid].poke.starter      -> string | null (Starter-Spezies-ID)
-     users[jid].poke.team         -> [{ uid, species, level, xp, nickname }]
-     users[jid].poke.dex          -> { [speciesId]: true } (Pokédex)
-     users[jid].poke.pokeballs    -> { pokeball, superball, meisterball }
-     users[jid].poke.secretCodes  -> string[] (eingelöste Geheimcodes)
-
-   OPTIONALE POKÉMON-ZÄHLER (analog zu den __flags oben, in
-   pokemon-system.mjs an den passenden Stellen hochzählen):
-     users[jid].poke.battleWins   -> Siege in ?pokebattle
-     users[jid].poke.battleFights -> Gesamtanzahl ?pokebattle-Kämpfe
-     users[jid].poke.evolutions   -> Anzahl erfolgreicher ?pokevolve-Aufrufe
-     users[jid].poke.trainings    -> Anzahl erfolgreicher ?poketrain-Aufrufe
-     users[jid].poke.ballsBought  -> Anzahl gekaufter Pokébälle (gesamt)
-   Fehlen diese Zähler, bleiben nur die betroffenen Titel dauerhaft
-   gesperrt — es gibt dadurch keinen Fehler.
-
-   Integration in andere Module:
-     - Nach Duellen, Level-Ups, Gilden-Gründung, Pokémon-Fängen,
-       -Kämpfen, -Entwicklungen etc. `checkProgress(ctx, jid)`
-       aufrufen. Neu freigeschaltete Titel/Erfolge werden automatisch
-       per ctx.send an den Spieler gemeldet.
-     - Für die Profilanzeige: users[jid].activeTitle -> TITLES.find(...)
-       um den Anzeigenamen zu bekommen.
-     - Für Duell-/Gear-Ausgaben: renderHpBar(current, max) importieren
-       und nur anzeigen, wenn users[jid].showHpBar !== false.
-     - Owner-Erkennung für den "Kayaba Akihiko"-Titel: übergib beim
-       Handler-Aufruf ctx.ownerJids = [OWNER_LID, OWNER_PRIV, ...]
-       (Array eurer Owner-JIDs/-Nummern aus index.js). Der Vergleich
-       läuft über die reine Rufnummer, also egal ob @lid oder
-       @s.whatsapp.net ankommt.
-   ===================================================================== */
-
 import { POKEMON_DB } from './pokemon-system.mjs'; // Pfad ggf. an euer Projekt anpassen
 
 export const TITLE_COMMANDS = [
@@ -84,9 +12,6 @@ export const TITLE_HELP_TEXT =
   `▸ {P}achievements — Deine Erfolge & Fortschritt anzeigen\n` +
   `▸ {P}hpbar — HP-Balken-Anzeige an/aus umschalten\n`;
 
-/* ---------------------------------------------------------------------
-   POKÉMON-HELFER — robust gegen fehlendes u.poke-Objekt
---------------------------------------------------------------------- */
 const dexCount = (u) => Object.keys(u.poke?.dex || {}).length;
 const teamCount = (u) => (u.poke?.team || []).length;
 const maxTeamLevel = (u) => (u.poke?.team || []).reduce((m, pk) => Math.max(m, pk.level || 0), 0);
@@ -95,12 +20,7 @@ const hasRarity = (u, rarity) =>
 const hasAnyOfType = (u, type) =>
   Object.keys(u.poke?.dex || {}).some((id) => POKEMON_DB[id]?.type === type);
 
-/* ---------------------------------------------------------------------
-   TITEL-DEFINITIONEN
-   check(u) bekommt das users[jid]-Objekt und gibt true/false zurück.
---------------------------------------------------------------------- */
 export const TITLES = [
-  // ---------- Einstieg / Level ----------
   {
     id: 'black_cat_rookie',
     name: 'Frischling von Aincrad',
@@ -157,8 +77,6 @@ export const TITLES = [
     desc: 'Erreiche Level 99.',
     check: (u) => (u.level || 1) >= 99
   },
-
-  // ---------- Duelle: Siege ----------
   {
     id: 'first_blood',
     name: 'Erstschlag',
@@ -215,8 +133,6 @@ export const TITLES = [
     desc: 'Gewinne 200 Duelle.',
     check: (u) => (u.duel?.wins || 0) >= 200
   },
-
-  // ---------- Duelle: Serien & Sonderleistungen ----------
   {
     id: 'undefeated',
     name: 'Unbesiegt',
@@ -273,8 +189,6 @@ export const TITLES = [
     desc: 'Gewinne ein Duell, ohne selbst Schaden zu nehmen.',
     check: (u) => u.__wonWithoutDamage === true
   },
-
-  // ---------- Wirtschaft ----------
   {
     id: 'gold_hoarder',
     name: 'Goldgräber',
@@ -317,8 +231,6 @@ export const TITLES = [
     desc: 'Verdiene netto 30.000 Coins allein durch Duelle.',
     check: (u) => (u.duel?.earnings || 0) >= 30000
   },
-
-  // ---------- Floor / Fortschritt ----------
   {
     id: 'front_liner',
     name: 'Frontkämpfer',
@@ -361,8 +273,6 @@ export const TITLES = [
     desc: 'Besiege einen Etagenboss im Alleingang.',
     check: (u) => u.__soloClearedBoss === true
   },
-
-  // ---------- Gilde ----------
   {
     id: 'guild_member',
     name: 'Gildenmitglied',
@@ -384,8 +294,6 @@ export const TITLES = [
     desc: 'Erreiche Level 25, ohne je einer Gilde beizutreten.',
     check: (u) => (u.level || 1) >= 25 && !u.guildId
   },
-
-  // ---------- Besondere / seltene Titel ----------
   {
     id: 'beta_tester',
     name: 'Beta-Tester',
@@ -414,12 +322,6 @@ export const TITLES = [
     desc: 'Der Schöpfer selbst. Exklusiv für den Bot-Owner.',
     check: (u) => u.__isOwner === true
   },
-
-  // =====================================================================
-  // ▼▼▼ NEUE TITEL (90) ▼▼▼
-  // =====================================================================
-
-  // ---------- Level (Zwischenstufen) ----------
   {
     id: 'level_1_newbie',
     name: 'Neuling in Aincrad',
@@ -539,8 +441,6 @@ export const TITLES = [
     desc: 'Erreiche Level 100.',
     check: (u) => (u.level || 1) >= 100
   },
-
-  // ---------- Duelle: weitere Sieg-Meilensteine ----------
   {
     id: 'duel_wins_5',
     name: 'Frischer Kämpfer',
@@ -618,8 +518,6 @@ export const TITLES = [
     desc: 'Gewinne 500 Duelle.',
     check: (u) => (u.duel?.wins || 0) >= 500
   },
-
-  // ---------- Duelle: Niederlagen ----------
   {
     id: 'duel_losses_1',
     name: 'Erste Niederlage',
@@ -662,8 +560,6 @@ export const TITLES = [
     desc: 'Verliere 100 Duelle.',
     check: (u) => (u.duel?.losses || 0) >= 100
   },
-
-  // ---------- Duelle: Gesamtanzahl ----------
   {
     id: 'duel_fights_10',
     name: 'Erste Kämpfe',
@@ -720,8 +616,6 @@ export const TITLES = [
     desc: 'Bestreite insgesamt 500 Duelle.',
     check: (u) => (u.duel?.fights || 0) >= 500
   },
-
-  // ---------- Duell-Einnahmen ----------
   {
     id: 'earnings_1000',
     name: 'Erste Beute',
@@ -771,8 +665,6 @@ export const TITLES = [
     desc: 'Verdiene netto 100.000 Coins allein durch Duelle.',
     check: (u) => (u.duel?.earnings || 0) >= 100000
   },
-
-  // ---------- Coins ----------
   {
     id: 'coins_500',
     name: 'Erstes Kapital',
@@ -829,8 +721,6 @@ export const TITLES = [
     desc: 'Besitze 1.000.000 Coins gleichzeitig.',
     check: (u) => (u.coins || 0) >= 1000000
   },
-
-  // ---------- Floor / Fortschritt ----------
   {
     id: 'floor_1',
     name: 'Erste Etage betreten',
@@ -887,8 +777,6 @@ export const TITLES = [
     desc: 'Erreiche Etage/Floor 95.',
     check: (u) => (u.floor || 1) >= 95
   },
-
-  // ---------- Gilde ----------
   {
     id: 'loyal_guild_member',
     name: 'Treues Gildenmitglied',
@@ -910,8 +798,6 @@ export const TITLES = [
     desc: 'Sei Gildenmitglied und gewinne 50 Duelle.',
     check: (u) => !!u.guildId && (u.duel?.wins || 0) >= 50
   },
-
-  // ---------- Kombinierte / seltene Titel ----------
   {
     id: 'true_champion',
     name: 'Wahrer Champion',
@@ -982,8 +868,6 @@ export const TITLES = [
     desc: 'Besitze 500.000 Coins und gewinne 200 Duelle.',
     check: (u) => (u.coins || 0) >= 500000 && (u.duel?.wins || 0) >= 200
   },
-
-  // ---------- Siegesserien ----------
   {
     id: 'win_streak_3',
     name: 'Serienschläger',
@@ -1012,8 +896,6 @@ export const TITLES = [
     desc: 'Gewinne 20 Duelle in Folge.',
     check: (u) => (u.duel?.winStreak || 0) >= 20
   },
-
-  // ---------- Weitere seltene / besondere Titel ----------
   {
     id: 'perfectionist',
     name: 'Perfektionist',
@@ -1070,12 +952,6 @@ export const TITLES = [
     desc: 'Heirate einen anderen Spieler im Spiel.',
     check: (u) => u.__isMarried === true
   },
-
-  // =====================================================================
-  // ▼▼▼ POKÉMON-TITEL ▼▼▼
-  // =====================================================================
-
-  // ---------- Einstieg ----------
   {
     id: 'poke_trainer',
     name: 'Taschenmonster-Trainer',
@@ -1111,8 +987,6 @@ export const TITLES = [
     desc: 'Fange dein erstes wildes Pokémon.',
     check: (u) => teamCount(u) >= 2
   },
-
-  // ---------- Team-Größe ----------
   {
     id: 'poke_team_3',
     name: 'Kleines Team',
@@ -1141,8 +1015,6 @@ export const TITLES = [
     desc: 'Habe 15 Pokémon im Team.',
     check: (u) => teamCount(u) >= 15
   },
-
-  // ---------- Pokédex ----------
   {
     id: 'poke_dex_5',
     name: 'Neugieriger Forscher',
@@ -1178,8 +1050,6 @@ export const TITLES = [
     desc: 'Entdecke alle Pokémon-Arten im Spiel.',
     check: (u) => dexCount(u) >= Object.keys(POKEMON_DB).length
   },
-
-  // ---------- Seltenheit ----------
   {
     id: 'poke_uncommon_catch',
     name: 'Glückspilz',
@@ -1230,8 +1100,6 @@ export const TITLES = [
     desc: 'Löse alle 4 bekannten Geheimcodes ein.',
     check: (u) => (u.poke?.secretCodes || []).length >= 4
   },
-
-  // ---------- Level ----------
   {
     id: 'poke_level_20',
     name: 'Vielversprechendes Talent',
@@ -1260,8 +1128,6 @@ export const TITLES = [
     desc: 'Habe ein Pokémon mit Level 100.',
     check: (u) => maxTeamLevel(u) >= 100
   },
-
-  // ---------- Entwicklung ----------
   {
     id: 'poke_fully_evolved_starter',
     name: 'Vollendeter Weggefährte',
@@ -1286,8 +1152,6 @@ export const TITLES = [
     desc: 'Entwickle insgesamt 10 Pokémon.',
     check: (u) => (u.poke?.evolutions || 0) >= 10
   },
-
-  // ---------- Bälle & Wirtschaft ----------
   {
     id: 'poke_master_ball',
     name: 'Meisterhafter Fänger',
@@ -1312,8 +1176,6 @@ export const TITLES = [
     desc: 'Kaufe insgesamt 50 Pokébälle.',
     check: (u) => (u.poke?.ballsBought || 0) >= 50
   },
-
-  // ---------- Training ----------
   {
     id: 'poke_dedicated_trainer',
     name: 'Fleißiger Trainer',
@@ -1328,8 +1190,6 @@ export const TITLES = [
     desc: 'Trainiere 50 Mal erfolgreich.',
     check: (u) => (u.poke?.trainings || 0) >= 50
   },
-
-  // ---------- PVP (?pokebattle) ----------
   {
     id: 'poke_first_battle_win',
     name: 'Erster Ringsieg',
@@ -1358,8 +1218,6 @@ export const TITLES = [
     desc: 'Bestreite 30 Pokémon-PVPs, egal ob Sieg oder Niederlage.',
     check: (u) => (u.poke?.battleFights || 0) >= 30
   },
-
-  // ---------- Typ-Sammlungen ----------
   {
     id: 'poke_dragon_tamer',
     name: 'Drachenbändiger',
@@ -1381,8 +1239,6 @@ export const TITLES = [
     desc: 'Entdecke ein Pokémon vom Typ Elektro.',
     check: (u) => hasAnyOfType(u, 'elektro')
   },
-
-  // ---------- Kombinierte / seltene Pokémon-Titel ----------
   {
     id: 'poke_true_champion',
     name: 'Wahrer Pokémon-Champion',
@@ -1401,9 +1257,6 @@ export const TITLES = [
   }
 ];
 
-/* ---------------------------------------------------------------------
-   ACHIEVEMENT-DEFINITIONEN
---------------------------------------------------------------------- */
 export const ACHIEVEMENTS = [
   {
     id: 'first_duel_win',
@@ -1517,8 +1370,6 @@ export const ACHIEVEMENTS = [
     desc: 'Gewinne 10 Duelle, ohne ein einziges zu verlieren.',
     check: (u) => (u.duel?.wins || 0) >= 10 && (u.duel?.losses || 0) === 0
   },
-
-  // ---------- Pokémon-Erfolge ----------
   {
     id: 'poke_starter_chosen',
     name: 'Neuer Weggefährte',
@@ -1549,11 +1400,6 @@ export const ACHIEVEMENTS = [
   }
 ];
 
-/* ---------------------------------------------------------------------
-   HP-BALKEN — rein kosmetische Darstellung, z.B. für ?gear oder
-   Duell-Ergebnisse. Einfach importieren und aufrufen:
-     renderHpBar(current, max)
---------------------------------------------------------------------- */
 export function renderHpBar(current, max, length = 10) {
   const safeMax = Math.max(1, max || 1);
   const safeCurrent = Math.max(0, Math.min(current ?? safeMax, safeMax));
@@ -1570,21 +1416,13 @@ export function renderHpBar(current, max, length = 10) {
   return `${bar} ${safeCurrent}/${safeMax} HP (${pct}%)`;
 }
 
-/* ---------------------------------------------------------------------
-   Extrahiert nur die reine Ziffernfolge aus einer JID, egal ob @lid,
-   @s.whatsapp.net oder mit :device-Suffix.
---------------------------------------------------------------------- */
+// Extrahiert nur die reine Ziffernfolge aus einer JID, egal ob @lid,
+// @s.whatsapp.net oder mit :device-Suffix.
 function extractRawNumberTitle(jid) {
   if (!jid) return null;
   return String(jid).split(':')[0].split('@')[0].replace(/[^0-9]/g, '') || null;
 }
 
-/* ---------------------------------------------------------------------
-   FORTSCHRITTS-CHECK — von anderen Modulen nach relevanten Events
-   aufrufen (Duell gewonnen, Level-Up, Gilde beigetreten, Pokémon
-   gefangen, entwickelt, PVP gekämpft, ...).
-   Schaltet automatisch neue Titel/Achievements frei und meldet sie.
---------------------------------------------------------------------- */
 export async function checkProgress(ctx, jid) {
   const { users, save, FILES, send } = ctx;
   const u = users[jid];
@@ -1593,12 +1431,10 @@ export async function checkProgress(ctx, jid) {
   if (!Array.isArray(u.unlockedTitles)) u.unlockedTitles = [];
   if (!u.unlockedAchievements || typeof u.unlockedAchievements !== 'object') u.unlockedAchievements = {};
 
-  // Hilfsflag für Gildenmeister-Titel
   if (ctx.guilds && u.guildId && ctx.guilds[u.guildId]) {
     u.__isGuildLeader = ctx.guilds[u.guildId].leader === jid;
   }
 
-  // Hilfsflag für den exklusiven "Kayaba Akihiko"-Titel (Bot-Owner).
   if (Array.isArray(ctx.ownerJids) && ctx.ownerJids.length) {
     const rawNum = extractRawNumberTitle(jid);
     u.__isOwner = !!rawNum && ctx.ownerJids.some(o => extractRawNumberTitle(o) === rawNum);
@@ -1662,10 +1498,8 @@ export function createTitleSystem() {
     if (!Array.isArray(u.unlockedTitles)) u.unlockedTitles = [];
     if (!u.unlockedAchievements || typeof u.unlockedAchievements !== 'object') u.unlockedAchievements = {};
 
-    // Bei jedem Aufruf still im Hintergrund prüfen, ob etwas nachzuholen ist
     await checkProgress(ctx, sender);
 
-    // ---------------- ?hpbar ----------------
     if (cmd === 'hpbar') {
       const sub = (args[0] || '').toLowerCase();
 
@@ -1702,7 +1536,6 @@ export function createTitleSystem() {
       return true;
     }
 
-    // ---------------- ?achievements ----------------
     if (cmd === 'achievements' || cmd === 'erfolge') {
       const total = ACHIEVEMENTS.length;
       const unlockedCount = Object.keys(u.unlockedAchievements).length;
@@ -1723,7 +1556,6 @@ export function createTitleSystem() {
       return true;
     }
 
-    // ---------------- ?title / ?titel ----------------
     const sub = (args[0] || '').toLowerCase();
 
     if (!sub) {
