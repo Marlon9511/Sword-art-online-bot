@@ -1,7 +1,4 @@
-// web-games.js
-// Spiele-API für die Website: Slots, Schere-Stein-Papier, Blackjack.
-// Arbeitet auf demselben "users"-Objekt wie der WhatsApp-Bot (gleiche Coins/XP/Level),
-// damit Web und WhatsApp konsistent bleiben.
+
 
 import express from 'express';
 
