@@ -1,38 +1,13 @@
-/* =====================================================================
-   ⚔️ SAO ARENA-SYSTEM — Modul
-   =====================================================================
-   Eigenständiges, komplett fertiges Modul. Verwaltet:
-   - Item-Datenbank (Waffen & Rüstungen, 5 Seltenheitsstufen + Secret)
-   - Lootboxen ("kiste" im Shop)
-   - Ausrüsten / Ablegen
-   - Verkaufen von Items
-   - PVP-Duelle mit Coin-Einsatz
-   - Arena-Leaderboard (meiste Siege)
-   - Floor-System (Aincrad-Fortschrittsanzeige)
-
-   Speichert alles direkt in eurem bestehenden users-Objekt
-   (users[jid].items, users[jid].equipped, users[jid].duel) — es werden
-   KEINE neuen JSON-Dateien gebraucht. Persistiert wird über euer
-   vorhandenes save(FILES.users, users).
-
-   Einbau in bot.js: siehe integration-patch.txt (nur 4 Zeilen nötig).
-   ===================================================================== */
-
-// ---------------------------------------------------------------------
-// Item-Datenbank
-// ---------------------------------------------------------------------
 export const RARITY_INFO = {
   common:    { label: 'Gewöhnlich',   emoji: '⚪', weight: 45 },
   uncommon:  { label: 'Ungewöhnlich', emoji: '🟢', weight: 30 },
   rare:      { label: 'Selten',       emoji: '🔵', weight: 15 },
   epic:      { label: 'Episch',       emoji: '🟣', weight: 8 },
   legendary: { label: 'Legendär',     emoji: '🟡', weight: 2 },
-  secret:    { label: 'Geheim',       emoji: '⚫', weight: 0 } // nie zufällig ziehbar, nur exklusiv vergeben
+  secret:    { label: 'Geheim',       emoji: '⚫', weight: 0 }
 };
 
-// type: 'weapon' | 'armor'
 export const ITEM_DB = {
-  // ---- WAFFEN ----
   w_common_1:    { name: 'Rostiges Schwert',        type: 'weapon', rarity: 'common',    power: 8 },
   w_common_2:    { name: 'Holzstab',                type: 'weapon', rarity: 'common',    power: 6 },
   w_common_3:    { name: 'Alter Dolch',             type: 'weapon', rarity: 'common',    power: 7 },
@@ -49,7 +24,6 @@ export const ITEM_DB = {
   w_legendary_2: { name: 'Dark Repulser',           type: 'weapon', rarity: 'legendary', power: 68 },
   w_legendary_3: { name: 'Lambent Light',           type: 'weapon', rarity: 'legendary', power: 66 },
 
-  // ---- RÜSTUNGEN ----
   a_common_1:    { name: 'Lederrüstung',            type: 'armor',  rarity: 'common',    power: 8 },
   a_common_2:    { name: 'Stoffmantel',             type: 'armor',  rarity: 'common',    power: 6 },
   a_common_3:    { name: 'Einfacher Schild',        type: 'armor',  rarity: 'common',    power: 7 },
@@ -66,8 +40,6 @@ export const ITEM_DB = {
   a_legendary_2: { name: 'Rune des Kobold-Königs',  type: 'armor',  rarity: 'legendary', power: 68 },
   a_legendary_3: { name: 'Himmlischer Panzer',      type: 'armor',  rarity: 'legendary', power: 66 },
 
-  // ---- SECRET-POOL (via {P}openkiste mit 1:1000-Chance, keine Anzeige in {P}arenaitems) ----
-  // Bei einem Secret-Treffer wird zufällig EINES dieser Items vergeben.
   w_secret_dualblades: {
     name: 'Holzstab',
     trueName: 'Kiritos Doppelklingen (Dual Blades)',
@@ -149,7 +121,6 @@ export const ITEM_DB = {
     secret: true
   },
 
-  // ---- EXCALIBUR — ausschließlich für den Haupt-Owner, niemals via Kiste/Shop erhältlich ----
   w_excalibur: {
     name: 'Excalibur',
     trueName: 'Das Schwert des Systemadministrators',
@@ -160,9 +131,6 @@ export const ITEM_DB = {
     ownerOnly: true
   },
 
-// ---- RAGNAROK — Event-exklusive Waffe, NUR über Clan-Boss-Events erhältlich ----
-  // Kann nicht gekauft, gefunden oder über Kisten erhalten werden.
-  // Wird ausschließlich vom Boss-Event-System vergeben (siehe guildboss-event.mjs).
   w_ragnarok: {
     name: 'Ragnarok',
     trueName: 'Ragnarok — Die Klinge der Götterdämmerung',
@@ -170,11 +138,9 @@ export const ITEM_DB = {
     rarity: 'secret',
     power: 200,
     secret: true,
-    eventOnly: true,      // kann nicht via Kiste/Shop/Duell-Gegner erhalten werden
-    bossBonus: 0.75        // +75% ZUSÄTZLICHER Bonus, aber NUR im Clan-Boss-Kampf
+    eventOnly: true,
+    bossBonus: 0.75
   },
-  // ---- AEGIS DES SYSTEMADMINISTRATORS — Rüstungs-Pendant zu Excalibur,
-  // ausschließlich für den Haupt-Owner, niemals via Kiste/Shop erhältlich ----
   a_aegis: {
     name: 'Aegis des Systemadministrators',
     trueName: 'Der unzerbrechliche Schild-Mantel von Kayaba Akihiko',
@@ -186,14 +152,11 @@ export const ITEM_DB = {
   }
 };
 
-// Feste Referenz auf das "klassische" Secret-Item (weiterhin für ?kiritossecret genutzt)
 export const SECRET_ITEM_ID = 'w_secret_dualblades';
 export const EXCALIBUR_ITEM_ID = 'w_excalibur';
 export const AEGIS_ITEM_ID = 'a_aegis';
 export const RAGNAROK_ITEM_ID = 'w_ragnarok';
 
-// Pool aller Secret-Items, die per Kiste (1:1000) fallen können.
-// ownerOnly-Items (Excalibur) sind hiervon immer ausgeschlossen.
 export const SECRET_POOL = Object.keys(ITEM_DB).filter(
   (id) => ITEM_DB[id].secret && !ITEM_DB[id].ownerOnly && !ITEM_DB[id].eventOnly
 );
@@ -204,9 +167,6 @@ export const ARENA_SHOP_ITEM = {
   desc: '⚔️ SAO-Ausrüstungskiste: zufällige Waffe oder Rüstung'
 };
 
-// ---------------------------------------------------------------------
-// Verkaufspreise (nach Seltenheit). Secret-Items bringen einen Aufschlag.
-// ---------------------------------------------------------------------
 export const SELL_PRICES = {
   common: 50,
   uncommon: 150,
@@ -244,11 +204,8 @@ export const ARENA_HELP_TEXT =
   `▸ {P}floor — Deinen Floor-Fortschritt in Aincrad anzeigen\n` +
   `_Es gibt außerdem geheime Ausrüstung, die niemand kennt, bis sie gefunden wird..._\n`;
 
-// ---------------------------------------------------------------------
-// Fabrikfunktion — erstellt eine unabhängige Arena-Instanz.
-// ---------------------------------------------------------------------
 export function createArenaSystem() {
-  const pendingDuels = new Map(); // targetJid -> { from, bet, at }
+  const pendingDuels = new Map();
 
   function ensureArenaFields(users, jid) {
     if (!users[jid]) return;
@@ -356,7 +313,6 @@ export function createArenaSystem() {
         const resolved = await getNumberMention(jid, sock);
         if (resolved) return resolved.startsWith('@') ? resolved : `@${resolved}`;
       } catch {
-        // Fällt unten auf den Rohtext zurück, falls Auflösung fehlschlägt
       }
     }
     return `@${jid.split('@')[0]}`;
@@ -369,7 +325,6 @@ export function createArenaSystem() {
       getNumberMention, randInt, sleep, activePrefix, isPrimaryOwner
     } = ctx;
 
-    // ---------- FLOOR-SYSTEM ----------
     if (cmd === 'floor' || cmd === 'etage') {
       ensureUser(sender);
       const u = users[sender];
@@ -404,7 +359,6 @@ export function createArenaSystem() {
       return true;
     }
 
-    // ---------- ARENA-ITEMS (öffentliche Item-Übersicht, ohne Secrets) ----------
     if (cmd === 'arenaitems' || cmd === 'itemliste') {
       const order = ['legendary', 'epic', 'rare', 'uncommon', 'common'];
       let out = `⚔️ *— ARENA-ITEMS —* ⚔️\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n`;
@@ -426,7 +380,6 @@ export function createArenaSystem() {
       return true;
     }
 
-    // ---------- GEHEIMER OWNER-BEFEHL: Secret-Item verleihen (Dual Blades) ----------
     if (cmd === 'kiritossecret') {
       ensureUser(sender);
       const senderRank = users[sender]?.rank || 'USER';
@@ -465,14 +418,9 @@ export function createArenaSystem() {
       return true;
     }
 
-    // ---------- EXCALIBUR — exklusiv für den Haupt-Owner, keine Vergabe an andere ----------
     if (cmd === 'excalibur') {
-      // Harte Sperre: nur der/die im Code hinterlegte(n) Haupt-Owner
-      // (isPrimaryOwner kommt aus index.js und prüft gegen OWNER_LID/OWNER_PRIV,
-      // NICHT gegen den vergebbaren "OWNER"-Rang, damit das niemand über
-      // ?setrole umgehen kann).
       if (typeof isPrimaryOwner !== 'function' || !isPrimaryOwner(sender)) {
-        return false; // tut so, als gäbe es den Befehl nicht
+        return false;
       }
 
       ensureUser(sender);
@@ -497,12 +445,9 @@ export function createArenaSystem() {
       return true;
     }
 
-    // ---------- AEGIS — exklusiv für den Haupt-Owner, keine Vergabe an andere ----------
     if (cmd === 'aegis') {
-      // Gleiche harte Sperre wie bei Excalibur: nur der im Code hinterlegte
-      // Haupt-Owner (isPrimaryOwner), nicht der vergebbare "OWNER"-Rang.
       if (typeof isPrimaryOwner !== 'function' || !isPrimaryOwner(sender)) {
-        return false; // tut so, als gäbe es den Befehl nicht
+        return false;
       }
 
       ensureUser(sender);
@@ -527,7 +472,6 @@ export function createArenaSystem() {
       return true;
     }
 
-    // ---------- KISTE ÖFFNEN ----------
     if (cmd === 'openkiste' || cmd === 'kisteoeffnen' || cmd === 'openbox') {
       ensureUser(sender);
       ensureArenaFields(users, sender);
@@ -539,11 +483,7 @@ export function createArenaSystem() {
       users[sender].items.kiste -= 1;
       if (users[sender].items.kiste <= 0) delete users[sender].items.kiste;
 
-      // Secret-Items: 1:1000-Chance (0,1%) bei jedem Kisten-Öffnen.
-      // Bei Treffer wird eines der Secret-Items aus SECRET_POOL zufällig vergeben.
-      // Excalibur ist hiervon NICHT betroffen — es wird nie über die
-      // Kiste ausgegeben, nur exklusiv über ?excalibur an den Owner.
-      const SECRET_DROP_CHANCE_PERCENT = 0.1; // 1 zu 1000
+      const SECRET_DROP_CHANCE_PERCENT = 0.1;
       const isSecretDrop = Math.random() * 100 < SECRET_DROP_CHANCE_PERCENT;
 
       const itemId = isSecretDrop ? rollSecretItem(randInt) : rollBoxItem(randInt);
@@ -584,7 +524,6 @@ export function createArenaSystem() {
       return true;
     }
 
-    // ---------- AUSRÜSTUNG ANZEIGEN ----------
     if (cmd === 'gear' || cmd === 'ausruestung' || cmd === 'equipment') {
       ensureUser(sender);
       ensureArenaFields(users, sender);
@@ -611,7 +550,6 @@ export function createArenaSystem() {
       return true;
     }
 
-    // ---------- AUSRÜSTEN ----------
     if (cmd === 'equip') {
       ensureUser(sender);
       ensureArenaFields(users, sender);
@@ -622,9 +560,6 @@ export function createArenaSystem() {
         return true;
       }
 
-      // Excalibur darf niemand ausrüsten, der es nicht besitzt UND selbst
-      // wenn es (technisch) im Inventar landen würde, ist es weiterhin
-      // an den Haupt-Owner gebunden.
       if (it.ownerOnly && (typeof isPrimaryOwner !== 'function' || !isPrimaryOwner(sender))) {
         await send('❌ Diese Waffe kannst du nicht führen.');
         return true;
@@ -644,7 +579,6 @@ export function createArenaSystem() {
       return true;
     }
 
-    // ---------- ABLEGEN ----------
     if (cmd === 'unequip') {
       ensureUser(sender);
       ensureArenaFields(users, sender);
@@ -660,7 +594,6 @@ export function createArenaSystem() {
       return true;
     }
 
-    // ---------- VERKAUFEN ----------
     if (cmd === 'sell' || cmd === 'verkaufen') {
       ensureUser(sender);
       ensureArenaFields(users, sender);
@@ -694,8 +627,6 @@ export function createArenaSystem() {
       if (isNaN(amount) || amount < 1) amount = 1;
       amount = Math.min(amount, owned);
 
-      // Wenn das Item aktuell ausgerüstet ist und ALLE Exemplare verkauft würden,
-      // muss zuerst abgelegt werden.
       if ((isEquippedWeapon || isEquippedArmor) && amount >= owned) {
         await send(
           `❌ Du kannst dein ausgerüstetes Item nicht (vollständig) verkaufen.\n` +
@@ -723,7 +654,6 @@ export function createArenaSystem() {
       return true;
     }
 
-    // ---------- DUELL ----------
     if (cmd === 'duell' || cmd === 'duel') {
       const sub = (args[0] || '').toLowerCase();
 
@@ -861,7 +791,6 @@ export function createArenaSystem() {
       return true;
     }
 
-    // ---------- ARENA-LEADERBOARD ----------
     if (cmd === 'arena' || cmd === 'duelleaderboard' || cmd === 'kampfrangliste') {
       const entries = Object.entries(users).filter(([jid, u]) => u?.duel && u.duel.fights > 0);
       if (!entries.length) {
@@ -887,7 +816,7 @@ export function createArenaSystem() {
       return true;
     }
 
-    return false; // nicht von der Arena behandelt
+    return false;
   }
 
   return { handle, ensureArenaFields, getBattleStats, simulateDuel, rollBoxItem, rollSecretItem, formatItemLine, mentionText };
