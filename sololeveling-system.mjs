@@ -1,23 +1,3 @@
-// ============================================================
-// sololeveling-system.mjs
-// Hunter-/Gate-/Schatten-Armee-System (inspiriert von "Solo Leveling")
-// Folgt dem selben Muster wie arena-system.mjs / guildboss-event.mjs:
-//   createSoloLevelingSystem(DATA_PATH) -> { handle, SL_COMMANDS, SL_HELP_TEXT }
-// Persistiert eigenständig in DATA_PATH/sololeveling.json
-//
-// NEU (diese Version):
-//   - Schatten-Armee zählt jetzt sichtbar & spürbar im Gate-Kampf mit
-//     (eigener Bonus auf Sieg-Chance, nicht nur auf die Kampfkraft-Zahl).
-//   - Es können jetzt auch höhere Gates auftauchen, als das eigene Level
-//     eigentlich hergibt ("Überraschungs-Gate") – riskanter, aber lohnender.
-//   - Neu: 🔴 Rotes Tor (Red Gate) – seltenes, isoliertes Spezial-Gate mit
-//     deutlich höherem Risiko & höherer Belohnung, garantiertem Boss und
-//     Gefahr, "eingeschlossen" zu werden, wenn man verliert.
-//
-// Bei erfolgreicher Schatten-Extraktion (?extract / ?arise) wird
-// zusätzlich zur Textnachricht ein fester Sound (von GitHub geladen) als
-// WhatsApp-Sprachnachricht (PTT) verschickt.
-// ============================================================
 
 import fs from 'fs';
 import path from 'path';
@@ -31,22 +11,16 @@ const __dirname = path.dirname(__filename);
 export function createSoloLevelingSystem(DATA_PATH) {
   const FILE_PATH = path.join(DATA_PATH, 'sololeveling.json');
 
-  // ---------- ARISE-Sound (Datei aus deinem GitHub-Repo -> Sprachnachricht) ----------
-  // ⚠️ Hier den RAW-Link zu deiner hochgeladenen Audiodatei eintragen.
-  // Wichtig: es muss der "raw" Link sein (nicht der normale github.com/.../blob/... Link)!
-  // Beispiel: Datei liegt im Repo unter /assets/arise.mp3 auf dem Branch "main":
-  //   https://raw.githubusercontent.com/<dein-user>/<dein-repo>/main/assets/arise.mp3
-  const ARISE_SOUND_URL = 'https://raw.githubusercontent.com/Marlon9511/Sword-art-online-bot/main/AUD-20260814-WA0954.mp3'; // <-- ggf. Ordner ergänzen, falls die Datei nicht im Repo-Root liegt
+ 
+  const ARISE_SOUND_URL = 'https://raw.githubusercontent.com/Marlon9511/Sword-art-online-bot/main/AUD-20260814-WA0954.mp3'; 
 
   const ARISE_CACHE_DIR = path.join(__dirname, 'cache', 'sololeveling-arise');
-  // Dateiendung wird automatisch aus der URL übernommen (z.B. .mp3, .ogg, .m4a, .wav ...)
+  
   const ARISE_SOURCE_EXT = (path.extname(new URL(ARISE_SOUND_URL).pathname) || '.mp3').toLowerCase();
   const ARISE_SOURCE_PATH = path.join(ARISE_CACHE_DIR, `arise-source${ARISE_SOURCE_EXT}`);
   const ARISE_OGG_PATH = path.join(ARISE_CACHE_DIR, 'arise.ogg');
 
-  // Lädt die Audiodatei einmalig von GitHub herunter und cached sie lokal.
-  // Wenn du die Datei im Repo aktualisierst, musst du den lokalen Cache-Ordner
-  // (cache/sololeveling-arise) manuell leeren, damit die neue Version geladen wird.
+  
   async function downloadAriseSourceIfNeeded() {
     if (fs.existsSync(ARISE_SOURCE_PATH)) return ARISE_SOURCE_PATH;
     fs.mkdirSync(ARISE_CACHE_DIR, { recursive: true });
@@ -67,8 +41,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
   function convertToOggOpusIfNeeded(sourcePath) {
     return new Promise((resolve, reject) => {
       if (fs.existsSync(ARISE_OGG_PATH)) return resolve(ARISE_OGG_PATH);
-      // -c:a libopus + .ogg-Container = das Format, das WhatsApp für
-      // "echte" Sprachnachrichten (ptt: true) mit Wellenform-Anzeige erwartet.
+      
       const cmd = `ffmpeg -y -i "${sourcePath}" -c:a libopus -b:a 64k -vn "${ARISE_OGG_PATH}"`;
       exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
         if (err) return reject(err);
@@ -110,9 +83,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
   const persist = () => saveHunters(hunters);
   setInterval(persist, 60_000);
 
-  // ---------- Globale Einstellungen (z.B. Gruppen-Cooldown-Override) ----------
-  // Wird unter einem reservierten Key im selben JSON gespeichert. Kollidiert nicht
-  // mit echten Hunter-Einträgen, da deren Keys immer WhatsApp-JIDs sind.
+  
   function getSettings() {
     if (!hunters._settings) hunters._settings = { noCooldownGroups: {} };
     if (!hunters._settings.noCooldownGroups) hunters._settings.noCooldownGroups = {};
@@ -152,10 +123,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
     { key: 'S', label: 'S-Rang Gate', minLevel: 68, maxLevel: 999, monsters: ['Drachenritter', 'Titan der Tiefe', 'Alptraumherold'], boss: 'Monarch der Verwüstung' }
   ];
 
-  // Chance, dass pro ?gate-Versuch ein Tier über dem eigentlich für das
-  // Level vorgesehenen Gate erscheint ("Überraschungs-Gate"). Wird pro
-  // Stufe erneut gewürfelt, kann sich also theoretisch mehrfach hochschaukeln.
-  const HIGHER_GATE_CHANCE = 0.16;
+ 
 
   function baseGateTierIndexForLevel(level) {
     let idx = 0;
@@ -165,9 +133,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
     return idx;
   }
 
-  // Wählt das Gate für diesen Versuch: Grundlage ist das Level, aber mit
-  // steigender (aber abnehmender) Wahrscheinlichkeit kann auch ein höheres,
-  // eigentlich noch "zu starkes" Gate auftauchen.
+  
   function pickGateTier(level, randFn) {
     let idx = baseGateTierIndexForLevel(level);
     while (idx < GATE_TIERS.length - 1 && randFn() < HIGHER_GATE_CHANCE) {
@@ -207,7 +173,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
   const RED_GATE_BOSSES = ['Blutmond-Ogerfürst', 'Verschlungener Wächter', 'Herold des Roten Tores', 'Abyssaler Flammenkoloss'];
 
   // ---------- Waffen ----------
-  // Normale Waffen: jederzeit im Waffenladen kaufbar (?huntershop / ?buyweapon).
+  
   const SHOP_WEAPONS = [
     { key: 'rostiges_schwert', name: 'Rostiges Schwert', price: 50, power: 8, rarity: 'Gewöhnlich' },
     { key: 'stahlschwert', name: 'Stahlschwert', price: 150, power: 18, rarity: 'Gewöhnlich' },
@@ -216,9 +182,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
     { key: 'runenschwert', name: 'Runenschwert', price: 1000, power: 65, rarity: 'Episch' }
   ];
 
-  // Seltene Waffen: NICHT im normalen Laden erhältlich, sondern nur bei
-  // einem "Schwarzhändler", der nach einem gewonnenen Roten Tor kurzzeitig
-  // erscheint (siehe pendingBlackMarket).
+  
   const RARE_WEAPONS = [
     { key: 'daemonenklinge', name: 'Dämonenklinge', price: 800, power: 90, rarity: 'Episch' },
     { key: 'frostfangschwert', name: 'Frostfangschwert', price: 1200, power: 120, rarity: 'Episch' },
@@ -280,7 +244,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
     return (h.shadows || []).reduce((sum, sh) => sum + sh.power, 0);
   }
 
-  // "Rohe" Kampfkraft-Anzeige (Stats + Level + Schatten + Waffe), wie gehabt.
+  
   function combatPower(h) {
     const s = h.stats;
     const shadowPower = shadowArmyPower(h);
@@ -290,14 +254,12 @@ export function createSoloLevelingSystem(DATA_PATH) {
     );
   }
 
-  // Kampfkraft für Gate-Kämpfe: Basis-Stats/Level zählen normal, die
-  // Schatten-Armee steuert zusätzlich einen eigenen, spürbaren Kampfanteil
-  // bei (deine Diener kämpfen aktiv mit), die ausgerüstete Waffe zählt voll.
+  
   function gateEffectivePower(h) {
     const s = h.stats;
     const basePower = s.str * 2.2 + s.agi * 1.6 + s.vit * 1.4 + s.int * 1.1 + s.per * 1.0 + h.level * 3;
     const shadowPower = shadowArmyPower(h);
-    // Diminishing Returns, damit eine riesige Armee ein Gate nicht komplett trivialisiert.
+    
     const shadowContribution = Math.sqrt(Math.max(0, shadowPower)) * 6;
     const weaponPower = equippedWeaponPower(h);
     return { basePower, shadowPower, shadowContribution, weaponPower, total: basePower + shadowContribution + weaponPower };
@@ -499,8 +461,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
         h.gold = (h.gold || 0) + goldGain;
         h.pendingExtraction = { bossName: boss, tier: 'Rot', expiresAt: now + EXTRACT_WINDOW_MS };
 
-        // Schwarzhändler erscheint kurzzeitig mit 2 zufälligen seltenen Waffen,
-        // die sonst nirgendwo kaufbar sind.
+        
         const shuffled = [...RARE_WEAPONS].sort(() => Math.random() - 0.5);
         const offerKeys = shuffled.slice(0, 2).map(w => w.key);
         h.pendingBlackMarket = { offers: offerKeys, expiresAt: now + EXTRACT_WINDOW_MS };
@@ -631,8 +592,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
         `Deine Schatten-Armee zählt nun ${h.shadows.length} Diener.\n${divider}`
       );
 
-      // ---- Sound als Sprachnachricht senden (best effort, blockiert den
-      // Befehl nicht, falls Download/Konvertierung fehlschlägt) ----
+      
       if (sock && from) {
         try {
           const voiceBuffer = await getAriseVoiceBuffer();
@@ -698,7 +658,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
         return true;
       }
 
-      // Zuerst prüfen, ob es eine reguläre Ladenwaffe ist.
+     
       let def = SHOP_WEAPONS.find(w => w.key === key);
       let isRareBuy = false;
 
@@ -782,7 +742,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
         return true;
       }
 
-      // Strafe, falls die letzte Quest zu lange überfällig war (>48h seit letzter Erledigung, aber nicht beim allerersten Mal)
+      
       if (last !== 0 && now - last > DAILY_QUEST_COOLDOWN_MS * 2) {
         h.dailyQuest.penaltyUntil = now + 60 * 60 * 1000; // 1h Debuff
         h.stats.vit = Math.max(1, h.stats.vit - 1);
