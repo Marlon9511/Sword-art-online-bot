@@ -1,10 +1,3 @@
-// migrate-json-to-sqlite.js
-// EINMALIG ausführen, bevor du db.js in index.js einbindest.
-// Übernimmt alle bestehenden Daten aus /data/*.json in bot.db.
-// Die ursprünglichen .json-Dateien werden NICHT gelöscht (dienen als Backup).
-//
-// Aufruf: node migrate-json-to-sqlite.js
-
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -13,7 +6,6 @@ import { createStore } from './db.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_PATH = path.join(__dirname, 'data');
 
-// Muss zu deiner FILES-Konstante im Bot passen
 const FILES = [
   'users.json', 'bans.json', 'joinreq.json', 'pets.json', 'tickets.json',
   'ranks.json', 'command-bans.json', 'broadcast-settings.json', 'deleted.json',
