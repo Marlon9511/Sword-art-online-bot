@@ -58,6 +58,20 @@ function findMember(guild, jid) {
   return guild.members.find(mm => mm.jid === jid);
 }
 
+// Migriert Alt-Gilden (members als reine JID-String-Liste) auf das neue
+// Objekt-Format { jid, rank, joinedAt }. Gibt true zurück, wenn migriert wurde.
+function migrateGuild(guild) {
+  if (guild.members.length && typeof guild.members[0] === 'string') {
+    guild.members = guild.members.map(jid => ({
+      jid,
+      rank: jid === guild.leader ? 'leader' : 'member',
+      joinedAt: guild.createdAt || Date.now()
+    }));
+    return true;
+  }
+  return false;
+}
+
 // Rekruten, die seit 3+ Tagen dabei sind, automatisch zu Mitglied befördern.
 // Gibt true zurück, wenn etwas verändert wurde (dann sollte gespeichert werden).
 function autoPromoteRecruits(guild) {
@@ -108,6 +122,7 @@ export function createGuildSystem() {
 
       let anyChanged = false;
       const scored = entries.map(([id, g]) => {
+        if (migrateGuild(g)) anyChanged = true;
         if (autoPromoteRecruits(g)) anyChanged = true;
         const totalLevel = Math.round(weightedGuildLevel(g, users));
         return { id, ...g, totalLevel };
@@ -128,10 +143,13 @@ export function createGuildSystem() {
     const sub = (args[0] || '').toLowerCase();
     ensureUser(sender);
 
-    // Rekruten-Auto-Beförderung für die eigene Gilde vor jeder Aktion prüfen
+    // Alt-Gilden migrieren + Rekruten-Auto-Beförderung für die eigene Gilde vor jeder Aktion prüfen
     const currentGuildId = users[sender].guildId;
     if (currentGuildId && guilds[currentGuildId]) {
-      if (autoPromoteRecruits(guilds[currentGuildId])) save(FILES.guilds, guilds);
+      let needsSave = false;
+      if (migrateGuild(guilds[currentGuildId])) needsSave = true;
+      if (autoPromoteRecruits(guilds[currentGuildId])) needsSave = true;
+      if (needsSave) save(FILES.guilds, guilds);
     }
 
     // ---------- RÄNGE / VORTEILE ----------
@@ -366,6 +384,7 @@ export function createGuildSystem() {
       const guildId = nameArg ? slugify(nameArg) : users[sender].guildId;
       if (!guildId || !guilds[guildId]) { await send('❌ Gilde nicht gefunden. Du bist evtl. in keiner Gilde — nutze ' + activePrefix + 'gilde info <name>.'); return true; }
       const guild = guilds[guildId];
+      if (migrateGuild(guild)) save(FILES.guilds, guilds);
 
       const sortedMembers = [...guild.members].sort((a, b) => rankIdx(a.rank) - rankIdx(b.rank));
       const memberLines = await Promise.all(sortedMembers.map(async mm => {
