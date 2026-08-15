@@ -1,15 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 
-// ============================================================
-// DEMON SLAYER SYSTEM
-// Eigenständiges Modul, speichert seine Daten in data/demonslayer.json
-// Folgt dem gleichen Aufruf-Stil wie arena-system.mjs / guildboss-event.mjs:
-//   const demonSlayer = createDemonSlayerSystem(DATA_PATH);
-//   const handled = await demonSlayer.handle({ cmd, args, sender, ... });
-// ============================================================
-
-// ---- ATEMSTILE (Breathing Styles) ----
 const BREATHING_STYLES = {
   wasser:    { name: '💧 Wasseratmung',     rarity: 'common',    power: 15, weight: 26 },
   flamme:    { name: '🔥 Flammenatmung',    rarity: 'common',    power: 16, weight: 24 },
@@ -22,11 +13,9 @@ const BREATHING_STYLES = {
   insekt:    { name: '🦋 Insektenatmung',   rarity: 'rare',      power: 23, weight: 4  },
   schlange:  { name: '🐍 Schlangenatmung',  rarity: 'rare',      power: 24, weight: 4  },
 
-  // ---- SECRET / SEHR SELTEN — NICHT KÄUFLICH, nur via ?atemzug ----
   sonne:     { name: '☀️ Sonnenatmung',     trueName: 'Atmung der Sonne — Hinokami Kagura', rarity: 'legendary', power: 100, weight: 0.05, ownerWeight: 3, secret: true },
   mond:      { name: '🌙 Mondatmung',       trueName: 'Atmung des Mondes', rarity: 'legendary', power: 95,  weight: 0.05, ownerWeight: 3, secret: true },
 
-  // ---- DÄMONENKÜNSTE (Blood Demon Arts) — SEHR SELTEN, NICHT KÄUFLICH, nur via ?atemzug ----
   douma:     { name: '❄️ Doumas Blutdämonenkunst',   trueName: 'Frostzirkel der Oberen Zwei — Ewiges Eis', rarity: 'epic',      power: 90,  weight: 0.07, ownerWeight: 3.5, secret: true, type: 'demonart' },
   akaza:     { name: '👊 Akazas Vernichtungskunst',  trueName: 'Kompassnadel-Zerschlagung der Oberen Drei', rarity: 'epic',      power: 88,  weight: 0.07, ownerWeight: 3.5, secret: true, type: 'demonart' },
   kokushibo: { name: '🗡️ Kokushibos Mondklingenkunst', trueName: 'Tsuki no Utsuroi — Tanz der Mondphasen', rarity: 'epic',      power: 92,  weight: 0.05, ownerWeight: 3.5, secret: true, type: 'demonart' },
@@ -41,14 +30,12 @@ const RARITY_LABEL = {
   legendary: '🟡 Legendär'
 };
 
-// Preise im Shop (nur nicht-secret Stile käuflich/verschenkbar)
 const SHOP_PRICE = {
   common: 400,
   uncommon: 700,
   rare: 1200
 };
 
-// ---- RANG-SYSTEM (Dämonentöter-Korps-Ränge) ----
 const RANKS = [
   'Mizunoto', 'Mizunoe', 'Kanoto', 'Kanoe', 'Tsuchinoto',
   'Tsuchinoe', 'Hinoto', 'Hinoe', 'Kinoto', 'Kinoe', 'Hashira'
@@ -85,8 +72,6 @@ export function createDemonSlayerSystem(DATA_PATH) {
     fs.writeFileSync(FILE_PATH, JSON.stringify(data, null, 2));
   }
 
-  // Erstellt den Spieler bei Bedarf und migriert alte Speicherstände
-  // (früher: einzelnes "style"-Feld) automatisch in die neue Sammlung.
   function ensurePlayer(data, jid) {
     if (!data.players[jid]) {
       data.players[jid] = {
@@ -162,7 +147,6 @@ export function createDemonSlayerSystem(DATA_PATH) {
     const P = activePrefix;
     const senderJid = normalizeJid(sender);
 
-    // ---- HILFE ----
     if (cmd === 'dshelp' || cmd === 'demonslayerhelp') {
       await send(
         `👹 *— DÄMONENTÖTER-SYSTEM —* 👹\n` +
@@ -185,7 +169,6 @@ export function createDemonSlayerSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- ATEMLISTE ----
     if (cmd === 'atemliste' || cmd === 'breathinglist') {
       const lines = Object.values(BREATHING_STYLES)
         .sort((a, b) => a.power - b.power)
@@ -194,7 +177,6 @@ export function createDemonSlayerSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- ATEMSHOP (Liste käuflicher Stile) ----
     if (cmd === 'atemshop' || cmd === 'breathingshop') {
       const lines = Object.entries(BREATHING_STYLES)
         .filter(([, s]) => !s.secret)
@@ -211,7 +193,6 @@ export function createDemonSlayerSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- ATEMKAUFEN (gezielt für sich selbst kaufen) ----
     if (cmd === 'atemkaufen' || cmd === 'buybreathing') {
       const wanted = (args[0] || '').toLowerCase();
       const style = BREATHING_STYLES[wanted];
@@ -258,7 +239,6 @@ export function createDemonSlayerSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- ATEMSCHENKEN (an andere verschenken) ----
     if (cmd === 'atemschenken' || cmd === 'giftbreathing') {
       const mctx = ctx.m?.message?.extendedTextMessage?.contextInfo;
       let target = args[0];
@@ -323,7 +303,6 @@ export function createDemonSlayerSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- ATEMZUG (Gacha: zufälligen Stil / Dämonenkunst erlernen) ----
     if (cmd === 'atemzug' || cmd === 'learnbreathing') {
       const data = load();
       const player = ensurePlayer(data, senderJid);
@@ -370,7 +349,6 @@ export function createDemonSlayerSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- ATEMSAMMLUNG (alle besessenen Stile) ----
     if (cmd === 'atemsammlung' || cmd === 'mybreathings' || cmd === 'breathingcollection') {
       const data = load();
       const player = ensurePlayer(data, senderJid);
@@ -394,7 +372,6 @@ export function createDemonSlayerSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- ATEMAUSRUESTEN (aktiven Kampf-Stil wechseln) ----
     if (cmd === 'atemausrüsten' || cmd === 'equipbreathing') {
       const data = load();
       const player = ensurePlayer(data, senderJid);
@@ -429,7 +406,6 @@ export function createDemonSlayerSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- EIGENER (AKTIVER) ATEMSTIL ----
     if (cmd === 'atemstil' || cmd === 'mybreathing') {
       const data = load();
       const player = ensurePlayer(data, senderJid);
@@ -450,7 +426,6 @@ export function createDemonSlayerSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- RANG ANZEIGEN ----
     if (cmd === 'dsrang' || cmd === 'dsrank') {
       const data = load();
       const player = ensurePlayer(data, senderJid);
@@ -469,7 +444,6 @@ export function createDemonSlayerSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- RANGAUFSTIEG ----
     if (cmd === 'dsaufstieg' || cmd === 'dspromote') {
       const data = load();
       const player = ensurePlayer(data, senderJid);
@@ -499,7 +473,6 @@ export function createDemonSlayerSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- DÄMONEN-BOSS-KAMPF ----
     if (cmd === 'demonboss' || cmd === 'dämonenboss' || cmd === 'daemonboss') {
       const data = load();
       const player = ensurePlayer(data, senderJid);
