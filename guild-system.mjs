@@ -1,15 +1,3 @@
-/* =====================================================================
-   🏰 SAO GILDEN-SYSTEM — Modul
-   =====================================================================
-   Verwaltet: Gilden erstellen/beitreten/verlassen, Einladungen,
-   Gilden-Info, Gilden-Rangliste (nach gewichtetem Gesamt-Level),
-   sowie interne Ränge mit Rechten (Anführer, Vize, Offizier, Veteran,
-   Mitglied, Rekrut).
-   Speichert in eigener guilds.json: { [guildId]: { name, leader,
-   members: [{ jid, rank, joinedAt }], createdAt } }
-   Zusätzlich: users[jid].guildId zeigt auf die Gilde des Spielers.
-   ===================================================================== */
-
 export const GUILD_COMMANDS = [
   'gilde', 'guild', 'gildenrang', 'guildrank'
 ];
@@ -28,10 +16,6 @@ export const GUILD_HELP_TEXT =
   `▸ {P}gilde list — Alle Gilden anzeigen\n` +
   `▸ {P}gildenrang — Gilden-Rangliste (nach gewichtetem Gesamt-Level)\n`;
 
-// ---------------------------------------------------------------------
-// RANG-DEFINITIONEN
-// ---------------------------------------------------------------------
-// Reihenfolge = Hierarchie, Index 0 ist der höchste Rang.
 export const RANK_ORDER = ['leader', 'vice', 'officer', 'veteran', 'member', 'recruit'];
 
 export const RANKS = {
@@ -43,7 +27,7 @@ export const RANKS = {
   recruit:  { name: 'Rekrut',        emoji: '🌱', weight: 0.8, canInvite: false, canKick: false,   canPromote: false,       desc: 'Startrang direkt nach Beitritt. Zählt nur mit 0.8x-Gewichtung fürs Gilden-Gesamt-Level, bis er sich beweist. Wird nach 3 Tagen automatisch zu Mitglied befördert.' },
 };
 
-const RECRUIT_PROMOTION_MS = 3 * 24 * 60 * 60 * 1000; // 3 Tage
+const RECRUIT_PROMOTION_MS = 3 * 24 * 60 * 60 * 1000;
 
 function slugify(name) {
   return name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
@@ -58,8 +42,6 @@ function findMember(guild, jid) {
   return guild.members.find(mm => mm.jid === jid);
 }
 
-// Migriert Alt-Gilden (members als reine JID-String-Liste) auf das neue
-// Objekt-Format { jid, rank, joinedAt }. Gibt true zurück, wenn migriert wurde.
 function migrateGuild(guild) {
   if (guild.members.length && typeof guild.members[0] === 'string') {
     guild.members = guild.members.map(jid => ({
@@ -72,8 +54,6 @@ function migrateGuild(guild) {
   return false;
 }
 
-// Rekruten, die seit 3+ Tagen dabei sind, automatisch zu Mitglied befördern.
-// Gibt true zurück, wenn etwas verändert wurde (dann sollte gespeichert werden).
 function autoPromoteRecruits(guild) {
   let changed = false;
   for (const mm of guild.members) {
@@ -107,7 +87,7 @@ function rankOverviewText(activePrefix) {
 }
 
 export function createGuildSystem() {
-  const pendingInvites = new Map(); // targetJid -> { guildId, from, at }
+  const pendingInvites = new Map();
 
   async function handle(ctx) {
     const {
@@ -143,7 +123,6 @@ export function createGuildSystem() {
     const sub = (args[0] || '').toLowerCase();
     ensureUser(sender);
 
-    // Alt-Gilden migrieren + Rekruten-Auto-Beförderung für die eigene Gilde vor jeder Aktion prüfen
     const currentGuildId = users[sender].guildId;
     if (currentGuildId && guilds[currentGuildId]) {
       let needsSave = false;
@@ -152,13 +131,11 @@ export function createGuildSystem() {
       if (needsSave) save(FILES.guilds, guilds);
     }
 
-    // ---------- RÄNGE / VORTEILE ----------
     if (sub === 'ränge' || sub === 'raenge' || sub === 'ranks' || sub === 'rank' || sub === 'vorteile') {
       await send(rankOverviewText(activePrefix));
       return true;
     }
 
-    // ---------- CREATE ----------
     if (sub === 'create' || sub === 'erstellen') {
       if (users[sender].guildId) { await send('❌ Du bist bereits in einer Gilde. Verlasse sie zuerst mit ' + activePrefix + 'gilde leave.'); return true; }
       const name = args.slice(1).join(' ').trim();
@@ -182,7 +159,6 @@ export function createGuildSystem() {
       return true;
     }
 
-    // ---------- INVITE ----------
     if (sub === 'invite' || sub === 'einladen') {
       const guildId = users[sender].guildId;
       if (!guildId || !guilds[guildId]) { await send('❌ Du bist in keiner Gilde.'); return true; }
@@ -210,7 +186,6 @@ export function createGuildSystem() {
       return true;
     }
 
-    // ---------- ACCEPT ----------
     if (sub === 'accept' || sub === 'annehmen') {
       const invite = pendingInvites.get(sender);
       if (!invite) { await send('❌ Du hast keine offene Gildeneinladung.'); return true; }
@@ -228,7 +203,6 @@ export function createGuildSystem() {
       return true;
     }
 
-    // ---------- DENY ----------
     if (sub === 'deny' || sub === 'ablehnen') {
       const invite = pendingInvites.get(sender);
       if (!invite) { await send('❌ Du hast keine offene Gildeneinladung.'); return true; }
@@ -237,7 +211,6 @@ export function createGuildSystem() {
       return true;
     }
 
-    // ---------- LEAVE ----------
     if (sub === 'leave' || sub === 'verlassen') {
       const guildId = users[sender].guildId;
       if (!guildId || !guilds[guildId]) { await send('❌ Du bist in keiner Gilde.'); return true; }
@@ -248,7 +221,6 @@ export function createGuildSystem() {
 
       if (guild.leader === sender) {
         if (guild.members.length > 0) {
-          // Nachfolge: Vize zuerst, sonst Offizier, sonst dienstältestes Mitglied
           guild.members.sort((a, b) => rankIdx(a.rank) - rankIdx(b.rank) || a.joinedAt - b.joinedAt);
           const successor = guild.members[0];
           successor.rank = 'leader';
@@ -264,7 +236,6 @@ export function createGuildSystem() {
       return true;
     }
 
-    // ---------- KICK ----------
     if (sub === 'kick' || sub === 'entfernen') {
       const guildId = users[sender].guildId;
       if (!guildId || !guilds[guildId]) { await send('❌ Du bist in keiner Gilde.'); return true; }
@@ -296,7 +267,6 @@ export function createGuildSystem() {
       return true;
     }
 
-    // ---------- PROMOTE ----------
     if (sub === 'promote' || sub === 'befördern' || sub === 'befoerdern') {
       const guildId = users[sender].guildId;
       if (!guildId || !guilds[guildId]) { await send('❌ Du bist in keiner Gilde.'); return true; }
@@ -313,7 +283,7 @@ export function createGuildSystem() {
       const targetMember = findMember(guild, targetJid);
       if (!targetMember) { await send('❌ Diese Person ist nicht in deiner Gilde.'); return true; }
 
-      const floorIdx = actor.rank === 'leader' ? rankIdx('vice') : rankIdx('officer'); // höchster erreichbarer Rang
+      const floorIdx = actor.rank === 'leader' ? rankIdx('vice') : rankIdx('officer');
       const currentIdx = rankIdx(targetMember.rank);
       if (currentIdx <= floorIdx) { await send(`❌ Du kannst diese Person nicht weiter befördern (dein Limit: ${RANKS[RANK_ORDER[floorIdx]].emoji} ${RANKS[RANK_ORDER[floorIdx]].name}).`); return true; }
 
@@ -325,7 +295,6 @@ export function createGuildSystem() {
       return true;
     }
 
-    // ---------- DEMOTE ----------
     if (sub === 'demote' || sub === 'degradieren') {
       const guildId = users[sender].guildId;
       if (!guildId || !guilds[guildId]) { await send('❌ Du bist in keiner Gilde.'); return true; }
@@ -352,7 +321,6 @@ export function createGuildSystem() {
       return true;
     }
 
-    // ---------- TRANSFER ----------
     if (sub === 'transfer' || sub === 'übertragen' || sub === 'uebertragen') {
       const guildId = users[sender].guildId;
       if (!guildId || !guilds[guildId]) { await send('❌ Du bist in keiner Gilde.'); return true; }
@@ -378,7 +346,6 @@ export function createGuildSystem() {
       return true;
     }
 
-    // ---------- INFO ----------
     if (sub === 'info' || !sub) {
       const nameArg = args.slice(1).join(' ').trim();
       const guildId = nameArg ? slugify(nameArg) : users[sender].guildId;
@@ -403,7 +370,6 @@ export function createGuildSystem() {
       return true;
     }
 
-    // ---------- LIST ----------
     if (sub === 'list' || sub === 'liste') {
       const all = Object.values(guilds);
       if (!all.length) { await send('🏰 Es existieren noch keine Gilden.'); return true; }
