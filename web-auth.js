@@ -1,14 +1,10 @@
-// web-auth.js
-// JWT-Hilfsfunktionen für die Web-Login-API des SAO-Bots.
-// Braucht das Paket "jsonwebtoken" (npm install jsonwebtoken --prefix ~/.npm-global ODER lokal im Projekt).
 
 import jwt from 'jsonwebtoken';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
-// Erzeugt (oder lädt) ein dauerhaftes JWT-Secret in data/jwt-secret.txt.
-// Dadurch bleiben ausgestellte Tokens auch nach einem Bot-Neustart gültig.
+
 function getOrCreateSecret(dataPath) {
   const secretFile = path.join(dataPath, 'jwt-secret.txt');
   if (fs.existsSync(secretFile)) {
@@ -30,7 +26,7 @@ export function createAuthTools(dataPath) {
     return jwt.sign({ webId }, JWT_SECRET, { expiresIn: EXPIRES_IN });
   }
 
-  // Express-Middleware: prüft "Authorization: Bearer <token>" und setzt req.webId
+  
   function authenticateToken(req, res, next) {
     const header = req.headers['authorization'] || '';
     const token = header.startsWith('Bearer ') ? header.slice(7) : null;
