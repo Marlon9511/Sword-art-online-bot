@@ -25,37 +25,24 @@ const SECRET_WEAPON_CRIT_BONUS = 10;
 const RARITY_EMOJI = { common: '⚪', uncommon: '🟢', rare: '🔵', epic: '🟣', legendary: '🟡', secret: '⚫' };
 const CRIT_CHANCE_BY_RARITY = { common: 5, uncommon: 8, rare: 12, epic: 16, legendary: 22, secret: 30 };
 
-// ID der exklusiven Boss-Event-Waffe (muss zu arena-system.mjs passen)
 const RAGNAROK_ITEM_ID = 'w_ragnarok';
-// Ragnarok ignoriert (wie Excalibur) die normale Schadensformel und macht
-// im Boss-Kampf immer einen festen Zufallsschaden in diesem Bereich.
-// Bewusst höher angesetzt als Excalibur, damit Ragnarok die stärkste
-// Waffe im Boss-Kampf bleibt.
 const RAGNAROK_MIN_DAMAGE = 500;
 const RAGNAROK_MAX_DAMAGE = 4000;
 
-// ID der Owner-exklusiven Waffe (muss zu arena-system.mjs passen)
 const EXCALIBUR_ITEM_ID = 'w_excalibur';
-// Excalibur ignoriert die normale Schadensformel und macht im Boss-Kampf
-// immer einen festen Zufallsschaden in diesem Bereich.
 const EXCALIBUR_MIN_DAMAGE = 250;
 const EXCALIBUR_MAX_DAMAGE = 1000;
 
-// Skalierende Chance: je mehr HP der Boss hatte, desto höher die Ragnarok-Chance
-const RAGNAROK_BASE_CHANCE_PERCENT = 10;      // Mindest-Chance, auch bei kleinen Bossen
-const RAGNAROK_CHANCE_PER_1000_HP = 5;        // +5% pro 1000 maxHp
-const RAGNAROK_MAX_CHANCE_PERCENT = 75;       // Deckel, damit es nie garantiert ist
+const RAGNAROK_BASE_CHANCE_PERCENT = 10;
+const RAGNAROK_CHANCE_PER_1000_HP = 5;
+const RAGNAROK_MAX_CHANCE_PERCENT = 75;
 
 function calculateRagnarokChance(maxHp) {
   const chance = RAGNAROK_BASE_CHANCE_PERCENT + (maxHp / 1000) * RAGNAROK_CHANCE_PER_1000_HP;
   return Math.min(RAGNAROK_MAX_CHANCE_PERCENT, Math.round(chance));
 }
 
-// ===== Zusätzliche Chance für Platz 2 & 3 der Gilden-Rangliste =====
-// Platz 1 (Sieger-Gilde) nutzt weiterhin die volle Chance aus
-// calculateRagnarokChance(). Platz 2 und 3 bekommen eine niedrigere,
-// unabhängige Chance, damit auch sie noch Ragnarok ergattern können.
-const RAGNAROK_RANK_CHANCE_DIVISOR = { 1: 1, 2: 2, 3: 3 }; // Rang -> Divisor der Basis-Chance
+const RAGNAROK_RANK_CHANCE_DIVISOR = { 1: 1, 2: 2, 3: 3 };
 
 function calculateGuildRankRagnarokChance(maxHp, rank) {
   const baseChance = calculateRagnarokChance(maxHp);
@@ -127,8 +114,6 @@ export function createGuildBossSystem(DATA_PATH) {
     return Object.entries(state.damageByGuild).sort((a, b) => b[1] - a[1]).slice(0, limit);
   }
 
-  // ===== Schaden basierend auf der ausgerüsteten Waffe berechnen =====
-  // Ragnarok bekommt hier einen zusätzlichen "bossBonus", der NUR im Boss-Kampf zählt.
   function calculateWeaponDamage({ users, ITEM_DB, ensureArenaFields, normalizedSender, randInt, isPrimaryOwner }) {
     ensureArenaFields(users, normalizedSender);
     const weaponId = users[normalizedSender].equipped?.weapon;
@@ -151,10 +136,6 @@ export function createGuildBossSystem(DATA_PATH) {
     const isRagnarok = weaponId === RAGNAROK_ITEM_ID;
     const isExcalibur = weaponId === EXCALIBUR_ITEM_ID;
 
-    // ===== Ragnarok-Sonderregel =====
-    // Ignoriert die normale Power/Rarity-Formel komplett und macht
-    // stattdessen immer einen festen Zufallsschaden zwischen 500 und 1000.
-    // Damit ist Ragnarok im Schnitt stärker als Excalibur (250-1000).
     if (isRagnarok) {
       let damage = randInt(RAGNAROK_MIN_DAMAGE, RAGNAROK_MAX_DAMAGE);
       const critChance = (CRIT_CHANCE_BY_RARITY[weapon.rarity] || 5) + SECRET_WEAPON_CRIT_BONUS + 15;
@@ -172,9 +153,6 @@ export function createGuildBossSystem(DATA_PATH) {
       };
     }
 
-    // ===== Excalibur-Sonderregel =====
-    // Ignoriert die normale Power/Rarity-Formel komplett und macht
-    // stattdessen immer einen festen Zufallsschaden zwischen 250 und 1000.
     if (isExcalibur) {
       let damage = randInt(EXCALIBUR_MIN_DAMAGE, EXCALIBUR_MAX_DAMAGE);
       const critChance = (CRIT_CHANCE_BY_RARITY[weapon.rarity] || 5) + SECRET_WEAPON_CRIT_BONUS;
@@ -208,8 +186,6 @@ export function createGuildBossSystem(DATA_PATH) {
     let weaponName = weapon.name;
     let weaponEmoji = RARITY_EMOJI[weapon.rarity] || '';
 
-    // Ragnarok bleibt sichtbar (kein Verschleiern) — es ist eine verdiente Trophäe,
-    // kein Owner-Secret. Andere Secret-Waffen (Excalibur etc.) bleiben verschleiert.
     if (isSecretWeapon && !isRagnarok && !viewerIsPrimaryOwner) {
       weaponName = 'einer geheimnisvollen Klinge';
       weaponEmoji = '❓';
@@ -218,12 +194,8 @@ export function createGuildBossSystem(DATA_PATH) {
     return { damage, weaponName, weaponEmoji, isCrit, isSecret: isSecretWeapon, isRagnarok, isExcalibur };
   }
 
-  // ===== Ragnarok-Vergabe nach Event-Ende =====
-  // Jede der Top-3-Gilden (nach Gesamtschaden) rollt UNABHÄNGIG ihre eigene
-  // Chance (Platz 1 = volle Chance, Platz 2/3 = niedrigere Chance).
-  // Trifft eine Gilde, bekommt JEDES Mitglied dieser Gilde je eine Ragnarok.
   function distributeRagnarok({ users, guilds, save, FILES, ITEM_DB, ensureArenaFields, randInt, top3Guilds, maxHp }) {
-    const results = []; // [{ guildId, guildName, rank, hit, chance, recipients }]
+    const results = [];
 
     top3Guilds.forEach(([guildId, guildDamage], idx) => {
       const rank = idx + 1;
@@ -308,7 +280,6 @@ export function createGuildBossSystem(DATA_PATH) {
 
     save(FILES.users, users);
 
-    // ===== Ragnarok-Vergabe =====
     let ragnarokLine = '';
     if (ITEM_DB && ensureArenaFields && randInt && ITEM_DB[RAGNAROK_ITEM_ID]) {
       const top3Guilds = getTopGuilds(3);
@@ -452,7 +423,6 @@ export function createGuildBossSystem(DATA_PATH) {
         return true;
       }
 
-      // ===== Cooldown zurücksetzen (zum Testen) =====
       if (sub === 'resetcd' || sub === 'cdreset') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) {
           await send('❌ Nur Owner/CoOwner dürfen den Cooldown zurücksetzen.');
@@ -489,7 +459,6 @@ export function createGuildBossSystem(DATA_PATH) {
           .map(([gid, dmg], i) => `${i + 1}. ${guilds[gid]?.name || gid} — ${dmg} DMG`)
           .join('\n') || '(noch kein Schaden)';
 
-        // Aktuell führende Gilde (statt einzelner Top-Spieler)
         const currentTopGuildEntry = getTopGuilds(1)[0];
         let topGuildPreview = '';
         if (currentTopGuildEntry) {
