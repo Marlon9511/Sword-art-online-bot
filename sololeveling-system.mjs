@@ -1,4 +1,3 @@
-
 import fs from 'fs';
 import path from 'path';
 import { exec } from 'child_process';
@@ -11,16 +10,13 @@ const __dirname = path.dirname(__filename);
 export function createSoloLevelingSystem(DATA_PATH) {
   const FILE_PATH = path.join(DATA_PATH, 'sololeveling.json');
 
- 
-  const ARISE_SOUND_URL = 'https://raw.githubusercontent.com/Marlon9511/Sword-art-online-bot/main/AUD-20260814-WA0954.mp3'; 
+  const ARISE_SOUND_URL = 'https://raw.githubusercontent.com/Marlon9511/Sword-art-online-bot/main/AUD-20260814-WA0954.mp3';
 
   const ARISE_CACHE_DIR = path.join(__dirname, 'cache', 'sololeveling-arise');
-  
   const ARISE_SOURCE_EXT = (path.extname(new URL(ARISE_SOUND_URL).pathname) || '.mp3').toLowerCase();
   const ARISE_SOURCE_PATH = path.join(ARISE_CACHE_DIR, `arise-source${ARISE_SOURCE_EXT}`);
   const ARISE_OGG_PATH = path.join(ARISE_CACHE_DIR, 'arise.ogg');
 
-  
   async function downloadAriseSourceIfNeeded() {
     if (fs.existsSync(ARISE_SOURCE_PATH)) return ARISE_SOURCE_PATH;
     fs.mkdirSync(ARISE_CACHE_DIR, { recursive: true });
@@ -41,7 +37,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
   function convertToOggOpusIfNeeded(sourcePath) {
     return new Promise((resolve, reject) => {
       if (fs.existsSync(ARISE_OGG_PATH)) return resolve(ARISE_OGG_PATH);
-      
       const cmd = `ffmpeg -y -i "${sourcePath}" -c:a libopus -b:a 64k -vn "${ARISE_OGG_PATH}"`;
       exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
         if (err) return reject(err);
@@ -83,7 +78,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
   const persist = () => saveHunters(hunters);
   setInterval(persist, 60_000);
 
-  
   function getSettings() {
     if (!hunters._settings) hunters._settings = { noCooldownGroups: {} };
     if (!hunters._settings.noCooldownGroups) hunters._settings.noCooldownGroups = {};
@@ -93,8 +87,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
   function isGroupCooldownDisabled(groupJid) {
     return !!getSettings().noCooldownGroups[groupJid];
   }
-
-  // ---------- Konfiguration ----------
 
   const RANKS = [
     { key: 'E', label: 'E-Rang', minLevel: 1 },
@@ -123,7 +115,7 @@ export function createSoloLevelingSystem(DATA_PATH) {
     { key: 'S', label: 'S-Rang Gate', minLevel: 68, maxLevel: 999, monsters: ['Drachenritter', 'Titan der Tiefe', 'Alptraumherold'], boss: 'Monarch der Verwüstung' }
   ];
 
- 
+  const HIGHER_GATE_CHANCE = 0.16;
 
   function baseGateTierIndexForLevel(level) {
     let idx = 0;
@@ -133,7 +125,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
     return idx;
   }
 
-  
   function pickGateTier(level, randFn) {
     let idx = baseGateTierIndexForLevel(level);
     while (idx < GATE_TIERS.length - 1 && randFn() < HIGHER_GATE_CHANCE) {
@@ -162,18 +153,15 @@ export function createSoloLevelingSystem(DATA_PATH) {
   const STAT_KEYS = ['str', 'agi', 'vit', 'int', 'per'];
   const STAT_LABELS = { str: '💪 Stärke', agi: '💨 Beweglichkeit', vit: '❤️ Vitalität', int: '🧠 Intelligenz', per: '👁️ Wahrnehmung' };
 
-  const GATE_COOLDOWN_MS = 10 * 60 * 1000; // 10 Minuten
-  const RED_GATE_COOLDOWN_MS = 25 * 60 * 1000; // Rotes Tor: längere Sperre bei Niederlage
+  const GATE_COOLDOWN_MS = 10 * 60 * 1000;
+  const RED_GATE_COOLDOWN_MS = 25 * 60 * 1000;
   const DAILY_QUEST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
-  const EXTRACT_WINDOW_MS = 5 * 60 * 1000; // 5 Minuten nach Bosskill
+  const EXTRACT_WINDOW_MS = 5 * 60 * 1000;
 
-  // Rotes Tor: seltenes Spezial-Gate, ab Level 5 möglich.
   const RED_GATE_MIN_LEVEL = 5;
-  const RED_GATE_CHANCE = 0.06; // 6% pro ?gate-Versuch
+  const RED_GATE_CHANCE = 0.06;
   const RED_GATE_BOSSES = ['Blutmond-Ogerfürst', 'Verschlungener Wächter', 'Herold des Roten Tores', 'Abyssaler Flammenkoloss'];
 
-  // ---------- Waffen ----------
-  
   const SHOP_WEAPONS = [
     { key: 'rostiges_schwert', name: 'Rostiges Schwert', price: 50, power: 8, rarity: 'Gewöhnlich' },
     { key: 'stahlschwert', name: 'Stahlschwert', price: 150, power: 18, rarity: 'Gewöhnlich' },
@@ -182,7 +170,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
     { key: 'runenschwert', name: 'Runenschwert', price: 1000, power: 65, rarity: 'Episch' }
   ];
 
-  
   const RARE_WEAPONS = [
     { key: 'daemonenklinge', name: 'Dämonenklinge', price: 800, power: 90, rarity: 'Episch' },
     { key: 'frostfangschwert', name: 'Frostfangschwert', price: 1200, power: 120, rarity: 'Episch' },
@@ -200,8 +187,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
     return owned ? owned.power : 0;
   }
 
-  // ---------- Helper ----------
-
   function ensureHunter(jid) {
     if (!hunters[jid]) {
       hunters[jid] = {
@@ -213,8 +198,8 @@ export function createSoloLevelingSystem(DATA_PATH) {
         shadows: [],
         gateCooldownUntil: 0,
         dailyQuest: { lastDone: 0, penaltyUntil: 0 },
-        pendingExtraction: null, // { bossName, tier, expiresAt }
-        pendingBlackMarket: null, // { offers: [weaponKey,...], expiresAt }
+        pendingExtraction: null,
+        pendingBlackMarket: null,
         weapons: [],
         equippedWeaponKey: null,
         gold: 0
@@ -244,7 +229,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
     return (h.shadows || []).reduce((sum, sh) => sum + sh.power, 0);
   }
 
-  
   function combatPower(h) {
     const s = h.stats;
     const shadowPower = shadowArmyPower(h);
@@ -254,12 +238,10 @@ export function createSoloLevelingSystem(DATA_PATH) {
     );
   }
 
-  
   function gateEffectivePower(h) {
     const s = h.stats;
     const basePower = s.str * 2.2 + s.agi * 1.6 + s.vit * 1.4 + s.int * 1.1 + s.per * 1.0 + h.level * 3;
     const shadowPower = shadowArmyPower(h);
-    
     const shadowContribution = Math.sqrt(Math.max(0, shadowPower)) * 6;
     const weaponPower = equippedWeaponPower(h);
     return { basePower, shadowPower, shadowContribution, weaponPower, total: basePower + shadowContribution + weaponPower };
@@ -282,8 +264,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
 
   const divider = '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈';
 
-  // ---------- Handler ----------
-
   async function handle(ctx) {
     const {
       cmd, args, sender, from, isGroup, send, sock, users, ensureUser, normalizeJid,
@@ -298,7 +278,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
     const groupBypass = !!(isGroup && from && isGroupCooldownDisabled(from));
     const cooldownBypass = ownerBypass || groupBypass;
 
-    // ---- AWAKEN ----
     if (cmd === 'awaken' || cmd === 'erwachen') {
       if (hunters[jid]) {
         await send('⚡ Du bist bereits als Hunter erwacht. Nutze ?hunterinfo für deinen Status.');
@@ -318,7 +297,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- SLCOOLDOWN — Gate-Cooldown für diese Gruppe an/aus (nur Owner) ----
     if (cmd === 'slcooldown' || cmd === 'gatecooldown') {
       if (!isGroup) {
         await send('❌ Dieser Befehl funktioniert nur innerhalb einer Gruppe.');
@@ -365,7 +343,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- HUNTERINFO / STATUS ----
     if (cmd === 'hunterinfo' || cmd === 'hunterstatus' || cmd === 'systemwindow') {
       const rank = rankForLevel(h.level);
       const needed = expNeeded(h.level);
@@ -389,7 +366,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- STATPOINT ----
     if (cmd === 'statpoint' || cmd === 'sp') {
       const stat = (args[0] || '').toLowerCase();
       const amount = parseInt(args[1]);
@@ -412,7 +388,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- GATE ----
     if (cmd === 'gate' || cmd === 'dungeon') {
       const now = Date.now();
       if (!cooldownBypass && now < (h.gateCooldownUntil || 0)) {
@@ -422,7 +397,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
 
       const rollRed = h.level >= RED_GATE_MIN_LEVEL && Math.random() < RED_GATE_CHANCE;
 
-      // ================= ROTES TOR =================
       if (rollRed) {
         const { total: cp, shadowContribution, weaponPower } = gateEffectivePower(h);
         const boss = RED_GATE_BOSSES[randInt(0, RED_GATE_BOSSES.length - 1)];
@@ -461,7 +435,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
         h.gold = (h.gold || 0) + goldGain;
         h.pendingExtraction = { bossName: boss, tier: 'Rot', expiresAt: now + EXTRACT_WINDOW_MS };
 
-        
         const shuffled = [...RARE_WEAPONS].sort(() => Math.random() - 0.5);
         const offerKeys = shuffled.slice(0, 2).map(w => w.key);
         h.pendingBlackMarket = { offers: offerKeys, expiresAt: now + EXTRACT_WINDOW_MS };
@@ -482,7 +455,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
         return true;
       }
 
-      // ================= NORMALES GATE =================
       const { tier, wasBoosted } = pickGateTier(h.level, Math.random);
       const { total: cp, shadowContribution, weaponPower } = gateEffectivePower(h);
       const tierIdx = GATE_TIERS.indexOf(tier);
@@ -523,7 +495,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
 
       out += `⚔️ Der ${monster} wurde besiegt!\n✨ +${expGain} EXP  💰 +${goldGain} Gold\n`;
 
-      // Chance auf Boss-Begegnung
       const bossChance = 0.22;
       if (Math.random() < bossChance) {
         const bossWinChance = Math.min(0.8, Math.max(0.1, cp / (cp + difficulty * 1.8)));
@@ -553,7 +524,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- EXTRACT ----
     if (cmd === 'extract' || cmd === 'arise') {
       const pending = h.pendingExtraction;
       if (!pending || Date.now() > pending.expiresAt) {
@@ -592,7 +562,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
         `Deine Schatten-Armee zählt nun ${h.shadows.length} Diener.\n${divider}`
       );
 
-      
       if (sock && from) {
         try {
           const voiceBuffer = await getAriseVoiceBuffer();
@@ -609,7 +578,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- SHADOWS LIST ----
     if (cmd === 'shadows' || cmd === 'schattenarmee') {
       if (!h.shadows.length) {
         await send('🌑 Deine Schatten-Armee ist leer. Besiege Gate-Bosse und nutze ?extract.');
@@ -628,7 +596,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- SHOP (Waffenladen + ggf. Schwarzhändler) ----
     if (cmd === 'huntershop' || cmd === 'waffenladen') {
       const lines = SHOP_WEAPONS.map(w =>
         `• ${w.name} (${w.rarity}) — ⚔️ +${w.power} — 💰 ${w.price} — Code: \`${w.key}\``
@@ -650,7 +617,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- BUY WEAPON ----
     if (cmd === 'buyweapon' || cmd === 'waffekaufen' || cmd === 'kaufen') {
       const key = (args[0] || '').toLowerCase();
       if (!key) {
@@ -658,11 +624,9 @@ export function createSoloLevelingSystem(DATA_PATH) {
         return true;
       }
 
-     
       let def = SHOP_WEAPONS.find(w => w.key === key);
       let isRareBuy = false;
 
-      // Sonst prüfen, ob es ein aktives Schwarzhändler-Angebot ist.
       if (!def) {
         const bm = h.pendingBlackMarket;
         if (bm && Date.now() <= bm.expiresAt && bm.offers.includes(key)) {
@@ -703,7 +667,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- WEAPONS INVENTORY ----
     if (cmd === 'weapons' || cmd === 'waffen' || cmd === 'inventar') {
       if (!h.weapons || !h.weapons.length) {
         await send('🗡️ Du besitzt noch keine Waffen. Schau im ?huntershop vorbei.');
@@ -717,7 +680,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- EQUIP WEAPON ----
     if (cmd === 'hunterequip' || cmd === 'ausruesten') {
       const key = (args[0] || '').toLowerCase();
       const owned = (h.weapons || []).find(w => w.key === key);
@@ -731,7 +693,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- DAILY QUEST ----
     if (cmd === 'dailyquest' || cmd === 'tagesquest') {
       const now = Date.now();
       const last = h.dailyQuest?.lastDone || 0;
@@ -742,9 +703,8 @@ export function createSoloLevelingSystem(DATA_PATH) {
         return true;
       }
 
-      
       if (last !== 0 && now - last > DAILY_QUEST_COOLDOWN_MS * 2) {
-        h.dailyQuest.penaltyUntil = now + 60 * 60 * 1000; // 1h Debuff
+        h.dailyQuest.penaltyUntil = now + 60 * 60 * 1000;
         h.stats.vit = Math.max(1, h.stats.vit - 1);
         h.dailyQuest.lastDone = now;
         persist();
@@ -771,7 +731,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- LEADERBOARD ----
     if (cmd === 'hunterrank' || cmd === 'hunterleaderboard' || cmd === 'jaegerrangliste') {
       const entries = Object.entries(hunters)
         .filter(([hjid]) => !hjid.startsWith('_'))
@@ -799,7 +758,6 @@ export function createSoloLevelingSystem(DATA_PATH) {
       return true;
     }
 
-    // ---- HELP ----
     if (cmd === 'sololevelinghelp' || cmd === 'jaegerhilfe') {
       await send(SL_HELP_TEXT);
       return true;
