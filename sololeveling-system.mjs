@@ -359,10 +359,12 @@ export function createSoloLevelingSystem(DATA_PATH) {
     // ---- SLCOOLDOWN — Gate-Cooldown für diese Gruppe an/aus (nur Owner) ----
     if (cmd === 'slcooldown' || cmd === 'gatecooldown') {
       if (!isGroup) {
-        return send('❌ Dieser Befehl funktioniert nur innerhalb einer Gruppe.');
+        await send('❌ Dieser Befehl funktioniert nur innerhalb einer Gruppe.');
+        return true;
       }
       if (!ownerBypass) {
-        return send('❌ Nur der Bot-Inhaber darf den Gate-Cooldown für eine Gruppe umschalten.');
+        await send('❌ Nur der Bot-Inhaber darf den Gate-Cooldown für eine Gruppe umschalten.');
+        return true;
       }
 
       const sub = (args[0] || '').toLowerCase();
@@ -370,25 +372,29 @@ export function createSoloLevelingSystem(DATA_PATH) {
 
       if (!sub || sub === 'status') {
         const active = isGroupCooldownDisabled(from);
-        return send(
+        await send(
           `⏳ Gate-Cooldown in dieser Gruppe: ${active ? 'AUS ❌ (kein Cooldown für alle Hunter hier)' : 'AN ✅ (normaler Cooldown)'}\n` +
           `Umschalten: ?slcooldown an | ?slcooldown aus`
         );
+        return true;
       }
 
       if (sub === 'aus' || sub === 'off') {
         settings.noCooldownGroups[from] = true;
         persist();
-        return send('✅ Gate-Cooldown für diese Gruppe DEAKTIVIERT. Alle Hunter hier können ?gate ohne Wartezeit nutzen.');
+        await send('✅ Gate-Cooldown für diese Gruppe DEAKTIVIERT. Alle Hunter hier können ?gate ohne Wartezeit nutzen.');
+        return true;
       }
 
       if (sub === 'an' || sub === 'on') {
         delete settings.noCooldownGroups[from];
         persist();
-        return send('✅ Gate-Cooldown für diese Gruppe wieder AKTIVIERT (normale Wartezeit gilt wieder).');
+        await send('✅ Gate-Cooldown für diese Gruppe wieder AKTIVIERT (normale Wartezeit gilt wieder).');
+        return true;
       }
 
-      return send('❌ Nutzung: ?slcooldown an | aus | status');
+      await send('❌ Nutzung: ?slcooldown an | aus | status');
+      return true;
     }
 
     const h = hunters[jid];
