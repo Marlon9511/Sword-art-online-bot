@@ -1,30 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 
-/* =====================================================================
-   ⚔️🏰 SAO GILDENKRIEG-SYSTEM — Modul
-   =====================================================================
-   Erweitert das bestehende Gilden-System (guild-system.mjs) um:
-   - Allianzen zwischen Gilden (gegenseitige Zustimmung nötig)
-   - Gildenkriege: Zwei Gilden kämpfen gegeneinander um eine "Festungs-HP",
-     Mitglieder greifen mit ihrer ausgerüsteten Waffe an (wie beim
-     Clan-Boss-Event), Sieger bekommt Belohnungen + Kriegsstatistik.
-
-   Erwartet an guilds[gid] mindestens: { name, leader, members: [jid...] }
-   (exakt wie in eurem guild-system.mjs). Ergänzt bei Bedarf automatisch
-   guild.allies (Array von Gilden-IDs) und guild.warStats.
-
-   Speichert den Kriegszustand eigenständig in guildwars.json
-   (wie guildboss.json beim Boss-Event) — KEIN neues FILES-Entry nötig.
-   Allianzen werden direkt in guilds.json mitgespeichert (guild.allies),
-   über euer bestehendes save(FILES.guilds, guilds).
-
-   Integration in bot.js: siehe Hinweise am Ende der Datei.
-   ===================================================================== */
-
-// ---------------------------------------------------------------------
-// Konstanten
-// ---------------------------------------------------------------------
 const RARITY_DAMAGE_BONUS = {
   common: 0,
   uncommon: 0.10,
@@ -37,26 +13,18 @@ const SECRET_WEAPON_CRIT_BONUS = 10;
 const RARITY_EMOJI = { common: '⚪', uncommon: '🟢', rare: '🔵', epic: '🟣', legendary: '🟡', secret: '⚫' };
 const CRIT_CHANCE_BY_RARITY = { common: 5, uncommon: 8, rare: 12, epic: 16, legendary: 22, secret: 30 };
 
-const WAR_BASE_HP = 2000;             // Grund-Festungs-HP jeder Gilde
-const WAR_HP_PER_MEMBER = 300;        // + HP pro Mitglied der jeweiligen Gilde
-const WAR_DEFAULT_MINUTES = 120;      // Standard-Kriegsdauer
+const WAR_BASE_HP = 2000;
+const WAR_HP_PER_MEMBER = 300;
+const WAR_DEFAULT_MINUTES = 120;
 const WAR_ATTACK_COOLDOWN_MS = 3 * 60 * 1000;
 const WAR_REWARD_COINS_PER_MEMBER = 250;
 const WAR_REWARD_XP_PER_MEMBER = 80;
 
-// ID der Owner-exklusiven Waffe (muss zu arena-system.mjs / index.js ITEM_DB passen)
 const EXCALIBUR_ITEM_ID = 'w_excalibur';
-// Excaliburs reguläre Power (10000) ist für normale Duelle gedacht.
-// Im Gildenkrieg wird der daraus resultierende Schaden gedrosselt, damit
-// eine einzelne Person eine Festung nicht in einem Schlag zerstören kann.
 const WAR_EXCALIBUR_DAMAGE_CAP = 5000;
 
-// ===== Verteidigung durch Rüstung =====
-// Die durchschnittliche Rüstungs-Power aller Gildenmitglieder (Mitglieder
-// ohne ausgerüstete Rüstung zählen als 0) reduziert eingehenden Festungs-
-// schaden. Gedeckelt, damit eine Festung nie komplett unverwundbar wird.
-const WAR_ARMOR_REDUCTION_PER_POWER = 0.004; // 0.4% Reduktion pro Ø-Rüstungs-Power
-const WAR_MAX_ARMOR_REDUCTION = 0.60;        // maximal 60% Reduktion
+const WAR_ARMOR_REDUCTION_PER_POWER = 0.004;
+const WAR_MAX_ARMOR_REDUCTION = 0.60;
 
 export const GUILDWAR_COMMANDS = ['allianz', 'alliance', 'krieg', 'war', 'kriegsangriff', 'warattack'];
 
@@ -97,7 +65,6 @@ function calculateWarHp(guild) {
   return WAR_BASE_HP + memberCount * WAR_HP_PER_MEMBER;
 }
 
-// Durchschnittliche Rüstungs-Power der Gildenmitglieder -> Schadensreduktion (0 bis WAR_MAX_ARMOR_REDUCTION)
 function calculateGuildDefenseReduction(guild, users, ITEM_DB) {
   const members = Array.isArray(guild?.members) ? guild.members : [];
   if (!members.length) return 0;
@@ -127,9 +94,6 @@ function formatTimeLeft(ms) {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-// ===== Schaden basierend auf der ausgerüsteten Waffe (normale Formel,
-// KEIN Boss-exklusiver Bonus für Ragnarok/Excalibur — der gilt nur im
-// Clan-Boss-Event) =====
 function calculateWeaponDamage({ users, ITEM_DB, ensureArenaFields, jid, randInt }) {
   ensureArenaFields(users, jid);
   const weaponId = users[jid].equipped?.weapon;
@@ -154,9 +118,6 @@ function calculateWeaponDamage({ users, ITEM_DB, ensureArenaFields, jid, randInt
   const isCrit = randInt(1, 100) <= critChance;
   if (isCrit) damage = Math.round(damage * 2);
 
-  // ===== Excalibur-Drosselung (nur im Gildenkrieg) =====
-  // Excaliburs reguläre Power (10000) ist für normale Duelle gedacht;
-  // gegen eine Festung wird der Schaden auf WAR_EXCALIBUR_DAMAGE_CAP gekappt.
   if (weaponId === EXCALIBUR_ITEM_ID) {
     damage = Math.min(damage, WAR_EXCALIBUR_DAMAGE_CAP);
   }
@@ -169,18 +130,14 @@ function calculateWeaponDamage({ users, ITEM_DB, ensureArenaFields, jid, randInt
   };
 }
 
-// ---------------------------------------------------------------------
-// Fabrikfunktion
-// ---------------------------------------------------------------------
 export function createGuildWarSystem(DATA_PATH) {
   const WAR_FILE = path.join(DATA_PATH, 'guildwars.json');
 
   const defaultState = { wars: {} };
   let state = loadState();
 
-  // In-Memory-Anfragen (wie pendingInvites/pendingDuels in euren anderen Modulen)
-  const pendingAlliances = new Map();      // targetGuildId -> { fromGuildId, at }
-  const pendingWarDeclarations = new Map(); // targetGuildId -> { fromGuildId, minutes, at }
+  const pendingAlliances = new Map();
+  const pendingWarDeclarations = new Map();
 
   function loadState() {
     try {
@@ -228,8 +185,8 @@ export function createGuildWarSystem(DATA_PATH) {
     const nameA = guildA?.name || war.guildA;
     const nameB = guildB?.name || war.guildB;
 
-    const pctADealt = war.maxHpB > 0 ? (war.maxHpB - war.hpB) / war.maxHpB : 0; // Schaden von A an B
-    const pctBDealt = war.maxHpA > 0 ? (war.maxHpA - war.hpA) / war.maxHpA : 0; // Schaden von B an A
+    const pctADealt = war.maxHpB > 0 ? (war.maxHpB - war.hpB) / war.maxHpB : 0;
+    const pctBDealt = war.maxHpA > 0 ? (war.maxHpA - war.hpA) / war.maxHpA : 0;
 
     let winnerGid = null, loserGid = null;
     if (war.hpA <= 0 && war.hpB > 0) { winnerGid = war.guildA; loserGid = war.guildB; }
@@ -239,7 +196,6 @@ export function createGuildWarSystem(DATA_PATH) {
       loserGid = war.concedeLoser;
     } else if (pctADealt > pctBDealt) { winnerGid = war.guildA; loserGid = war.guildB; }
     else if (pctBDealt > pctADealt) { winnerGid = war.guildB; loserGid = war.guildA; }
-    // sonst: Unentschieden (winnerGid bleibt null)
 
     const mentions = [];
     let rewardLine = '';
@@ -317,9 +273,6 @@ export function createGuildWarSystem(DATA_PATH) {
 
     ensureUser(sender);
 
-    // =====================================================================
-    // ALLIANZEN
-    // =====================================================================
     if (cmd === 'allianz' || cmd === 'alliance') {
       const sub = (args[0] || '').toLowerCase();
       const myGuildId = getUserGuildId(users, guilds, sender);
@@ -411,9 +364,6 @@ export function createGuildWarSystem(DATA_PATH) {
       return true;
     }
 
-    // =====================================================================
-    // GILDENKRIEGE
-    // =====================================================================
     if (cmd === 'krieg' || cmd === 'war') {
       const sub = (args[0] || '').toLowerCase();
       const myGuildId = getUserGuildId(users, guilds, sender);
@@ -430,7 +380,6 @@ export function createGuildWarSystem(DATA_PATH) {
         if (findActiveWarForGuild(myGuildId)) { await send('❌ Deine Gilde befindet sich bereits in einem aktiven Krieg.'); return true; }
         if (findPendingOutgoingWar(myGuildId)) { await send('❌ Deine Gilde hat bereits eine offene Kriegserklärung.'); return true; }
 
-        // Letztes Argument könnte die Minutenzahl sein
         let minutesArg = null;
         let nameArgs = args.slice(1);
         const last = nameArgs[nameArgs.length - 1];
@@ -586,9 +535,6 @@ export function createGuildWarSystem(DATA_PATH) {
       return true;
     }
 
-    // =====================================================================
-    // KRIEGSANGRIFF
-    // =====================================================================
     if (cmd === 'kriegsangriff' || cmd === 'warattack') {
       const myGuildId = getUserGuildId(users, guilds, sender);
       if (!myGuildId || !guilds[myGuildId]) { await send('❌ Du bist in keiner Gilde.'); return true; }
