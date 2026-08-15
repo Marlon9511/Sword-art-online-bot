@@ -1,7 +1,4 @@
-// app.js — AINCRAD Web-Terminal
-// Spricht mit den Endpunkten aus web-auth.js / web-games.js / web-owner.js.
-
-const API_BASE = ''; // gleiche Origin wie die Seite; bei getrenntem Server: 'http://DEIN-SERVER:3001'
+const API_BASE = '';
 
 const loginScreen = document.getElementById('loginScreen');
 const hubScreen = document.getElementById('hubScreen');
@@ -27,7 +24,6 @@ async function apiGet(path) {
   return res.json();
 }
 
-// ---------------- LOGIN ----------------
 loginForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   loginError.hidden = true;
@@ -59,7 +55,6 @@ async function tryAutoLogin() {
   else { token = null; localStorage.removeItem('aincrad_token'); }
 }
 
-// ---------------- HUB / HUD ----------------
 async function enterHub() {
   loginScreen.hidden = true;
   hubScreen.hidden = false;
@@ -81,7 +76,6 @@ async function refreshHud() {
   if (data.success) applyStats(data);
 }
 
-// ---------------- TABS ----------------
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -92,7 +86,6 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
-// ---------------- SLOTS ----------------
 document.getElementById('slotSpin').addEventListener('click', async () => {
   const bet = parseInt(document.getElementById('slotBet').value) || 50;
   const resultEl = document.getElementById('slotResult');
@@ -112,7 +105,6 @@ document.getElementById('slotSpin').addEventListener('click', async () => {
   }, 600);
 });
 
-// ---------------- BLACKJACK ----------------
 const CARD_RED = ['♥', '♦'];
 function renderHand(containerId, cards) {
   const el = document.getElementById(containerId);
@@ -164,7 +156,6 @@ bjStand.addEventListener('click', async () => {
   applyStats(data);
 });
 
-// ---------------- RPS ----------------
 document.querySelectorAll('.rps-btn').forEach(btn => {
   btn.addEventListener('click', async () => {
     const resultEl = document.getElementById('rpsResult');
@@ -180,7 +171,6 @@ document.querySelectorAll('.rps-btn').forEach(btn => {
   });
 });
 
-// ---------------- OWNER ----------------
 const ownerTabBtn = document.getElementById('ownerTabBtn');
 const ownerOverviewEl = document.getElementById('ownerOverview');
 const ownerUserBody = document.getElementById('ownerUserBody');
@@ -238,7 +228,6 @@ function renderOwnerTable(users) {
     ownerUserBody.appendChild(tr);
   });
 
-  // Rang ändern
   document.querySelectorAll('.rankSelect').forEach(sel => {
     sel.addEventListener('change', async () => {
       const data = await apiPost('/api/owner/rank', { jid: sel.dataset.jid, rank: sel.value });
@@ -246,7 +235,6 @@ function renderOwnerTable(users) {
     });
   });
 
-  // Coins geben
   document.querySelectorAll('.coinsBtn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const data = await apiPost('/api/owner/coins', { jid: btn.dataset.jid, amount: parseInt(btn.dataset.amount) });
@@ -255,7 +243,6 @@ function renderOwnerTable(users) {
     });
   });
 
-  // XP geben
   document.querySelectorAll('.xpBtn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const data = await apiPost('/api/owner/xp', { jid: btn.dataset.jid, amount: parseInt(btn.dataset.amount) });
@@ -264,7 +251,6 @@ function renderOwnerTable(users) {
     });
   });
 
-  // Bannen
   document.querySelectorAll('.banBtn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const reason = prompt('Grund für den Bann (optional):') || '';
@@ -274,7 +260,6 @@ function renderOwnerTable(users) {
     });
   });
 
-  // Entbannen
   document.querySelectorAll('.unbanBtn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const data = await apiPost('/api/owner/unban', { jid: btn.dataset.jid });
