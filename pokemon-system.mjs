@@ -1,7 +1,3 @@
-// ============================================================
-// POKEMON-SYSTEM.MJS — Fangen, Leveln, Entwickeln, Pokédex, PVP, Geheime Pokémon
-// ============================================================
-
 export const POKEMON_COMMANDS = [
   'pokestarter', 'wild', 'catch', 'pokemon', 'p', 'pokeinfo',
   'pokeactive', 'pokename', 'pokerelease', 'pokedex',
@@ -45,7 +41,6 @@ const RARITY_INFO = {
 const RARITY_WEIGHTS = { starter: 0, common: 55, uncommon: 30, rare: 12, legendary: 3, secret: 0 };
 
 export const POKEMON_DB = {
-  // ---- Starter-Linien ----
   bisasam:    { name: 'Bisasam',    type: 'pflanze', catchRate: 60, evolvesAt: 12, evolvesTo: 'bisaknosp', hp: 45, power: 12, rarity: 'starter' },
   bisaknosp:  { name: 'Bisaknosp',  type: 'pflanze', catchRate: 40, evolvesAt: 28, evolvesTo: 'bisaflor',  hp: 65, power: 22, rarity: 'starter' },
   bisaflor:   { name: 'Bisaflor',   type: 'pflanze', catchRate: 15, evolvesAt: null, evolvesTo: null,      hp: 90, power: 38, rarity: 'starter' },
@@ -58,7 +53,6 @@ export const POKEMON_DB = {
   schillok:   { name: 'Schillok',   type: 'wasser', catchRate: 40, evolvesAt: 30, evolvesTo: 'turtok',   hp: 66, power: 22, rarity: 'starter' },
   turtok:     { name: 'Turtok',     type: 'wasser', catchRate: 14, evolvesAt: null, evolvesTo: null,     hp: 92, power: 36, rarity: 'starter' },
 
-  // ---- Normale Wildpokémon ----
   rattfratz:  { name: 'Rattfratz',  type: 'normal', catchRate: 85, evolvesAt: 10, evolvesTo: 'rattikarl', hp: 30, power: 8,  rarity: 'common' },
   rattikarl:  { name: 'Rattikarl',  type: 'normal', catchRate: 55, evolvesAt: null, evolvesTo: null,      hp: 55, power: 18, rarity: 'common' },
 
@@ -95,7 +89,6 @@ export const POKEMON_DB = {
 
   mewtu:      { name: 'Mewtu',      type: 'psycho', catchRate: 1, evolvesAt: null, evolvesTo: null, hp: 106, power: 80, rarity: 'legendary' },
 
-  // ---- Neu hinzugefügte Pokémon ----
   zubat:      { name: 'Zubat',      type: 'gift', catchRate: 75, evolvesAt: 22, evolvesTo: 'golbat', hp: 32, power: 12, rarity: 'common' },
   golbat:     { name: 'Golbat',     type: 'gift', catchRate: 30, evolvesAt: null, evolvesTo: null,    hp: 68, power: 28, rarity: 'uncommon' },
 
@@ -130,7 +123,6 @@ export const POKEMON_DB = {
   flegmon:    { name: 'Flegmon',    type: 'wasser', catchRate: 45, evolvesAt: 38, evolvesTo: 'lahmus', hp: 60, power: 14, rarity: 'uncommon' },
   lahmus:     { name: 'Lahmus',     type: 'wasser', catchRate: 12, evolvesAt: null, evolvesTo: null,    hp: 110, power: 38, rarity: 'rare' },
 
-  // ---- Geheime Pokémon (nicht in der normalen Wildsuche) ----
   mew:        { name: 'Mew',        type: 'psycho', catchRate: 3, evolvesAt: null, evolvesTo: null, hp: 100, power: 70, rarity: 'secret' },
   zapdos:     { name: 'Zapdos',     type: 'elektro', catchRate: 2, evolvesAt: null, evolvesTo: null, hp: 108, power: 75, rarity: 'secret' },
   arktos:     { name: 'Arktos',     type: 'eis', catchRate: 2, evolvesAt: null, evolvesTo: null,     hp: 106, power: 74, rarity: 'secret' },
@@ -143,8 +135,6 @@ const BALL_TYPES = {
   meisterball: { name: 'Meisterball', bonus: null, price: 5000 } // fängt immer
 };
 
-// Geheimcodes: einmal pro Spieler einlösbar, geben ein garantiertes Pokémon.
-// Jeder Code trägt sein eigenes Level (Standard-Codes: Lv.15, neue Codes: Lv.30).
 const SECRET_CODES = {
   'MEWCODE2026':   { species: 'mew',     level: 15 },
   'ZAPCODE2026':   { species: 'zapdos',  level: 15 },
@@ -227,13 +217,11 @@ export function createPokemonSystem() {
     const p = users[sender].poke;
     const persist = () => save(FILES.users, users);
 
-    // ---- HILFE ----
     if (cmd === 'pokehelp') {
       await send('🐾 *Pokémon-Hilfe*\n' + POKEMON_HELP_TEXT.split('\n').filter(Boolean).map(l => l.replace(/\{P\}/g, activePrefix)).join('\n'));
       return true;
     }
 
-    // ---- SECRET CODE (funktioniert auch ohne Starter) ----
     if (cmd === 'pokesecret') {
       const code = (args[0] || '').toUpperCase();
       if (!code) {
@@ -261,7 +249,6 @@ export function createPokemonSystem() {
       return true;
     }
 
-    // ---- STARTER ----
     if (cmd === 'pokestarter') {
       if (p.starter) {
         await send('❌ Du hast bereits ein Starter-Pokémon gewählt.');
@@ -289,7 +276,6 @@ export function createPokemonSystem() {
       return true;
     }
 
-    // ---- WILD ----
     if (cmd === 'wild') {
       const now = Date.now();
       if (now - (p.lastEncounter || 0) < ENCOUNTER_COOLDOWN_MS) {
@@ -324,7 +310,6 @@ export function createPokemonSystem() {
       return true;
     }
 
-    // ---- CATCH ----
     if (cmd === 'catch') {
       if (!p.wild || Date.now() > p.wild.expiresAt) {
         p.wild = null;
@@ -373,7 +358,6 @@ export function createPokemonSystem() {
       return true;
     }
 
-    // ---- TEAM ----
     if (cmd === 'pokemon' || cmd === 'p') {
       if (!p.team.length) {
         await send('📋 Dein Team ist leer.');
@@ -387,7 +371,6 @@ export function createPokemonSystem() {
       return true;
     }
 
-    // ---- POKEINFO ----
     if (cmd === 'pokeinfo') {
       const idx = parseInt(args[0]) - 1;
       if (isNaN(idx) || !p.team[idx]) {
@@ -410,7 +393,6 @@ export function createPokemonSystem() {
       return true;
     }
 
-    // ---- ACTIVE ----
     if (cmd === 'pokeactive') {
       const idx = parseInt(args[0]) - 1;
       if (isNaN(idx) || !p.team[idx]) {
@@ -423,7 +405,6 @@ export function createPokemonSystem() {
       return true;
     }
 
-    // ---- NAME ----
     if (cmd === 'pokename') {
       const idx = parseInt(args[0]) - 1;
       const name = args.slice(1).join(' ').trim();
@@ -437,7 +418,6 @@ export function createPokemonSystem() {
       return true;
     }
 
-    // ---- RELEASE ----
     if (cmd === 'pokerelease') {
       const idx = parseInt(args[0]) - 1;
       if (isNaN(idx) || !p.team[idx]) {
@@ -451,7 +431,6 @@ export function createPokemonSystem() {
       return true;
     }
 
-    // ---- DEX ----
     if (cmd === 'pokedex') {
       const total = Object.keys(POKEMON_DB).length;
       const seen = Object.keys(p.dex).length;
@@ -463,7 +442,6 @@ export function createPokemonSystem() {
       return true;
     }
 
-    // ---- SHOP ----
     if (cmd === 'pokeshop') {
       let out = '🛒 *Pokéball-Shop*\n\n';
       for (const [key, b] of Object.entries(BALL_TYPES)) {
@@ -477,7 +455,6 @@ export function createPokemonSystem() {
       return true;
     }
 
-    // ---- BUY ----
     if (cmd === 'pokebuy') {
       const ballKey = (args[0] || '').toLowerCase();
       const amount = parseInt(args[1]) || 1;
@@ -497,7 +474,6 @@ export function createPokemonSystem() {
       return true;
     }
 
-    // ---- TRAIN ----
     if (cmd === 'poketrain') {
       const idx = parseInt(args[0]) - 1;
       if (isNaN(idx) || !p.team[idx]) {
@@ -528,7 +504,6 @@ export function createPokemonSystem() {
       return true;
     }
 
-    // ---- EVOLVE ----
     if (cmd === 'pokevolve') {
       const idx = parseInt(args[0]) - 1;
       if (isNaN(idx) || !p.team[idx]) {
@@ -553,7 +528,6 @@ export function createPokemonSystem() {
       return true;
     }
 
-    // ---- BATTLE (PVP) ----
     if (cmd === 'pokebattle') {
       const ctxInfo = m.message?.extendedTextMessage?.contextInfo;
       let target = args[0];
