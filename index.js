@@ -27,7 +27,6 @@ import { createGuildWarSystem, GUILDWAR_COMMANDS, GUILDWAR_HELP_TEXT } from './g
 import { createDemonSlayerSystem } from './demonslayer-system.mjs';
 import { createSoloLevelingSystem } from './sololeveling-system.mjs';
 
-// ========== GLOBALE FEHLERABSICHERUNG ==========
 process.on('unhandledRejection', (reason) => {
   console.error('⚠️ Unhandled Rejection:', reason?.message || reason);
 });
@@ -36,10 +35,8 @@ process.on('uncaughtException', (err) => {
   console.error('⚠️ Uncaught Exception:', err?.message || err);
 });
 
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const question = (q) => new Promise(resolve => rl.question(q, resolve));
@@ -76,7 +73,7 @@ const DATA_PATH = path.join(BASE_DIR, 'data');
 
 ensureDir(SESSIONS_DIR);
 ensureDir(DATA_PATH);
- 
+
 const USERS_FILE = path.join(DATA_PATH, 'users.json');
 const RESTART_FILE = path.join(DATA_PATH, 'restart.json');
 const LOG_FILE = path.join(BASE_DIR, 'logs.txt');
@@ -102,7 +99,7 @@ const FILES = {
   groupSettings: { file: 'group-settings.json', default: {} },
   credits: { file: 'credits.json', default: { list: [] } },
 guilds: { file: 'guilds.json', default: {} },
-marriages: { file: 'marriages.json', default: {} },   
+marriages: { file: 'marriages.json', default: {} },
 commandAllow: { file: 'command-allow.json', default: {} },
   officialGroup: { file: 'official-group.json', default: { link: 'https://chat.whatsapp.com/DBiDcF2s16FEWiGKyZA7Nl' } },
 partners: { file: 'partners.json', default: { list: [] } },
@@ -132,10 +129,6 @@ const saveRegisteredUsers = () => {
   fs.writeFileSync(USERS_FILE, JSON.stringify({ registeredUsers }, null, 2));
 };
 
-
-//=========================//
-// Connect Bot + Pairing-Code
-//=========================//
 async function connectBot() {
   const { state, saveCreds } = await useMultiFileAuthState("./auth");
 
@@ -185,8 +178,6 @@ async function connectBot() {
   sock.ev.on("creds.update", saveCreds);
 }
 
-// ========== CONFIG ==========
-
 const ROLES = {
   OWNER: [],
   COOWNER: [],
@@ -212,7 +203,6 @@ const SUPPORT_CONFIG = {
 };
 
 const JOIN_REQUEST_GROUP = '120363427405874233@g.us';
-
 
 const owner = '27088878862400@lid';
 let OWNER_LID = '27088878862400@lid';
@@ -256,7 +246,6 @@ if (!fs.existsSync(_groupInvitesPath)) fs.writeFileSync(_groupInvitesPath, '{}')
 const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-// ⚔️ Arena-System (Ausrüstung, Kisten, PVP-Duelle, Leaderboard)
 const arena = createArenaSystem();
 const guildSystem = createGuildSystem();
 const titleSystem = createTitleSystem();
@@ -405,7 +394,6 @@ function normalizeJid(jid) {
   return num ? `${num}@s.whatsapp.net` : jid;
 }
 
-// Bitchkick: Roh-Nummer -> @s.whatsapp.net JID (jede Formatierung wird toleriert)
 function normalizeNumber(input) {
   const num = String(input || '').replace(/[^0-9]/g, '');
   if (!num) return null;
@@ -475,8 +463,6 @@ function isGroupAdminJid(groupMeta, jid) {
   );
 }
 
-// Bitchkick: prüft ob der BOT selbst (nicht der Sender) in der Gruppe Admin ist.
-// Nutzt getBotSelfIds(sock), daher muss sock als Parameter übergeben werden.
 function isBotAdminInGroup(groupMeta, sock) {
   if (!groupMeta?.participants) return false;
   const allBotIds = [...getBotSelfIds(sock)];
@@ -495,7 +481,6 @@ function isBotAdminInGroup(groupMeta, sock) {
     botPart?.isAdmin === true
   );
 }
-
 
 function getBotSelfIds(sock) {
   const ids = new Set();
@@ -522,7 +507,6 @@ function getBotSelfIds(sock) {
 
   return ids;
 }
-
 
 function findAfkKey(rawJid) {
   const candidates = new Set(
@@ -574,7 +558,6 @@ let credits = load(FILES.credits.file) || { list: [] };
 let officialGroup = load(FILES.officialGroup.file) || { link: 'https://chat.whatsapp.com/DBiDcF2s16FEWiGKyZA7Nl' };
 if (!officialGroup.link) officialGroup.link = 'https://chat.whatsapp.com/DBiDcF2s16FEWiGKyZA7Nl';
 
-// Bitchkick: Kick-Listen pro Gruppe -> { "<groupJid>": ["<jid>", ...] }
 let bitchkickData = load(FILES.bitchkick.file) || {};
 
 console.log('Loaded ranks:', ranks);
@@ -612,7 +595,6 @@ if (ownerCfg.roles) {
   ROLES.COOWNER = [COOWNER_LID];
 }
 
-
 const PRIMARY_OWNER_IDS = new Set(
   [OWNER_LID, OWNER_PRIV].filter(Boolean).map(normalizeJid)
 );
@@ -621,8 +603,6 @@ function isPrimaryOwner(jid) {
   const n = normalizeJid(jid);
   return n ? PRIMARY_OWNER_IDS.has(n) : false;
 }
-
-
 
 function protectPrimaryOwner() {
   for (const jid of PRIMARY_OWNER_IDS) {
@@ -713,7 +693,6 @@ function getMentionDisplay(jid, contacts = {}) {
   return `@${String(display || normalizedJid.split('@')[0]).replace(/\n/g, ' ').trim()}`;
 }
 
-
 async function resolvePhoneJid(jid, sock) {
   const n = normalizeJid(jid);
   if (!n) return null;
@@ -729,7 +708,6 @@ async function resolvePhoneJid(jid, sock) {
   }
   return null;
 }
-
 
 async function getNumberMention(jid, sock) {
   const resolved = await resolvePhoneJid(jid, sock);
@@ -768,7 +746,7 @@ function persistAll() {
   save(FILES.guilds, guilds);
 save(FILES.deleted, deletedUsers);
   save(FILES.credits, credits);
-save(FILES.marriages, marriages); 
+save(FILES.marriages, marriages);
   save(FILES.groupLockSchedule, groupLockSchedules);
 save(FILES.officialGroup, officialGroup);
 save(FILES.bitchkick, bitchkickData);
@@ -777,7 +755,7 @@ save(FILES.bitchkick, bitchkickData);
   } catch (e) { console.error('Failed to save owner config:', e); }
 }
 setInterval(persistAll, 60_000);
-const groupMessageHistory = new Map(); // groupJid -> Array<{ id, participant }>
+const groupMessageHistory = new Map();
 const MAX_TRACKED_PER_GROUP = 2000;
 
 function trackGroupMessage(groupJid, msgId, participant) {
@@ -809,7 +787,7 @@ function isCommandBanned(cmdName) {
   const banned = loadBannedCommands();
   return banned.includes(cmdName.toLowerCase());
 }
-// ========== GAME HELPERS ==========
+
 const SLOT_SYMBOLS = ['🍒', '🍋', '🍇', '🍉', '⭐', '💎'];
 function spinSlots() { return [SLOT_SYMBOLS[randInt(0, SLOT_SYMBOLS.length - 1)], SLOT_SYMBOLS[randInt(0, SLOT_SYMBOLS.length - 1)], SLOT_SYMBOLS[randInt(0, SLOT_SYMBOLS.length - 1)]]; }
 
@@ -828,7 +806,6 @@ const RARITY_INFO = {
   secret:    { label: 'Geheim', emoji: '⚫', weight: 0 }
 };
 const ITEM_DB = {
-  // ---- WAFFEN ----
   w_common_1:    { name: 'Rostiges Schwert',        type: 'weapon', rarity: 'common',    power: 8 },
   w_common_2:    { name: 'Holzstab',                type: 'weapon', rarity: 'common',    power: 6 },
   w_common_3:    { name: 'Alter Dolch',             type: 'weapon', rarity: 'common',    power: 7 },
@@ -845,7 +822,6 @@ const ITEM_DB = {
   w_legendary_2: { name: 'Dark Repulser',           type: 'weapon', rarity: 'legendary', power: 68 },
   w_legendary_3: { name: 'Lambent Light',           type: 'weapon', rarity: 'legendary', power: 66 },
 
-  // ---- SECRET-WAFFEN (nur Owner, nie via Kiste/Shop) ----
   w_excalibur: {
     name: 'Excalibur',
     type: 'weapon',
@@ -864,7 +840,6 @@ const ITEM_DB = {
     bossBonus: 0.30
   },
 
-  // ---- SECRET-POOL WAFFEN (via Kiste, 1:1000-Chance) ----
   w_secret_dualblades: {
     name: 'Holzstab',
     trueName: 'Kiritos Doppelklingen (Dual Blades)',
@@ -914,7 +889,6 @@ const ITEM_DB = {
     secret: true
   },
 
-  // ---- RÜSTUNGEN ----
   a_common_1:    { name: 'Lederrüstung',            type: 'armor',  rarity: 'common',    power: 8 },
   a_common_2:    { name: 'Stoffmantel',             type: 'armor',  rarity: 'common',    power: 6 },
   a_common_3:    { name: 'Einfacher Schild',        type: 'armor',  rarity: 'common',    power: 7 },
@@ -931,7 +905,6 @@ const ITEM_DB = {
   a_legendary_2: { name: 'Rune des Kobold-Königs',  type: 'armor',  rarity: 'legendary', power: 68 },
   a_legendary_3: { name: 'Himmlischer Panzer',      type: 'armor',  rarity: 'legendary', power: 66 },
 
-  // ---- SECRET-RÜSTUNG (Pendant zu Excalibur) ----
   a_aegis: {
     name: 'Aegis des Systemadministrators',
     type: 'armor',
@@ -941,7 +914,6 @@ const ITEM_DB = {
     ownerOnly: true
   },
 
-  // ---- SECRET-POOL RÜSTUNGEN (via Kiste, 1:1000-Chance) ----
   a_secret_bwcoat: {
     name: 'Zerschlissener schwarzer Mantel',
     trueName: 'Blackwyrm Coat',
@@ -982,7 +954,6 @@ const webApi = express();
 webApi.use(cors());
 webApi.use(express.json());
 
-// Statische Website ausliefern (public/index.html, style.css, app.js)
 webApi.use(express.static(path.join(__dirname, 'public')));
 
 const { signToken, authenticateToken } = createAuthTools(DATA_PATH);
@@ -1012,7 +983,6 @@ webApi.post('/api/login', (req, res) => {
   return res.json({ success: true, token, id: user.webId, name: user.name || null });
 });
 
-// Ab hier: alle Routen brauchen ein gültiges Token
 webApi.use('/api/games', authenticateToken, createGameRoutes({ users, save, FILES }));
 webApi.get('/api/me', authenticateToken, (req, res) => {
   const entry = Object.entries(users).find(([, u]) => u.webId === req.webId);
@@ -1025,8 +995,6 @@ const WEB_API_PORT = process.env.WEB_API_PORT || 3001;
 webApi.listen(WEB_API_PORT, () => {
   console.log(`✅ Web-Login-API läuft auf Port ${WEB_API_PORT}`);
 });
-
-// ========== START BOT ==========
 
 async function startBot(sessionName = 'default', hooks = {}) {
   if (activeSessions.has(sessionName)) {
@@ -1049,14 +1017,13 @@ async function startBot(sessionName = 'default', hooks = {}) {
 
   activeSessions.set(sessionName, sock);
 
-  
   if (sessionName === 'default') {
     setActiveSock(sock);
   }
 sock.ev.on('creds.update', saveCreds);
 
-const pendingMarriageProposals = new Map(); // targetJid -> { from, at }
-const pendingApplications = new Map(); // sender -> { step, answers }
+const pendingMarriageProposals = new Map();
+const pendingApplications = new Map();
   const groupMetaCache = new Map();
   const lastProcessed = new Map();
   const pendingActions = new Map();
@@ -1102,7 +1069,6 @@ const pendingApplications = new Map(); // sender -> { step, answers }
 
     return null;
   }
-
 
 setInterval(async () => {
   try {
@@ -1208,7 +1174,6 @@ async function updateBotProfile() {
         );
         return p?.admin === 'admin' || p?.admin === 'superadmin';
       }
-      // Cache invalidieren: Admin-Status/Mitgliederliste hat sich geändert
       groupMetaCache.delete(groupId);
 
       if (!groupSettings[groupId]) {
@@ -1221,7 +1186,6 @@ async function updateBotProfile() {
       }
       const settings = groupSettings[groupId];
 
-      // ---- BITCHKICK: automatisches Entfernen von gelisteten Nummern ----
       if (action === 'add') {
         const groupKickList = bitchkickData[groupId] || [];
         if (groupKickList.length) {
@@ -1259,7 +1223,6 @@ async function updateBotProfile() {
         const welcomeMsg = settings.welcome.message || 'Willkommen in der Gruppe! 👋';
 
         for (const rawParticipant of participants) {
-          // Robust: participant kann ein String ODER ein Objekt { id, ... } sein
           const participantJid = typeof rawParticipant === 'string'
             ? rawParticipant
             : (rawParticipant?.id || rawParticipant?.jid || null);
@@ -1297,7 +1260,6 @@ const m = messages[0];
       const sender = normalizeJid(rawParticipant);
       const isGroup = typeof from === 'string' && from.endsWith('@g.us');
 
-      // 🔒 OWNER MODE — ignoriert wirklich ALLES von Nicht-Ownern (auch AFK, Antilink, XP etc.)
       if (OWNER_MODE && !isAuthorized(sender, ['OWNER', 'COOWNER']) && !m.key.fromMe) {
         return;
       }
@@ -1306,7 +1268,6 @@ const m = messages[0];
         || (m.message.extendedTextMessage && m.message.extendedTextMessage.text)
         || (m.message.imageMessage && m.message.imageMessage.caption)
         || '';
-
 
      if (body) {
         log(`[MSG] ${sender} in ${isGroup ? from : 'PM'}: ${body}`);
@@ -1336,7 +1297,6 @@ if (!m.key.fromMe && pendingApplications.has(sender)) {
     return;
   }
 
-  // Alle Fragen beantwortet -> an Owner senden
   pendingApplications.delete(sender);
   const a = appState.answers;
 
@@ -1365,7 +1325,6 @@ if (!m.key.fromMe && pendingApplications.has(sender)) {
   }
   return;
 }
-// Levenshtein-Distanz: misst, wie "ähnlich" zwei Strings sind
 function levenshtein(a, b) {
   const m = a.length, n = b.length;
   const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
@@ -1380,7 +1339,6 @@ function levenshtein(a, b) {
   return dp[m][n];
 }
 
-// Alle bekannten Befehle — bei neuen Commands hier ergänzen!
 const ALL_COMMANDS = [
   'help', 'menu', 'sao', 'ping', 'owner', 'com', 'whoami', 'me', 'afk',
   'register', 'unregister', 'backup', 'balance', 'stats', 'profile', 'userinfo',
@@ -1439,7 +1397,6 @@ if (cmdNoPrefix === 'resetprefix' && isGroup) {
     return;
   }
 
-
   if (!groupSettings[from]) {
     groupSettings[from] = { welcome: { enabled: false, message: 'Willkommen in der Gruppe {user}! 👋' }, prefix: PREFIX };
   }
@@ -1453,7 +1410,6 @@ if (isGroup && m.key.id) {
   trackGroupMessage(from, m.key.id, m.key.fromMe ? null : (m.key.participant || sender));
 }
 
-   
       if (body && !m.key.fromMe) {
         const afkKey = findAfkKey(sender);
         if (afkKey) {
@@ -1473,7 +1429,6 @@ if (isGroup && m.key.id) {
         }
       }
 
-   
 const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/channel)\/[a-zA-Z0-9]+/i;
 
       if (isGroup && body && !m.key.fromMe && whatsappLinkRegex.test(body)) {
@@ -1512,7 +1467,7 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
                 try {
                   await sock.sendMessage(from, {
                     text: `🚫 @${sender.split('@')[0]} wurde wegen eines WhatsApp-Links entfernt.`,
-                    mentions: [sender]
+mentions: [sender]
                   });
                 } catch (e) {}
 
@@ -1531,11 +1486,9 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
         } catch (e) { console.error('[antilink] Fehler:', e); }
       }
 
-
       const activePrefix = isGroup ? getGroupPrefix(from) : PREFIX;
       if (!body || !body.startsWith(activePrefix)) return;
 
-      // Wenn nach dem Prefix nichts (oder nur Leerzeichen) kommt, nicht reagieren
       const afterPrefix = body.slice(activePrefix.length).trim();
       if (!afterPrefix) return;
 
@@ -1577,7 +1530,6 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
             try { await sock.sendMessage(from, { text: '⚠️ Ich bin kein Administrator in dieser Gruppe und kann keine Befehle ausführen.' }); } catch (e) {}
             return;
           }
-// 🔒 ADMIN-MODUS: nur Gruppenadmins + Supporter/Mod/CoOwner/Owner dürfen den Bot hier nutzen
           if (groupSettings[from]?.adminMode?.enabled) {
             const senderIsGroupAdmin = isGroupAdminJid(meta, sender);
             const senderIsPrivileged = isAuthorized(sender, ['OWNER', 'COOWNER', 'MOD', 'SUPPORTER', 'TEST_SUPPORTER']);
@@ -1684,7 +1636,6 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
 
       ensureUser(sender);
 
-      
       if (!m.key.fromMe) {
         users[sender].xp = (users[sender].xp || 0) + 5;
         users[sender].msgCount = (users[sender].msgCount || 0) + 1;
@@ -1713,7 +1664,6 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
       const isOwner = isAuthorized(sender, ['OWNER', 'COOWNER']);
       const isCoOwner = isAuthorized(sender, ['COOWNER']);
       const isAdmin = isAuthorized(sender, ['ADMIN']);
-      // Team-Mitglieder = alle Ränge außer VIP, USER und ADMIN
       const isTeamMember = isAuthorized(sender, ['OWNER', 'COOWNER', 'MOD', 'SUPPORTER', 'TEST_SUPPORTER']);
 
       if (BOT_OFFLINE && !isOwner) {
@@ -1744,7 +1694,6 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
         return;
       }
 
-      // AFK-Mentions: Wenn ein AFK-User erwähnt wird, Sender informieren
       const mentionCtx = m.message?.extendedTextMessage?.contextInfo;
       if (mentionCtx && Array.isArray(mentionCtx.mentionedJid) && mentionCtx.mentionedJid.length) {
         for (const mid of mentionCtx.mentionedJid) {
@@ -1759,7 +1708,6 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
         }
       }
 
-      // GETLID
       if (cmd === 'getlid') {
         let target = args[0];
         if (!target) {
@@ -1775,13 +1723,11 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
         await sock.sendMessage(from, { text: `Die LID ist ${lid}` });
         return;
       }
-// GROUPID
       if (cmd === 'groupid' || cmd === 'gruppenid') {
         if (!isGroup) return send('❌ Dieser Befehl funktioniert nur in Gruppen.');
         return send(`📋 Diese Gruppen-ID ist:\n${from}`);
       }
 
-      // BITCHKICK — Nummern-Liste pro Gruppe, wird bei Beitritt automatisch gekickt
       if (cmd === 'bitchkick') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
         if (!isGroup) return send('❌ Dieser Befehl funktioniert nur innerhalb einer Gruppe.');
@@ -1851,7 +1797,6 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
         );
       }
 
-      // AFK
       if (cmd === 'afk') {
         const reason = args.length ? args.join(' ') : 'Abwesend';
         if (!users[sender]) ensureUser(sender);
@@ -1870,13 +1815,11 @@ function downloadYoutubeMp3(url) {
 
     const outTemplate = path.join(YTMP3_CACHE_DIR, `${Date.now()}-%(title).60s.%(ext)s`);
 
-    // -x = nur Audio extrahieren, --audio-format mp3 = zu mp3 konvertieren (braucht ffmpeg)
     const cmd = `yt-dlp -x --audio-format mp3 --audio-quality 0 --no-playlist -o "${outTemplate}" "${url}"`;
 
     exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err, stdout, stderr) => {
       if (err) return reject(err);
 
-      // Neueste .mp3-Datei im Cache-Ordner finden
       const files = fs.readdirSync(YTMP3_CACHE_DIR)
         .filter(f => f.endsWith('.mp3'))
         .map(f => ({ f, t: fs.statSync(path.join(YTMP3_CACHE_DIR, f)).mtimeMs }))
@@ -1902,7 +1845,6 @@ function downloadShortIfNeeded() {
 
     fs.mkdirSync(path.dirname(CACHE_PATH), { recursive: true });
 
-    // -f mp4 wählt ein Format, das WhatsApp gut abspielen kann
     const cmd = `yt-dlp -f "mp4" -o "${CACHE_PATH}" "${SHORT_URL}"`;
 
     exec(cmd, (err) => {
@@ -1912,7 +1854,6 @@ function downloadShortIfNeeded() {
   });
 }
 
-// HELP / MENU
 if (cmd === 'help' || cmd === 'menu') {
   const helpText = menuSystem.buildMenuText({
   args, sender, activePrefix, PREFIX,
@@ -1920,7 +1861,7 @@ if (cmd === 'help' || cmd === 'menu') {
   ARENA_HELP_TEXT, GUILD_HELP_TEXT, TITLE_HELP_TEXT, POKEMON_HELP_TEXT,
   GUILDWAR_HELP_TEXT,
   DS_HELP_TEXT: demonSlayer.DS_HELP_TEXT,
-  SL_HELP_TEXT: soloLeveling.SL_HELP_TEXT   // NEU
+  SL_HELP_TEXT: soloLeveling.SL_HELP_TEXT
 });
   try {
     const videoPath = await downloadShortIfNeeded();
@@ -1936,48 +1877,37 @@ if (cmd === 'help' || cmd === 'menu') {
   return;
 }
 
-   
  const GAME_COMMANDS = [
-  // ---- Basis (bereits vorhanden) ----
   'daily', 'work', 'blackjack', 'bj', 'bjstart', 'hit', 'stand',
   'slot', 'rps', 'fish', 'adopt', 'pet', 'petinfo', 'feed', 'play',
 
-  // ---- Arena-System (alle) ----
   'openkiste', 'kisteoeffnen', 'openbox', 'gear', 'ausruestung', 'equipment',
   'equip', 'unequip', 'sell', 'verkaufen', 'duell', 'arena', 'duelleaderboard',
   'kampfrangliste', 'arenaitems', 'itemliste', 'floor', 'etage',
 
-  // ---- Gilden-System (alle) ----
   'gilde', 'guild', 'gildenrang', 'guildrank',
 
-  // ---- Pokemon-System (alle) ----
   'pokestarter', 'wild', 'catch', 'pokemon', 'p', 'pokeinfo',
   'pokeactive', 'pokename', 'pokerelease', 'pokedex', 'pokeshop',
   'pokebuy', 'poketrain', 'pokevolve', 'pokebattle', 'pokehelp'
 ];
-// GAMES an/aus Check 
 if (isGroup && GAME_COMMANDS.includes(cmd)) {
-  const gamesEnabled = groupSettings[from]?.games?.enabled !== false; // Default: an
+  const gamesEnabled = groupSettings[from]?.games?.enabled !== false;
   if (!gamesEnabled) {
     return send(`🎮 Spiele sind in dieser Gruppe deaktiviert. Ein Admin kann sie mit ${activePrefix}games-an wieder aktivieren.`);
   }
 }
-      // Cooldown
       if (!isOwner && cmd !== 'help' && cmd !== 'menu') {
         const cooldownCommands = [
-          // ---- Basis (bereits vorhanden) ----
           'work', 'fish', 'slot', 'hunt', 'dig', 'crime', 'rob', 'daily', 'weekly', 'monthly',
           'collect', 'open', 'mine', 'farm', 'adventure', 'explore', 'quest', 'raid', 'train',
           'duel', 'gamble', 'casino', 'blackjack', 'rps', 'lottery', 'spin', 'loot',
 
-          // ---- Arena-System (alle) ----
   'duell', 'arena', 'duelleaderboard',
-          'kampfrangliste', 
+          'kampfrangliste',
 
-          // ---- Gilden-System (alle) ----
           'gilde', 'guild', 'gildenrang', 'guildrank',
 
-          // ---- Pokemon-System (alle) ----
           'pokestarter', 'wild',  'pokemon', 'p', 'pokeinfo',
           'pokeactive', 'pokename', 'pokerelease', 'pokedex', 'pokeshop',
           'pokebuy', 'poketrain', 'pokevolve', 'pokebattle', 'pokehelp'
@@ -1987,7 +1917,6 @@ if (isGroup && GAME_COMMANDS.includes(cmd)) {
           if (cooldownMessage) return send(cooldownMessage);
         }
       }
-      // Group Settings (gi)
       if (cmd === 'gi' && isGroup) {
         const groupMetadata = await getGroupMetaSafe(from);
         const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
@@ -2007,7 +1936,6 @@ if (isGroup && GAME_COMMANDS.includes(cmd)) {
         );
       }
 
-      // Welcome Controls
       if ((cmd === 'welcome-an' || cmd === 'welcome-aus' || cmd === 'welcome-set') && isGroup) {
         const groupMetadata = await getGroupMetaSafe(from);
         const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
@@ -2061,7 +1989,6 @@ if ((cmd === 'games-an' || cmd === 'games-aus') && isGroup) {
   save(FILES.groupSettings, groupSettings);
   return send('✅ Spiele-Befehle wurden in dieser Gruppe deaktiviert.');
 }
-// ADMIN-MODUS AN/AUS — nur Gruppenadmins/Owner/CoOwner dürfen umschalten
 if ((cmd === 'adminmodus-an' || cmd === 'adminmodus-aus') && isGroup) {
   const groupMetadata = await getGroupMetaSafe(from);
   const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
@@ -2084,7 +2011,6 @@ if ((cmd === 'adminmodus-an' || cmd === 'adminmodus-aus') && isGroup) {
   save(FILES.groupSettings, groupSettings);
   return send('🔓 Admin-Modus deaktiviert. Der Bot reagiert wieder auf alle Mitglieder.');
 }
-      // Ticket answer
       if (cmd === 'answer') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'MOD', 'SUPPORTER', 'TEST_SUPPORTER'])) return send('❌ Kein Zugriff.');
         if (args.length < 2) return send(`❌ Nutzung: ${PREFIX}answer <ticket-id> <antwort-text>`);
@@ -2100,8 +2026,6 @@ if ((cmd === 'adminmodus-an' || cmd === 'adminmodus-aus') && isGroup) {
         const answererRank = ranks[normalizedAnswerer] || users[normalizedAnswerer]?.rank || 'USER';
         const rankLabel = prettyRank(answererRank);
 
-        
-
         try {
           await sock.sendMessage(SUPPORT_CONFIG.SUPPORT_GROUP, {
             text: `📝 Antwort auf Ticket #${ticket.id}:\n\n${answerText}\n\n${rankLabel}: ${await getNumberMention(sender, sock)}`,
@@ -2111,7 +2035,6 @@ if ((cmd === 'adminmodus-an' || cmd === 'adminmodus-aus') && isGroup) {
           console.error('[answer] Konnte Support-Gruppe nicht benachrichtigen (falsche Gruppen-ID oder Bot nicht mehr Mitglied?):', e);
         }
 
-       
         try {
           await sock.sendMessage(ticket.sender, {
             text: `📩 Antwort auf dein Support-Ticket #${ticket.id}:\n\n${answerText}\n\nBeantwortet von: ${rankLabel} ${await getNumberMention(sender, sock)}`,
@@ -2121,7 +2044,6 @@ if ((cmd === 'adminmodus-an' || cmd === 'adminmodus-aus') && isGroup) {
           console.error('[answer] Konnte Antwort nicht direkt an den Nutzer senden:', e);
         }
 
-        
         delete tickets[ticket.id];
         save(FILES.tickets, tickets);
         ticketCounter = Object.keys(tickets).length;
@@ -2129,7 +2051,6 @@ if ((cmd === 'adminmodus-an' || cmd === 'adminmodus-aus') && isGroup) {
         return send(`✅ Antwort für Ticket #${ticket.id} gesendet und Ticket gelöscht.`);
       }
 
- 
       if (cmd === 'setrole') {
         if (!isAuthorized(sender, ['OWNER'])) return send('❌ Nur für Owner.');
 
@@ -2140,7 +2061,6 @@ if ((cmd === 'adminmodus-an' || cmd === 'adminmodus-aus') && isGroup) {
           return send(`❌ Nutzung:\n${PREFIX}setrole @user <ROLLE>\noder: ${PREFIX}setrole <ROLLE> @user\noder: als Antwort auf eine Nachricht einfach ${PREFIX}setrole <ROLLE>\nVerfügbare Rollen: ${Object.keys(ROLES).join(', ')}`);
         }
 
-        
         const firstUpper = args[0].toUpperCase();
         const lastUpper = args[args.length - 1].toUpperCase();
 
@@ -2174,7 +2094,6 @@ if ((cmd === 'adminmodus-an' || cmd === 'adminmodus-aus') && isGroup) {
           }
         }
 
-        
         if (jidList.length === 0) {
           jidList = [sender];
         }
@@ -2184,18 +2103,13 @@ if ((cmd === 'adminmodus-an' || cmd === 'adminmodus-aus') && isGroup) {
 
         const normalizedJids = Array.from(new Set(validJids));
 
-        
-
         if (roleUpper !== 'OWNER' && normalizedJids.some(isPrimaryOwner)) {
           return send('❌ Der Haupt-Owner ist geschützt und kann nicht heruntergestuft werden.');
         }
 
- // Alle JIDs in ranks.json und users.json speichern
 normalizedJids.forEach(jid => {
-  // ranks.json aktualisieren
   ranks[jid] = roleUpper;
 
-  // users.json aktualisieren (User anlegen falls nötig)
   if (!users[jid]) {
     users[jid] = {
       xp: 0,
@@ -2217,7 +2131,6 @@ normalizedJids.forEach(jid => {
   }
 });
 
-        // Aus anderen ROLES-Arrays entfernen (keine veralteten Einträge)
         for (const otherRole of Object.keys(ROLES)) {
           if (otherRole === roleUpper) continue;
           ROLES[otherRole] = (ROLES[otherRole] || []).filter(
@@ -2225,7 +2138,6 @@ normalizedJids.forEach(jid => {
           );
         }
 
-        // Zur Ziel-Rolle hinzufügen (Duplikate vermeiden)
         if (!ROLES[roleUpper]) ROLES[roleUpper] = [];
         for (const jid of normalizedJids) {
           if (!ROLES[roleUpper].some(id => isSameJid(id, jid))) {
@@ -2235,7 +2147,6 @@ normalizedJids.forEach(jid => {
 
         protectPrimaryOwner();
 
-        // Alles persistieren
         try {
           save(FILES.ranks, ranks);
           save(FILES.users, users);
@@ -2282,7 +2193,6 @@ normalizedJids.forEach(jid => {
         return send(`✅ Präfix gesetzt auf: ${PREFIX}`);
       }
 
-// RESET COINS
       if (cmd === 'resetcoins') {
         if (!isAuthorized(sender, ['OWNER'])) return send('❌ Nur der Inhaber darf diesen Befehl nutzen.');
 
@@ -2301,13 +2211,11 @@ normalizedJids.forEach(jid => {
 
         return send(`✅ Coins von @${targetJid.split('@')[0]} wurden zurückgesetzt (vorher: ${oldCoins} → jetzt: 0).`, { mentions: [targetJid] });
       }
-      // LISTROLES
 if (cmd === 'listroles') {
   if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
 
   const roleOrder = ['OWNER', 'COOWNER', 'ADMIN', 'MOD', 'VIP', 'SUPPORTER', 'TEST_SUPPORTER'];
 
-  // Schritt 1: alle rohen JIDs pro Rolle sammeln (noch ohne Dedupe)
   const rawEntries = {};
   for (const r of roleOrder) rawEntries[r] = new Set();
 
@@ -2325,12 +2233,9 @@ if (cmd === 'listroles') {
     for (const id of jids) collect(role, id);
   }
 
-  // Schritt 2: @lid-Einträge über die ECHTE LID->Telefonnummer-Zuordnung auflösen
-  // (nicht per Suffix-Tausch, sondern über die offizielle Mapping-Funktion),
-  // damit dieselbe Person aus @lid- und @s.whatsapp.net-Quellen zusammengeführt wird.
   const grouped = {};
   for (const role of Object.keys(rawEntries)) {
-    grouped[role] = new Map(); // canonicalRaw -> { displayJid, sourceJids: Set }
+    grouped[role] = new Map();
     for (const n of rawEntries[role]) {
       let canonicalRaw = extractRawNumber(n);
       let displayJid = n;
@@ -2341,9 +2246,6 @@ if (cmd === 'listroles') {
           canonicalRaw = extractRawNumber(resolved);
           displayJid = resolved;
         }
-        // Falls keine Auflösung möglich ist (z.B. noch kein Signal-Session mit
-        // dieser Person aufgebaut), bleibt es bei der rohen LID — das ist dann
-        // technisch bedingt und kein Bug.
       }
 
       const existing = grouped[role].get(canonicalRaw);
@@ -2372,8 +2274,6 @@ if (cmd === 'listroles') {
 
     message += `*${prettyRank(role)}* (${map.size}):\n`;
     for (const [raw, entry] of map) {
-      // Name über jede bekannte Quell-JID suchen (falls users.json unter der
-      // anderen JID-Form gespeichert ist)
       let name = '(kein name)';
       for (const src of entry.sourceJids) {
         const u = users[src];
@@ -2387,7 +2287,6 @@ if (cmd === 'listroles') {
 
   return send(message.trim(), { mentions: allMentions });
 }
-      // APPLYROLES
       if (cmd === 'applyroles') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
         const target = args[0] ? args[0].trim() : from;
@@ -2406,7 +2305,6 @@ if (cmd === 'listroles') {
         }
       }
 
-      // UNBANCMD
       if (cmd === 'unbancmd') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Nur Owner/CoOwner.');
         const target = args[0];
@@ -2424,7 +2322,6 @@ if (cmd === 'listroles') {
         }
       }
 
-      // UPDATEPROFILE
       if (cmd === 'updateprofile') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
         await send('🔄 Aktualisiere Bot-Profil...');
@@ -2432,7 +2329,6 @@ if (cmd === 'listroles') {
         return send('✅ Profilaktualisierung abgeschlossen.');
       }
 
-      // RESTART
       if (cmd === 'restart') {
         if (!hasAdminPerms(sender)) return send('❌ Kein Zugriff.');
         await send('🔄 Bot wird neugestartet...');
@@ -2443,7 +2339,6 @@ if (cmd === 'listroles') {
         process.exit(0);
       }
 
-// WHOAMI / ME
 if (cmd === 'whoami' || cmd === 'me') {
   const normalizedSender = normalizeJid(sender);
   const user = users[normalizedSender] || {};
@@ -2471,13 +2366,11 @@ if (cmd === 'whoami' || cmd === 'me') {
   if (user.sexualitaet) infoLines.push('Sexualitaet: ' + user.sexualitaet);
   const infoBlock = infoLines.length ? '\n' + infoLines.join('\n') : '';
 
-  // 🎖️ Titel
   const activeTitleObj = TITLES.find(t => t.id === user.activeTitle);
   const titleLine = activeTitleObj
     ? `🎖️ Titel: ${activeTitleObj.icon} "${activeTitleObj.name}"`
     : '🎖️ Titel: Keiner';
 
-  // ⚔️ Ausrüstung — nur Name + Seltenheits-Icon, KEINE ID, KEINE Stärke
   arena.ensureArenaFields(users, normalizedSender);
   const weaponId = user.equipped?.weapon;
   const armorId = user.equipped?.armor;
@@ -2495,13 +2388,11 @@ if (cmd === 'whoami' || cmd === 'me') {
 
   const caption = `User: ${username}\n${titleLine}\nCoins: ${coins}\nRank: ${r}\nLevel: ${level}\nXP: ${xp} / ${neededXp}\nNoch ${remainingXp} XP bis Level ${level + 1}\n🗡️ Waffe: ${weaponLine}\n🛡️ Rüstung: ${armorLine}\n${marriageLine}${infoBlock}`;
 
-  // Fallback-Bild, falls kein echtes Profilbild gefunden wird
   const FALLBACK_PP_URL = 'https://raw.githubusercontent.com/Marlon9511/Sword-art-online-bot/main/5d553cd8911378163e989839dff229f3.webp.jpg';
 
   try {
     const candidates = [];
 
-    // Echte Nummer über die offizielle LID->PN-Zuordnung auflösen (falls sender eine @lid ist)
     const resolved = await resolvePhoneJid(normalizedSender, sock);
     if (resolved) candidates.push(resolved);
 
@@ -2538,7 +2429,6 @@ if (cmd === 'whoami' || cmd === 'me') {
     }
     console.log('[whoami] Socket-Status:', sock.ws?.readyState, '| User:', !!sock.user);
 
-    // Kein echtes Profilbild gefunden -> Fallback nutzen
     if (!ppUrl) {
       console.error('[whoami] Kein Profilbild gefunden für Kandidaten:', [...tried]);
       ppUrl = FALLBACK_PP_URL;
@@ -2560,19 +2450,16 @@ if (cmd === 'whoami' || cmd === 'me') {
   return send(caption);
 }
 
-      // PING
       if (cmd === 'ping') {
         const startTime = Date.now();
         await send('🏓 Pong!');
         return send(`Antwortzeit: ${Date.now() - startTime}ms`);
       }
 
-      // OWNER
       if (cmd === 'owner') {
         return send('👑 Kontaktiere den Owner:\nhttps://wa.me/4915111254435');
       }
 
-      // COM — Offizielle Gruppe anzeigen / Link ändern
       if (cmd === 'com') {
         if (!args.length) {
           return send(`📢 *Offizielle Gruppe*\n${officialGroup.link}`);
@@ -2592,7 +2479,6 @@ if (cmd === 'whoami' || cmd === 'me') {
         return send(`✅ Offizieller Gruppenlink aktualisiert:\n${newLink}`);
       }
 
-      // CODE
       if (cmd === 'code') {
         if (!isOwner) return send('❌ Nur der Inhaber darf diesen Befehl verwenden.');
         const target = args[0];
@@ -2628,7 +2514,6 @@ if (cmd === 'whoami' || cmd === 'me') {
           return send('❌ Fehler beim Lesen der Datei.');
         }
       }
-// BEWERBUNG
 if (cmd === 'bewerbung' || cmd === 'bewerben' || cmd === 'apply') {
   if (pendingApplications.has(sender)) {
     return send('⚔️ Du hast bereits eine offene Bewerbung. Beantworte die letzte Frage oder schreibe "abbrechen".');
@@ -2637,7 +2522,6 @@ if (cmd === 'bewerbung' || cmd === 'bewerben' || cmd === 'apply') {
   await sock.sendMessage(from, { text: APPLICATION_STEPS[0].question });
   return;
 }
-      // BOTOFFLINE
       if (cmd === 'botoffline') {
         if (!isOwner) return send('❌ Nur der Inhaber.');
         const action = (args[0] || '').toLowerCase();
@@ -2648,7 +2532,6 @@ if (cmd === 'bewerbung' || cmd === 'bewerben' || cmd === 'apply') {
         return send('❌ Nutzung: $botoffline on|off|toggle|status');
       }
 
-      // NEWSESSION
       if (cmd === 'newsession') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) return send('❌ Kein Zugriff.');
         const newSessionName = args[0];
@@ -2680,7 +2563,6 @@ if (cmd === 'bewerbung' || cmd === 'bewerben' || cmd === 'apply') {
         return;
       }
 
-      // SESSIONS
       if (cmd === 'sessions') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) return send('❌ Kein Zugriff.');
         const list = [...activeSessions.keys()].map(name => {
@@ -2691,7 +2573,6 @@ if (cmd === 'bewerbung' || cmd === 'bewerben' || cmd === 'apply') {
         return send(`📱 Aktive Sessions:\n${list}`);
       }
 
-      // STOPSESSION
       if (cmd === 'stopsession') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
         const target = args[0];
@@ -2710,7 +2591,6 @@ if (cmd === 'bewerbung' || cmd === 'bewerben' || cmd === 'apply') {
         }
       }
 
-      // DELETESESSION — Session stoppen UND komplett von der Platte löschen
       if (cmd === 'deletesession' || cmd === 'delsession') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
         const target = args[0];
@@ -2747,7 +2627,6 @@ if (cmd === 'bewerbung' || cmd === 'bewerben' || cmd === 'apply') {
 
         return send(`✅ Session "${target}" wurde gestoppt und vollständig gelöscht (inkl. Login-Daten). Beim nächsten "${PREFIX}newsession ${target}" muss neu per QR-Code gescannt werden.`);
       }
-// MARRY
 if (cmd === 'marry') {
   const sub = (args[0] || '').toLowerCase();
 
@@ -2763,7 +2642,6 @@ if (cmd === 'marry') {
   save(FILES.marriages, marriages);
   pendingMarriageProposals.delete(sender);
 
-  // NEU: Flag für den Titel setzen + Fortschritt prüfen
   ensureUser(sender);
   ensureUser(proposal.from);
   users[sender].__isMarried = true;
@@ -2828,7 +2706,6 @@ if (cmd === 'marry') {
   );
 }
 
-// DIVORCE
 if (cmd === 'divorce') {
   ensureUser(sender);
   const marriage = marriages[sender];
@@ -2848,7 +2725,6 @@ if (cmd === 'divorce') {
 
   return send(`💔 Du hast dich von @${partnerJid.split('@')[0]} scheiden lassen.`, { mentions: [partnerJid] });
 }
-      // HIDETAG
       if (cmd === 'hidetag') {
         if (!isGroup) return send('❌ Nur in Gruppen.');
         const groupMetadata = await getGroupMetaSafe(from);
@@ -2868,7 +2744,6 @@ if (cmd === 'divorce') {
         }
       }
 
-      // DELETE / DEL — Nachricht löschen (per Reply auf die Nachricht)
       if (cmd === 'delete' || cmd === 'del') {
         const ctx = m.message?.extendedTextMessage?.contextInfo;
         if (!ctx || !ctx.stanzaId) {
@@ -2883,2564 +2758,3 @@ if (cmd === 'divorce') {
         if (!isOwnMessage) {
           if (!isGroup) {
             return send('❌ In privaten Chats kann ich nur meine eigenen Nachrichten löschen.');
-          }
-          let permitted = isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD']);
-          if (!permitted) {
-            const groupMetadata = await getGroupMetaSafe(from);
-            const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
-            permitted = !!isGroupAdmin;
-          }
-          if (!permitted) return send('❌ Du darfst nur eigene Nachrichten oder (als Admin) fremde Nachrichten löschen.');
-        }
-
-        const key = {
-          remoteJid: from,
-          id: ctx.stanzaId,
-          fromMe: isOwnMessage,
-          ...(isGroup ? { participant: quotedParticipant } : {})
-        };
-
-        try {
-          await sock.sendMessage(from, { delete: key });
-          return;
-        } catch (e) {
-          console.error('[delete] Fehler:', e);
-          return send('❌ Löschen fehlgeschlagen (ich brauche dafür ggf. Admin-Rechte in der Gruppe, wenn es nicht meine eigene Nachricht ist).');
-        }
-      }
-
-      // BALANCE
-      if (cmd === 'balance') {
-        ensureUser(sender);
-        const u = users[sender];
-        return send(`💰 Coins: ${u.coins}\n⭐ Level: ${u.level}\nXP: ${u.xp}`);
-      }
-
-      // ADD XP
-      if (cmd === 'addxp' && hasAdminPerms(sender)) {
-        const target = args[0];
-        const amount = parseInt(args[1]);
-        if (!target || isNaN(amount) || amount < 0) return send('❌ Nutzung: $addxp <@nutzer> <menge>');
-        const targetJid = normalizeJid(target);
-        ensureUser(targetJid);
-        users[targetJid].xp = (users[targetJid].xp || 0) + amount;
-        save(FILES.users, users);
-        return send(`✅ ${amount} XP an @${targetJid.split('@')[0]} geschenkt.`, { mentions: [targetJid] });
-      }
-
-      // ADD CASH
-      if (cmd === 'addcash' && hasAdminPerms(sender)) {
-        const target = args[0];
-        const amount = parseInt(args[1]);
-        if (!target || isNaN(amount) || amount < 0) return send('❌ Nutzung: $addcash <@nutzer> <menge>');
-        const targetJid = normalizeJid(target);
-        ensureUser(targetJid);
-        users[targetJid].coins = (users[targetJid].coins || 0) + amount;
-        save(FILES.users, users);
-        return send(`✅ ${amount} Coins an @${targetJid.split('@')[0]} geschenkt.`, { mentions: [targetJid] });
-      }
-
-      // ADD VIP
-      if (cmd === 'addvip' && hasAdminPerms(sender)) {
-        const target = args[0];
-        const duration = args[1];
-        if (!target || !duration) return send('❌ Nutzung: $addvip <@nutzer> <1d|12h|30m>');
-        const targetJid = normalizeJid(target);
-        if (!addVip(targetJid, duration)) return send('❌ Ungültiges Zeitformat.');
-        ensureUser(targetJid);
-        const expiry = new Date(vipExpiry.get(targetJid)).toLocaleString();
-        return send(`✅ VIP für @${targetJid.split('@')[0]} bis ${expiry}.`, { mentions: [targetJid] });
-      }
-
-      // FISH — Angeln in den Gewässern von Aincrad
-      if (cmd === 'fish') {
-        const FISH_EVENTS = [
-          // ---- Floor 1: Stadt der Anfänge — Fluss ----
-          { chance: 20, rarity: 'common',    text: '🐟 *Flusswels* aus dem Fluss der Stadt der Anfänge gefangen! (+8 Coins)', coins: 8 },
-          { chance: 16, rarity: 'common',    text: '🐠 *Blauschuppen-Barsch* gefangen! (+15 Coins)', coins: 15, xp: 3 },
-          { chance: 12, rarity: 'uncommon',  text: '🐡 *Kugelfisch der ersten Ebene* gefangen! (+25 Coins)', coins: 25, xp: 5 },
-
-          // ---- Floor 22: Kristallwald-See ----
-          { chance: 10, rarity: 'uncommon',  text: '💎 *Kristallforelle* aus dem Kristallwald-See schimmert in der Sonne! (+30 Coins)', coins: 30, xp: 8 },
-          { chance: 7,  rarity: 'rare',      text: '🌫️ *Nebelaal* (Floor 35) aus dem Sumpf gezogen! (+45 Coins)', coins: 45, xp: 10 },
-
-          // ---- Comedic / kleine Mob-Drops ----
-          { chance: 8,  rarity: 'common',    text: '🦀 *Kobold-Krebs* hat sich in der Angel verheddert. (+5 Coins)', coins: 5 },
-          { chance: 5,  rarity: 'rare',      text: '🐍 *Riesenaal* zerrt dich fast von der Plattform, gibt aber auf! (+40 Coins)', coins: 40, xp: 8 },
-
-          // ---- Höhere Floors ----
-          { chance: 4,  rarity: 'epic',      text: '🦈 *Sturmhai* (Floor 50) durchbricht die Wasseroberfläche! (+90 Coins)', coins: 90, xp: 20 },
-          { chance: 3,  rarity: 'epic',      text: '🎐 *Leuchtqualle der Tiefen* (Floor 75) taucht schimmernd auf! (+70 Coins)', coins: 70, xp: 15 },
-          { chance: 1.5, rarity: 'legendary', text: '🐉 *Drachenkarpfen* (Floor 90) — ein legendärer Feldboss-Fisch! (+180 Coins)', coins: 180, xp: 35 },
-          { chance: 0.4, rarity: 'legendary', text: '🐋 *Der Weiße Wal von Aincrad* — eine Systemlegende wird wahr! JACKPOT! (+600 Coins)', coins: 600, xp: 120 },
-
-          // ---- Schätze & Botschaften ----
-          { chance: 3,  rarity: 'rare',      text: '📦 *Schatztruhe* am Grund des Sees entdeckt! (+200 Coins)', coins: 200, xp: 10 },
-          { chance: 2,  rarity: 'uncommon',  text: '📜 *Flaschenpost eines gefallenen Spielers* gefunden. (+50 Coins)', coins: 50, xp: 20 },
-
-          // ---- Item-Drops ----
-          { chance: 2,  rarity: 'epic',      text: '⚔️ Im Netz verfangen: eine *SAO-Ausrüstungskiste*! Nutze {P}openkiste, um sie zu öffnen.', item: 'kiste', itemQty: 1, xp: 15 },
-          { chance: 3,  rarity: 'uncommon',  text: '💊 Eine *Heiltrank-Flasche* trieb vorbei und wurde eingesammelt.', item: 'potion', itemQty: 1 },
-          { chance: 3,  rarity: 'uncommon',  text: '🎁 Eine *mysteriöse Kiste* hing im Schilf fest.', item: 'box', itemQty: 1 },
-
-          // ---- Nieten / Pech ----
-          { chance: 10, rarity: 'common',    text: '🌿 Nur Algen gefangen... Aincrad ist manchmal enttäuschend.' },
-          { chance: 8,  rarity: 'common',    text: '💨 Ein Fisch hat deinen Köder gestohlen und ist geflüchtet!' },
-          { chance: 4,  rarity: 'common',    text: '💦 Du bist ausgerutscht und ins eiskalte Wasser gefallen!' },
-          { chance: 3,  rarity: 'common',    text: '🦶 Ein *Kobold* hat dein Boot umgestoßen! (-30 Coins)', coins: -30 },
-          { chance: 2,  rarity: 'common',    text: '🪝 Deine Angel ist an einem Stein zerbrochen! (-10 Coins)', coins: -10 }
-        ];
-
-        const totalWeight = FISH_EVENTS.reduce((sum, e) => sum + e.chance, 0);
-        let random = Math.random() * totalWeight;
-        let selectedEvent = FISH_EVENTS[FISH_EVENTS.length - 1];
-        for (const event of FISH_EVENTS) {
-          random -= event.chance;
-          if (random <= 0) { selectedEvent = event; break; }
-        }
-
-        ensureUser(sender);
-
-        if (selectedEvent.coins) {
-          users[sender].coins = Math.max(0, (users[sender].coins || 0) + selectedEvent.coins);
-        }
-        if (selectedEvent.xp) {
-          users[sender].xp = (users[sender].xp || 0) + selectedEvent.xp;
-        }
-        if (selectedEvent.item) {
-          if (!users[sender].items) users[sender].items = {};
-          users[sender].items[selectedEvent.item] = (users[sender].items[selectedEvent.item] || 0) + (selectedEvent.itemQty || 1);
-        }
-        save(FILES.users, users);
-
-        const rarityTag = selectedEvent.rarity ? (RARITY_INFO[selectedEvent.rarity]?.emoji || '') : '';
-        const header = `🎣 *— ANGELN IN AINCRAD —* 🎣\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n`;
-        const footer = `\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈`;
-        const bodyText = selectedEvent.text.replace(/\{P\}/g, activePrefix);
-
-        return send(`${header}${rarityTag ? rarityTag + ' ' : ''}${bodyText}${footer}`);
-      }
-// GIVE
-      if (cmd === 'give') {
-        const target = args[0];
-        const amount = parseInt(args[1]);
-        if (!target || isNaN(amount) || amount <= 0) return send('❌ Nutzung: $give <nummer|@mention> <betrag>');
-        const targetJid = normalizeJid(target);
-        if ((users[sender]?.coins || 0) < amount) return send('❌ Nicht genug Coins!');
-        ensureUser(sender);
-        ensureUser(targetJid);
-        if (isSameJid(sender, targetJid)) return send('❌ Du kannst dir nicht selbst Coins geben!');
-        users[sender].coins -= amount;
-        users[targetJid].coins = (users[targetJid].coins || 0) + amount;
-        save(FILES.users, users);
-        try { await sock.sendMessage(targetJid, { text: `💰 Du hast ${amount} Coins von @${sender.split('@')[0]} erhalten!`, mentions: [sender] }); } catch (e) {}
-        return send(`✅ ${amount} Coins an @${targetJid.split('@')[0]} gesendet!`, { mentions: [targetJid] });
-      }
-// PURGE / CLEARCHAT — löscht alle (oder die letzten N) bekannten Nachrichten der Gruppe
-if (cmd === 'purge' || cmd === 'clearchat') {
-  if (!isGroup) return send('❌ Nur in Gruppen.');
-  if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) {
-    const groupMetadata = await getGroupMetaSafe(from);
-    const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
-    if (!isGroupAdmin) return send('❌ Du musst Admin sein, um diesen Befehl zu nutzen.');
-  }
-
-  const fullHistory = groupMessageHistory.get(from) || [];
-  if (!fullHistory.length) {
-    return send('ℹ️ Keine gespeicherten Nachrichten zum Löschen vorhanden (ich kann nur Nachrichten löschen, die ich seit meinem Start gesehen habe).');
-  }
-
-  // Optionales Limit: $purge 50 löscht nur die letzten 50 Nachrichten
-  let limit = null;
-  if (args[0]) {
-    const parsed = parseInt(args[0]);
-    if (isNaN(parsed) || parsed <= 0) {
-      return send(`❌ Ungültige Zahl. Nutzung: ${PREFIX}purge [anzahl]\nBeispiel: ${PREFIX}purge 50`);
-    }
-    limit = parsed;
-  }
-
-  // Bei Limit: nur die letzten N Einträge (neueste zuerst gelöscht, wie gewünscht)
-  const toDelete = limit ? fullHistory.slice(-limit) : fullHistory;
-  const remaining = limit ? fullHistory.slice(0, -limit) : [];
-
-  await send(`🧹 Lösche ${toDelete.length} Nachricht(en), bitte warten...`);
-
-  let deleted = 0, failed = 0;
-  for (const entry of toDelete) {
-    try {
-      const isOwnMsg = !entry.participant;
-      await sock.sendMessage(from, {
-        delete: {
-          remoteJid: from,
-          id: entry.id,
-          fromMe: isOwnMsg,
-          ...(isOwnMsg ? {} : { participant: entry.participant })
-        }
-      });
-      deleted++;
-      await sleep(200); // kleine Pause, um Rate-Limits zu vermeiden
-    } catch (e) {
-      failed++;
-    }
-  }
-
-  groupMessageHistory.set(from, remaining);
-  return send(`✅ Fertig: ${deleted} Nachricht(en) gelöscht, ${failed} fehlgeschlagen (z.B. schon gelöscht oder zu alt).`);
-}
-      // WORK
-      if (cmd === 'work') {
-        const earn = randInt(50, 200);
-        users[sender].coins = (users[sender].coins || 0) + earn;
-        users[sender].xp = (users[sender].xp || 0) + 20;
-        save(FILES.users, users);
-        return send(`🛠 Du hast ${earn} Coins verdient!`);
-      }
-
-      // DAILY
-      if (cmd === 'daily') {
-        const now = Date.now();
-        const last = users[sender].lastDaily || 0;
-        if (now - last < 24 * 3600 * 1000) {
-          const hours = Math.floor((24 * 3600 * 1000 - (now - last)) / 3600000);
-          return send(`🕒 Wieder in ca. ${hours} Stunden verfügbar.`);
-        }
-        const amount = randInt(1, 1000);
-        users[sender].coins = (users[sender].coins || 0) + amount;
-        users[sender].lastDaily = now;
-        save(FILES.users, users);
-        return send(`🎁 Daily: +${amount} Coins!`);
-      }
-
-      // SHOP
-      const SHOP = {
-        potion: { price: 100, desc: 'Heilt 10 HP' },
-        box: { price: 500, desc: 'Zufälliger Gegenstand' },
-        vip: { price: 2000, desc: 'VIP-Rang' },
-        [ARENA_SHOP_ITEM.id]: { price: ARENA_SHOP_ITEM.price, desc: ARENA_SHOP_ITEM.desc }
-      };
-      if (cmd === 'shop') {
-        let out = '🛒 Shop:\n';
-        for (const [k, v] of Object.entries(SHOP)) out += `• ${k} — ${v.price} 💰 | ${v.desc}\n`;
-        return send(out);
-      }
-      if (cmd === 'buy') {
-        const item = args[0];
-        if (!item || !SHOP[item]) return send('Nutzung: $buy <item>');
-        if ((users[sender].coins || 0) < SHOP[item].price) return send('💸 Zu wenig Coins');
-        users[sender].coins -= SHOP[item].price;
-        users[sender].items[item] = (users[sender].items[item] || 0) + 1;
-        save(FILES.users, users);
-        return send(`✅ ${item} gekauft.`);
-      }
-      if (cmd === 'inventory') {
-        const inv = users[sender].items || {};
-        const out = Object.keys(inv).length ? Object.entries(inv).map(([k, v]) => `${k}: ${v}`).join('\n') : '(leer)';
-        return send(`🎒 Inventar:\n${out}`);
-      }
-     if (cmd === 'use') {
-  const it = (args[0] || '').toLowerCase();
-  if (!it) return send('Nutzung: $use <item>');
-  if (!users[sender].items || !users[sender].items[it]) return send('❌ Item nicht vorhanden. Prüfe mit $inventory die genaue Schreibweise.');
-
-  if (it === 'potion') {
-    users[sender].items[it] -= 1;
-    users[sender].xp = (users[sender].xp || 0) + 10;
-    save(FILES.users, users);
-    return send('💊 Trank verwendet: +10 XP');
-  }
-
-  if (it === 'box') {
-    users[sender].items[it] -= 1;
-    const coins = randInt(50, 300);
-    users[sender].coins = (users[sender].coins || 0) + coins;
-    save(FILES.users, users);
-    return send(`🎁 Box geöffnet: +${coins} Coins`);
-  }
-
-  if (it === 'vip') {
-    const VIP_DURATION = '7d'; // Dauer pro genutztem VIP-Item, z.B. 7 Tage
-    if (!addVip(sender, VIP_DURATION)) {
-      return send('❌ Fehler beim Aktivieren des VIP-Status.');
-    }
-    users[sender].items[it] -= 1;
-    save(FILES.users, users);
-    const expiry = new Date(vipExpiry.get(sender)).toLocaleString('de-DE');
-    return send(`💎 VIP aktiviert! Gültig bis: ${expiry}`);
-  }
-
-  return send('Item verwendet.');
-}
-      // SLOTS
-      if (cmd === 'slot') {
-        const bet = parseInt(args[0]) || 50;
-        if ((users[sender].coins || 0) < bet) return send('Zu wenig Coins.');
-        const spin = spinSlots();
-        const win = spin[0] === spin[1] && spin[1] === spin[2];
-        if (win) {
-          users[sender].coins += bet * 3;
-          users[sender].xp = (users[sender].xp || 0) + 50;
-          save(FILES.users, users);
-          return send(`🎰 | ${spin.join(' | ')} |\n🎉 Jackpot! +${bet * 3} Coins, +50 XP`);
-        } else {
-          users[sender].coins -= bet;
-          save(FILES.users, users);
-          return send(`🎰 | ${spin.join(' | ')} |\n😢 Verloren -${bet} Coins`);
-        }
-      }
-// RPS
-      if (cmd === 'rps') {
-        const choice = (args[0] || '').toLowerCase();
-        const valid = ['rock', 'paper', 'scissors', 'stein', 'papier', 'schere'];
-        if (!valid.includes(choice)) return send('Usage: $rps <rock|paper|scissors>');
-        const norm = (choice === 'stein') ? 'rock' : (choice === 'papier') ? 'paper' : (choice === 'schere') ? 'scissors' : choice;
-        const botOpt = ['rock', 'paper', 'scissors'][randInt(0, 2)];
-        const draw = norm === botOpt;
-        const win = (norm === 'rock' && botOpt === 'scissors') || (norm === 'paper' && botOpt === 'rock') || (norm === 'scissors' && botOpt === 'paper');
-        let res = `🤖 Ich: ${botOpt}\nDu: ${norm}\n`;
-        if (draw) res += 'Unentschieden 😐';
-        else if (win) { users[sender].coins = (users[sender].coins || 0) + 50; users[sender].xp = (users[sender].xp || 0) + 10; save(FILES.users, users); res += 'Du gewinnst! +50 Coins +10 XP 🎉'; }
-        else { users[sender].coins = Math.max(0, (users[sender].coins || 0) - 20); save(FILES.users, users); res += 'Du verlierst -20 Coins 😢'; }
-        return send(res);
-      }
-
-      // BLACKJACK
-      if (cmd === 'blackjack' || cmd === 'bjstart' || cmd === 'bj') {
-        if (!users[sender]) ensureUser(sender);
-        if (users[sender].bj?.active) return send('Du hast bereits ein aktives Spiel. Nutze $hit oder $stand.');
-        const player = [bjDraw(), bjDraw()];
-        const dealer = [bjDraw(), bjDraw()];
-        users[sender].bj = { player, dealer, active: true };
-        save(FILES.users, users);
-        return send(`🃏 Blackjack!\nDeine Karten: ${player.map(c => c.value + c.suit).join(', ')}\nDealer zeigt: ${dealer[0].value + dealer[0].suit}\nNutze ${PREFIX}hit oder ${PREFIX}stand`);
-      }
-      if (cmd === 'hit') {
-        if (!users[sender]) ensureUser(sender);
-        if (!users[sender].bj?.active) return send(`Kein aktives Spiel. Starte mit ${PREFIX}blackjack`);
-        const bj = users[sender].bj;
-        bj.player.push(bjDraw());
-        const p = bjScore(bj.player);
-        let out = `Deine Karten: ${bj.player.map(c => c.value + c.suit).join(', ')}\nPunkte: ${p}`;
-        if (p > 21) {
-          out += '\n😢 Bust! Du verlierst.';
-          delete users[sender].bj;
-        } else if (p === 21) {
-          users[sender].coins = (users[sender].coins || 0) + 75;
-          users[sender].xp = (users[sender].xp || 0) + 40;
-          out += '\n🎉 Blackjack! Du gewinnst +75 Coins +40 XP';
-          delete users[sender].bj;
-        } else {
-          out += '\nNutze $hit oder $stand';
-        }
-        save(FILES.users, users);
-        return send(out);
-      }
-      if (cmd === 'stand') {
-        if (!users[sender]) ensureUser(sender);
-        if (!users[sender].bj?.active) return send(`Kein aktives Spiel. Starte mit ${PREFIX}blackjack`);
-        const bj = users[sender].bj;
-        const p = bjScore(bj.player);
-        let d = bjScore(bj.dealer);
-        while (d < 17) {
-          bj.dealer.push(bjDraw());
-          d = bjScore(bj.dealer);
-        }
-        let out = `Dealer-Karten: ${bj.dealer.map(c => c.value + c.suit).join(', ')}\nDealer: ${d}\nDu: ${p}`;
-        if (p > 21) {
-          out += '\n😢 Bust! Du verlierst.';
-        } else if (d > 21 || p > d) {
-          users[sender].coins = (users[sender].coins || 0) + 75;
-          users[sender].xp = (users[sender].xp || 0) + 40;
-          out += '\n🎉 Du gewinnst! +75 Coins +40 XP';
-        } else if (p === d) {
-          out += '\nUnentschieden';
-        } else {
-          out += '\nDealer gewinnt';
-        }
-        delete users[sender].bj;
-        save(FILES.users, users);
-        return send(out);
-      }
-
-      // PET SYSTEM
-      if (cmd === 'adopt') {
-        const type = (args[0] || '').toLowerCase();
-        if (!['dog', 'cat', 'bird'].includes(type)) return send('Usage: $adopt <dog|cat|bird>');
-        const name = args.slice(1).join(' ') || null;
-        pets[sender] = { type, name, xp: 0, hunger: 100, happiness: 100, lastFed: Date.now() };
-        save(FILES.pets, pets);
-        return send(`🐾 ${type} ${name ? 'mit Namen ' + name : ''} adoptiert!`);
-      }
-      if (cmd === 'petinfo' || cmd === 'pet') {
-        const p = pets[sender];
-        if (!p) return send('Du hast kein Haustier. $adopt <dog|cat|bird>');
-        return send(`🐶 ${p.type} ${p.name ? '- ' + p.name : ''}\nHunger: ${p.hunger}%\nGlück: ${p.happiness}%\nXP: ${p.xp}`);
-      }
-      if (cmd === 'feed') {
-        const p = pets[sender];
-        if (!p) return send('Du hast kein Haustier.');
-        p.hunger = Math.min(100, (p.hunger || 0) + 20);
-        p.happiness = Math.min(100, (p.happiness || 0) + 10);
-        p.lastFed = Date.now();
-        save(FILES.pets, pets);
-        return send(`🍖 ${p.type} gefüttert. Hunger: ${p.hunger}% Glück: ${p.happiness}%`);
-      }
-      if (cmd === 'play') {
-        const p = pets[sender];
-        if (!p) return send('Du hast kein Haustier.');
-        p.happiness = Math.min(100, (p.happiness || 0) + 20);
-        p.xp = (p.xp || 0) + 5;
-        save(FILES.pets, pets);
-        return send(`🎾 Mit ${p.type} gespielt. Glück: ${p.happiness}% XP: ${p.xp}`);
-      }
-
-      // SUPPORT / TICKETS
-      if (cmd === 'support' || cmd === 'ticket') {
-        const text = args.join(' ') || 'Kein Text';
-        ticketCounter++;
-        const ticketId = ticketCounter.toString().padStart(4, '0');
-        tickets[ticketId] = { id: ticketId, sender, message: text, status: 'open', timestamp: Date.now() };
-        save(FILES.tickets, tickets);
-        try {
-          await sock.sendMessage(SUPPORT_CONFIG.TICKET_GROUP, {
-            text: `🎫 Neues Ticket #${ticketId}\nVon: ${await getNumberMention(sender, sock)}\n\nNachricht:\n${text}`,
-            mentions: [sender]
-          });
-          return send(`✅ Ticket #${ticketId} erstellt.`);
-        } catch (e) {
-          return send('❌ Fehler beim Erstellen des Tickets.');
-        }
-      }
-      if (cmd === 'tickets') {
-        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'MOD', 'SUPPORTER', 'TEST_SUPPORTER'])) return send('Kein Zugriff.');
-        const filter = (args[0] || '').toLowerCase();
-        let ticket = null;
-
-        if (filter) {
-          ticket = tickets[filter] || tickets[filter.padStart(4, '0')];
-        }
-
-        if (ticket) {
-          const messageText = ticket.message || ticket.text || 'Keine Nachricht';
-          return send(
-            `🎫 Ticket #${ticket.id}\n` +
-            `Status: ${ticket.status}\n` +
-            `Von: ${await getNumberMention(ticket.sender, sock)}\n` +
-            `Nachricht: ${messageText}\n` +
-            `Antwort: ${ticket.answer || 'Keine'}\n` +
-            `Erstellt: ${new Date(ticket.timestamp).toLocaleString()}`,
-            { mentions: [ticket.sender] }
-          );
-        }
-
-        const ticketValues = Object.values(tickets);
-        const visibleTickets = ticketValues.filter(t => !filter || filter === 'all' || t.status.toLowerCase() === filter);
-        const mentions = [...new Set(visibleTickets.map(t => t.sender))];
-        const listLines = await Promise.all(visibleTickets.map(async t => {
-          const msg = String(t.message || t.text || '').slice(0, 50);
-          return `${t.id} | ${t.status} | ${await getNumberMention(t.sender, sock)} | ${msg}${msg.length >= 50 ? '…' : ''}`;
-        }));
-        const list = listLines.join('\n') || '(keine)';
-        const subtitle = filter ? ` (${filter === 'all' ? 'alle' : filter})` : '';
-        return send(`🎫 Tickets${subtitle}:\n${list}`, { mentions });
-      }
-      if (cmd === 'closeticket') {
-        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'MOD', 'SUPPORTER', 'TEST_SUPPORTER'])) return send('Kein Zugriff.');
-        const id = args[0];
-        if (!id || !tickets[id]) return send('Usage: $closeticket <id>');
-        tickets[id].status = 'closed';
-        save(FILES.tickets, tickets);
-        return send(`✅ Ticket ${id} geschlossen.`);
-      }
-
-      // CLEARTICKETS — alle Tickets auf einmal löschen, Zähler zurücksetzen
-      if (cmd === 'cleartickets' || cmd === 'clearalltickets' || cmd === 'ticketsclear') {
-        if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
-        const count = Object.keys(tickets).length;
-        if (!count) return send('ℹ️ Es sind bereits keine Tickets vorhanden.');
-
-        for (const key of Object.keys(tickets)) delete tickets[key];
-        save(FILES.tickets, tickets);
-        ticketCounter = 0;
-
-        return send(`✅ ${count} Ticket(s) wurden gelöscht. Zähler zurückgesetzt — das nächste Ticket beginnt wieder bei #0001.`);
-      }
-// TEAM TODOS
-      if (cmd === 'todo' || cmd === 'todos') {
-        const sub = (args[0] || '').toLowerCase();
-        if (!sub || sub === 'list') {
-          const all = Object.values(teamTodos);
-          if (!all.length) return send('📝 Keine Team-Todos.');
-          const now = Date.now();
-          const lines = all.map(t => {
-            let line = `${t.id} [${t.status}] - ${t.text}`;
-            if (t.assignee) line += ` (→ @${t.assignee.split('@')[0]})`;
-            if (t.deadline) {
-              const days = Math.ceil((t.deadline - now) / (1000 * 60 * 60 * 24));
-              line += ` [Fällig: ${new Date(t.deadline).toLocaleDateString('de-DE')} (${days > 0 ? `in ${days} Tagen` : days === 0 ? 'heute' : 'überfällig'})]`;
-            }
-            return line + (t.status === 'done' ? ' ✅' : '');
-          });
-          return send(`📝 Team-Todos:\n${lines.join('\n')}`);
-        }
-        if (sub === 'add') {
-          const text = args.slice(1).join(' ');
-          if (!text) return send('Usage: $todo add <text>');
-          todoCounter++;
-          const tdId = `TD${String(todoCounter).padStart(3, '0')}`;
-          teamTodos[tdId] = { id: tdId, text, creator: sender, status: 'open', created: Date.now() };
-          save(FILES.teamTodos, teamTodos);
-          return send(`✅ Todo ${tdId} erstellt.`);
-        }
-        if (sub === 'done' || sub === 'complete') {
-          const id = args[1] || args[0];
-          if (!id || !teamTodos[id]) return send('Usage: $todo done <id>');
-          teamTodos[id].status = 'done';
-          teamTodos[id].doneBy = sender;
-          save(FILES.teamTodos, teamTodos);
-          return send(`✅ Todo ${id} erledigt.`);
-        }
-        if (sub === 'remove' || sub === 'rm') {
-          if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) return send('Kein Zugriff.');
-          const id = args[1] || args[0];
-          if (!id || !teamTodos[id]) return send('Usage: $todo remove <id>');
-          delete teamTodos[id];
-          save(FILES.teamTodos, teamTodos);
-          return send(`🗑️ Todo ${id} entfernt.`);
-        }
-        return send('Usage: $todo add <text> | list | done <id> | remove <id>');
-      }
-
-      // USER TODOS — Befehlsvorschläge von Usern, nur Owner/CoOwner können die Liste einsehen
-      if (cmd === 'usertodo' || cmd === 'usertodos') {
-        const sub = (args[0] || '').toLowerCase();
-
-        // usertodo add <text> — jeder registrierte User darf vorschlagen
-        if (sub === 'add') {
-          const text = args.slice(1).join(' ').trim();
-          if (!text) return send(`❌ Nutzung: ${PREFIX}usertodo add <befehlsvorschlag>`);
-          userTodoCounter++;
-          const utId = `UT${String(userTodoCounter).padStart(3, '0')}`;
-          userTodos[utId] = {
-            id: utId,
-            text,
-            sender,
-            status: 'open',
-            created: Date.now()
-          };
-          save(FILES.userTodos, userTodos);
-          return send(`✅ Dein Vorschlag wurde gespeichert (${utId})! Der Owner schaut sich das an.`);
-        }
-
-        // ?usertodo done <id> / ?usertodo remove <id> — nur Owner/CoOwner
-        if (sub === 'done' || sub === 'complete') {
-          if (!isOwner) return send('❌ Nur der Owner kann Vorschläge als erledigt markieren.');
-          const id = args[1];
-          if (!id || !userTodos[id]) return send(`Usage: ${PREFIX}usertodo done <id>`);
-          userTodos[id].status = 'done';
-          userTodos[id].doneBy = sender;
-          save(FILES.userTodos, userTodos);
-          return send(`✅ Vorschlag ${id} als erledigt markiert.`);
-        }
-        if (sub === 'remove' || sub === 'rm' || sub === 'delete') {
-          if (!isOwner) return send('❌ Nur der Owner kann Vorschläge entfernen.');
-          const id = args[1];
-          if (!id || !userTodos[id]) return send(`Usage: ${PREFIX}usertodo remove <id>`);
-          delete userTodos[id];
-          save(FILES.userTodos, userTodos);
-          return send(`🗑️ Vorschlag ${id} entfernt.`);
-        }
-
-        // ?usertodo (ohne Argument) oder ?usertodo list — nur Owner/CoOwner dürfen die Liste öffnen
-        if (!sub || sub === 'list') {
-          if (!isOwner) return send('❌ Nur der Owner kann sich die Vorschlagsliste ansehen. Nutze stattdessen: ' + PREFIX + 'usertodo add <text>');
-          const all = Object.values(userTodos);
-          if (!all.length) return send('📋 Es liegen noch keine User-Vorschläge vor.');
-          const lines = await Promise.all(all.map(async t => {
-            const who = await getNumberMention(t.sender, sock);
-            const status = t.status === 'done' ? '✅' : '🕓';
-            return `${status} ${t.id} — ${t.text}\n   von: ${who}`;
-          }));
-          const mentions = all.map(t => t.sender);
-          return send(`📋 *Von Usern vorgeschlagene Befehle*\n\n${lines.join('\n\n')}\n\n_${PREFIX}usertodo done <id> / ${PREFIX}usertodo remove <id>_`, { mentions });
-        }
-
-        return send(`Usage: ${PREFIX}usertodo add <text>${isOwner ? ` | list | done <id> | remove <id>` : ''}`);
-      }    
-
-      // MODERATION
-if (cmd === 'ban') {
-        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
-
-        const ctx = m.message?.extendedTextMessage?.contextInfo;
-        let t = args[0];
-        if ((!t || t === 'kick' || t === 'remove') && ctx?.mentionedJid?.length) t = ctx.mentionedJid[0];
-        if ((!t || t === 'kick' || t === 'remove') && ctx?.participant) t = ctx.participant;
-
-        if (!t) return send('Usage: $ban <@user|num|jid> [kick]');
-        const jid = normalizeJid(t);
-        if (isPrimaryOwner(jid)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gebannt werden.');
-        const reason = args.slice(1).filter(a => a !== 'kick' && a !== 'remove' && !a.startsWith('@')).join(' ') || 'Kein Grund';
-        bans[jid] = { by: sender, at: new Date().toISOString(), reason };
-        save(FILES.bans, bans);
-        if (args.includes('kick') || args.includes('remove')) {
-          try {
-            const groups = await sock.groupFetchAllParticipating();
-            for (const gid of Object.keys(groups)) {
-              try { await sock.groupParticipantsUpdate(gid, [jid], 'remove'); await sleep(200); } catch {}
-            }
-          } catch (e) {}
-        }
-        try { await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: `🚫 Gebannt: ${jid}\nDurch: ${sender}\nGrund: ${reason}` }); } catch {}
-        return send(`🚫 @${jid.split('@')[0]} gebannt.`, { mentions: [jid] });
-      }
-      if (cmd === 'banlist') {
-        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
-        const list = Object.entries(bans).map(([j, b]) => `${j} — ${b.reason}`).join('\n') || '(keine)';
-        return send(`🚫 Banliste:\n${list}`);
-      }
-      if (cmd === 'unban') {
-        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
-
-        const ctx = m.message?.extendedTextMessage?.contextInfo;
-        let t = args[0];
-        if (!t && ctx?.mentionedJid?.length) t = ctx.mentionedJid[0];
-        if (!t && ctx?.participant) t = ctx.participant;
-
-        if (!t) return send('Usage: $unban <@user|num|jid>');
-        const jid = normalizeJid(t);
-        delete bans[jid];
-        save(FILES.bans, bans);
-        return send(`✅ @${jid.split('@')[0]} entbannt.`, { mentions: [jid] });
-      }
-
-      if (cmd === 'kick') {
-        const ctx = m.message?.extendedTextMessage?.contextInfo;
-        let target = args[0];
-        if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
-        if (!target) return send('Usage: $kick <num|jid|@user>');
-        if (isPrimaryOwner(target)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gekickt werden.');
-
-       let permitted = isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD']);
-        let groupMetadata;
-        if (!permitted && isGroup) {
-          groupMetadata = await getGroupMetaSafe(from, true); // frische Daten erzwingen
-          const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
-          permitted = !!isGroupAdmin;
-        }
-        if (!permitted) return send('❌ Du musst Admin/Mod/Gruppenadmin sein, um kicken zu können.');
-
-        groupMetadata = groupMetadata || await getGroupMetaSafe(from);
-        const normalizedTarget = normalizeJid(target);
-        const rawId = target.replace(/^@/, '').split('@')[0];
-
-        const targetParticipant = groupMetadata?.participants?.find(p => 
-          isSameJid(p.id, normalizedTarget) || 
-          (p.id || '').split('@')[0] === rawId
-        );
-
-        if (!targetParticipant) return send('❌ Benutzer nicht gefunden.');
-
-        console.log('[kick-debug] Ziel:', { id: targetParticipant.id, jid: normalizedTarget, raw: rawId });
-
-        try {
-          await sock.groupParticipantsUpdate(from, [targetParticipant.id], 'remove');
-          return send(`✅ @${targetParticipant.id.split('@')[0]} entfernt.`, { mentions: [targetParticipant.id] });
-        } catch (e) {
-          console.error('[kick] Fehler:', e?.message, e?.response?.status);
-          if (e?.message?.includes('not admin') || e?.message?.includes('admin')) {
-            return send('❌ Ich bin kein Gruppenadmin und kann niemanden kicken.');
-          }
-          return send('❌ Kicken fehlgeschlagen: ' + (e?.message || 'Unbekannter Fehler'));
-        }
-      }
-
-     if (cmd === 'warn') {
-        let permitted = isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD']);
-        if (!permitted && isGroup) {
-          const groupMetadata = await getGroupMetaSafe(from, true);
-          permitted = isGroupAdminJid(groupMetadata, sender);
-        }
-        if (!permitted) return send('❌ Du musst Admin/Mod/Gruppenadmin sein, um zu verwarnen.');
-
-        const t = args[0]; const reason = args.slice(1).join(' ') || 'Kein Grund';
-        if (!t) return send('Usage: $warn <num|jid> <grund>');
-        const jid = normalizeJid(t);
-        ensureUser(jid);
-        users[jid].warns = users[jid].warns || [];
-        users[jid].warns.push({ by: sender, reason, at: new Date().toISOString() });
-        save(FILES.users, users);
-        return send(`⚠ ${jid} verwarnt.`);
-      }
-      if (cmd === 'clearwarns') {
-        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
-        const t = args[0]; if (!t) return send('Usage: $clearwarns <num|jid>');
-        const jid = normalizeJid(t);
-        if (users[jid]) users[jid].warns = [];
-        save(FILES.users, users);
-        return send(`✅ Warns entfernt für ${jid}`);
-      }
-if (cmd === 'warns') {
-        let permitted = isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD']);
-        if (!permitted && isGroup) {
-          const groupMetadata = await getGroupMetaSafe(from, true);
-          permitted = isGroupAdminJid(groupMetadata, sender);
-        }
-        if (!permitted) return send('❌ Du musst Admin/Mod/Gruppenadmin sein.');
-
-        const t = args[0];
-        if (!t) return send('Usage: $warns <num|jid>');
-        const jid = normalizeJid(t);
-        const warnList = users[jid]?.warns || [];
-
-        if (!warnList.length) return send(`✅ @${jid.split('@')[0]} hat keine Verwarnungen.`, { mentions: [jid] });
-
-        const lines = warnList.map((w, i) =>
-          `${i + 1}. ${w.reason} — von @${w.by.split('@')[0]} (${new Date(w.at).toLocaleString('de-DE')})`
-        );
-
-        return send(
-          `⚠️ *Verwarnungen von @${jid.split('@')[0]}* (${warnList.length}):\n\n${lines.join('\n')}\n\n_Entfernen mit ${activePrefix}unwarn @user <nummer>_`,
-          { mentions: [jid, ...warnList.map(w => w.by)] }
-        );
-      }
-
-if (cmd === 'promote') {
-  if (!isGroup) return send('❌ Nur in Gruppen.');
-
-  const groupMetadata = await getGroupMetaSafe(from, true);
-  const senderJid = m.key.participant || m.key.remoteJid; // Absender-JID
-  const senderIsGroupAdmin = isSenderGroupAdmin(groupMetadata, senderJid);
-
-  if (!isOwner && !senderIsGroupAdmin) {
-    return send('Nur Owner/Co-Owner oder Gruppenadmins dürfen promoten.');
-  }
-
-  const ctx = m.message?.extendedTextMessage?.contextInfo;
-  let target = args[0];
-  if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
-  if (!target && ctx?.participant) target = ctx.participant;
-  if (!target) return send('Usage: $promote <num|jid|@user>');
-
-  const jid = normalizeJid(target);
-  const rawId = jid.split('@')[0];
-  const targetParticipant = groupMetadata?.participants?.find(p =>
-    isSameJid(p.id, jid) || (p.id || '').split('@')[0] === rawId
-  );
-  if (!targetParticipant) return send('❌ Benutzer nicht in dieser Gruppe gefunden.');
-
-  try {
-    await sock.groupParticipantsUpdate(from, [targetParticipant.id], 'promote');
-    groupMetaCache.delete(from);
-    return send(`✅ @${targetParticipant.id.split('@')[0]} wurde zum Gruppenadmin befördert.`, { mentions: [targetParticipant.id] });
-  } catch (e) {
-    console.error('[promote] Fehler:', e?.message || e);
-    return send('❌ Beförderung fehlgeschlagen (bin ich Gruppenadmin?).');
-  }
-}
-// demote
-if (cmd === 'demote') {
-  if (!isGroup) return send('❌ Nur in Gruppen.');
-
-  const groupMetadata = await getGroupMetaSafe(from, true);
-  const senderJid = m.key.participant || m.key.remoteJid;
-  const senderIsGroupAdmin = isSenderGroupAdmin(groupMetadata, senderJid);
-
-  if (!isOwner && !senderIsGroupAdmin) {
-    return send('Nur Owner/Co-Owner oder Gruppenadmins dürfen demoten.');
-  }
-
-  const ctx = m.message?.extendedTextMessage?.contextInfo;
-  let target = args[0];
-  if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
-  if (!target && ctx?.participant) target = ctx.participant;
-  if (!target) return send('Usage: $demote <num|jid|@user>');
-
-  const jid = normalizeJid(target);
-  const rawId = jid.split('@')[0];
-  const targetParticipant = groupMetadata?.participants?.find(p =>
-    isSameJid(p.id, jid) || (p.id || '').split('@')[0] === rawId
-  );
-  if (!targetParticipant) return send('❌ Benutzer nicht in dieser Gruppe gefunden.');
-
-  try {
-    await sock.groupParticipantsUpdate(from, [targetParticipant.id], 'demote');
-    groupMetaCache.delete(from);
-
-    // Internen ADMIN-Rang ebenfalls entfernen, falls gesetzt
-    const normJid = normalizeJid(targetParticipant.id);
-    if (ranks[normJid] === 'ADMIN') {
-      ranks[normJid] = 'USER';
-      save(FILES.ranks, ranks);
-    }
-    if (users[normJid] && users[normJid].rank === 'ADMIN') {
-      users[normJid].rank = 'USER';
-      save(FILES.users, users);
-    }
-    ROLES.ADMIN = (ROLES.ADMIN || []).filter(id => !isSameJid(id, normJid));
-
-    return send(`✅ @${targetParticipant.id.split('@')[0]} wurde als Gruppenadmin entfernt.`, { mentions: [targetParticipant.id] });
-  } catch (e) {
-    console.error('[demote] Fehler:', e?.message || e);
-    return send('❌ Herabstufung fehlgeschlagen (bin ich Gruppenadmin?).');
-  }
-}
-
-      if (cmd === 'setrank') {
-        if (!isOwner) return send('❌ Nur der Inhaber.');
-        const r = (args[args.length - 1] || '').toUpperCase();
-        if (!r) return send('Usage: $setrank <@mention|num|jid> <OWNER|COOWNER|ADMIN|MOD|VIP|USER>');
-
-        const allowed = ['OWNER', 'COOWNER', 'ADMIN', 'MOD', 'VIP', 'USER'];
-        if (!allowed.includes(r)) return send('Ungültiger Rang.');
-
-        let jid;
-        const mentioned = m.message?.extendedTextMessage?.contextInfo?.mentionedJid;
-        if (mentioned && mentioned.length > 0) {
-          jid = mentioned[0];
-        } else {
-          jid = normalizeJid(args[0]);
-        }
-
-        if (!jid) return send('Usage: $setrank <@mention|num|jid> <OWNER|COOWNER|ADMIN|MOD|VIP|USER>');
-
-        // Der Haupt-Owner ist geschützt: sein Rang kann NIE weggenommen werden.
-        if (isPrimaryOwner(jid) && r !== 'OWNER') {
-          return send('❌ Der Haupt-Owner ist geschützt und kann nicht heruntergestuft werden.');
-        }
-
-        if (r === 'OWNER') {
-          // Bestehende Owner werden NICHT mehr entmachtet — der/die Haupt-Owner
-          // bleibt in jedem Fall Owner. Diese Person wird zusätzlich Owner.
-          ranks[jid] = 'OWNER';
-          if (!ROLES.OWNER.some(id => isSameJid(id, jid))) ROLES.OWNER.push(jid);
-        } else if (r === 'COOWNER') {
-          for (const k of Object.keys(ranks)) { if (ranks[k] === 'COOWNER' && !isPrimaryOwner(k)) ranks[k] = 'USER'; }
-          ranks[jid] = 'COOWNER'; COOWNER_LID = jid;
-        } else {
-          ranks[jid] = r;
-        }
-
-        protectPrimaryOwner();
-
-        try {
-          save(FILES.ranks, ranks);
-          save(FILES.users, users);
-          save(FILES.owner, { ownerLid: OWNER_LID, ownerPriv: OWNER_PRIV, coownerLid: COOWNER_LID, roles: ROLES });
-        } catch (e) {}
-
-        return send(`✅ Rang von ${await getNumberMention(jid, sock)} auf ${r} gesetzt.`, { mentions: [jid] });
-      }
-if (cmd === 'datadelete') {
-        if (!isOwner) return send('❌ Nur der Inhaber.');
-        const t = args[0]; if (!t) return send('Usage: $datadelete <num|jid>');
-        const jid = normalizeJid(t);
-        if (isPrimaryOwner(jid)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gelöscht/gebannt werden.');
-        delete users[jid]; delete pets[jid]; delete ranks[jid];
-        for (const rid of Object.keys(joinreqs)) {
-          if (joinreqs[rid]?.sender && isSameJid(joinreqs[rid].sender, jid)) delete joinreqs[rid];
-        }
-        for (const id of Object.keys(tickets)) {
-          if (tickets[id]?.user && isSameJid(tickets[id].user, jid)) delete tickets[id];
-        }
-        deletedUsers[jid] = { by: sender, at: new Date().toISOString() };
-        bans[jid] = { by: sender, at: new Date().toISOString(), reason: 'Data deleted by owner' };
-        save(FILES.users, users); save(FILES.pets, pets); save(FILES.ranks, ranks);
-        save(FILES.joinreq, joinreqs); save(FILES.tickets, tickets);
-        save(FILES.deleted, deletedUsers); save(FILES.bans, bans);
-        try { await sock.sendMessage(jid, { text: '🚫 Dein Account wurde gelöscht.' }); } catch (e) {}
-        return send(`✅ Daten von ${jid} gelöscht.`);
-      }
-if (cmd === 'selfpromote' || cmd === 'sp') {
-  try {
-    if (!from?.endsWith('@g.us')) return send('⚠ Nur in Gruppen.');
-    if (
-      sender !== OWNER_LID &&
-      sender !== OWNER_LID2 &&
-      sender !== OWNER_PRIV &&
-      sender !== OWNER_PRIV2 &&
-      sender !== COOWNER_LID
-    ) return send('⛔ Nur der Owner kann diesen Befehl nutzen.');
-    await sock.groupParticipantsUpdate(from, [sender], 'promote');
-    return send('🔰 Selfpromote ausgeführt.');
-  } catch (e) {
-    return send('❌ Selfpromote fehlgeschlagen.');
-  }
-}
-
-if (cmd === 'selfdemote' || cmd === 'sd') {
-  try {
-    if (!from?.endsWith('@g.us')) return send('⚠ Nur in Gruppen.');
-    if (
-      sender !== OWNER_LID &&
-      sender !== OWNER_LID2 &&
-      sender !== OWNER_PRIV &&
-      sender !== OWNER_PRIV2 &&
-      sender !== COOWNER_LID
-    ) return send('⛔ Nur der Owner kann diesen Befehl nutzen.');
-    await sock.groupParticipantsUpdate(from, [sender], 'demote');
-    return send('🔱 Selfdemote ausgeführt.');
-  } catch (e) {
-    return send('❌ Selfdemote fehlgeschlagen.');
-  }
-}
-
-      // JOIN — Beitrittsanfragen: einreichen, annehmen (Team) und ablehnen (Team)
-      if (cmd === 'join') {
-        const sub = (args[0] || '').toLowerCase();
-
-        // ---- join accept <session> [id] — Team nimmt eine gespeicherte Anfrage an ----
-        if (sub === 'accept') {
-          if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'MOD'])) return send('❌ Nur Team (Owner/CoOwner/Mod) darf Beitrittsanfragen annehmen.');
-
-          const sessionArg = args[1];
-          if (!sessionArg) return send(`❌ Nutzung: ${activePrefix}join accept <session> [id]\nBeispiel: ${activePrefix}join accept default`);
-
-          const targetSock = activeSessions.get(sessionArg);
-          if (!targetSock) return send(`❌ Session "${sessionArg}" ist nicht aktiv. Aktive Sessions: ${[...activeSessions.keys()].join(', ') || '(keine)'}`);
-
-          const idArg = args[2];
-          let reqId, reqEntry;
-          if (idArg) {
-            reqEntry = joinreqs[idArg];
-            reqId = idArg;
-          } else {
-            const sorted = Object.entries(joinreqs).sort((a, b) => (a[1].at || 0) - (b[1].at || 0));
-            if (!sorted.length) return send('ℹ️ Keine offenen Beitrittsanfragen vorhanden.');
-            [reqId, reqEntry] = sorted[0];
-          }
-
-          if (!reqEntry) return send(`❌ Anfrage "${idArg}" nicht gefunden.`);
-
-          const reqLink = reqEntry.link;
-          const match = reqLink.match(/chat\.whatsapp\.com\/(?:invite\/)?([A-Za-z0-9_-]+)/i);
-          const code = match ? match[1] : reqLink.trim();
-          if (!code) return send('❌ Konnte keinen gültigen Einladungscode aus dem gespeicherten Link extrahieren.');
-
-          try {
-            try {
-              await targetSock.groupGetInviteInfo(code);
-            } catch (infoErr) {
-              const msg = infoErr?.message || String(infoErr);
-              if (msg.includes('410') || msg.toLowerCase().includes('gone')) {
-                return send('❌ Dieser Einladungslink ist ungültig oder abgelaufen.');
-              }
-              if (msg.includes('401') || msg.toLowerCase().includes('unauthorized')) {
-                return send('❌ Kein Zugriff auf diesen Link (evtl. wurde der Bot bereits entfernt/blockiert).');
-              }
-            }
-
-            const result = await targetSock.groupAcceptInvite(code);
-            delete joinreqs[reqId];
-            save(FILES.joinreq, joinreqs);
-
-            try {
-              await sock.sendMessage(JOIN_REQUEST_GROUP, {
-                text: `✅ Anfrage #${reqId} angenommen — Session "${sessionArg}" ist der Gruppe beigetreten${result ? ` (${result})` : ''}.\nAngenommen von: @${sender.split('@')[0]}`,
-                mentions: [sender]
-              });
-            } catch (e) {}
-
-            try {
-              await sock.sendMessage(reqEntry.sender, { text: `✅ Deine Beitrittsanfrage wurde angenommen! Der Bot (Session: ${sessionArg}) ist deiner Gruppe beigetreten.` });
-            } catch (e) {}
-
-            return send(`✅ Erfolgreich beigetreten${result ? `: ${result}` : ''} (Session: ${sessionArg})`);
-          } catch (e) {
-            console.error('[join accept] Fehler beim Beitritt:', e);
-            const msg = e?.message || String(e);
-            let explanation = msg;
-            if (msg.includes('conflict') || msg.includes('409')) explanation = 'Bot ist bereits Mitglied dieser Gruppe.';
-            else if (msg.includes('410') || msg.toLowerCase().includes('gone')) explanation = 'Der Link ist ungültig oder abgelaufen.';
-            else if (msg.includes('401')) explanation = 'Kein Zugriff — evtl. wurde der Bot aus der Gruppe entfernt oder blockiert.';
-            else if (msg.includes('429')) explanation = 'Zu viele Beitrittsversuche — bitte kurz warten und erneut versuchen.';
-            return send(`❌ Beitritt fehlgeschlagen: ${explanation}`);
-          }
-        }
-
-        // ---- join deny <id> — Team lehnt eine gespeicherte Anfrage ab ----
-        if (sub === 'deny' || sub === 'decline' || sub === 'reject') {
-          if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'MOD'])) return send('❌ Nur Team (Owner/CoOwner/Mod) darf Beitrittsanfragen ablehnen.');
-          const idArg = args[1];
-          if (!idArg || !joinreqs[idArg]) return send(`❌ Nutzung: ${activePrefix}join deny <id>`);
-          const entry = joinreqs[idArg];
-          delete joinreqs[idArg];
-          save(FILES.joinreq, joinreqs);
-          try { await sock.sendMessage(entry.sender, { text: '❌ Deine Beitrittsanfrage wurde abgelehnt.' }); } catch (e) {}
-          return send(`✅ Anfrage #${idArg} abgelehnt.`);
-        }
-
-        // ---- join list — offene Anfragen anzeigen (Team) ----
-        if (sub === 'list') {
-          if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'MOD'])) return send('❌ Nur Team (Owner/CoOwner/Mod) darf die Liste einsehen.');
-          const entries = Object.entries(joinreqs);
-          if (!entries.length) return send('ℹ️ Keine offenen Beitrittsanfragen.');
-          const lines = entries.map(([id, e]) => `${id} | von @${e.sender.split('@')[0]} | ${e.link}`);
-          return send(`📋 Offene Beitrittsanfragen:\n${lines.join('\n')}`, { mentions: entries.map(([, e]) => e.sender) });
-        }
-
-        // ---- join <link> — Anfrage einreichen (an Team-Gruppe senden) ----
-        const link = args[0];
-        if (!link) {
-          return send(
-            `❌ Nutzung:\n${activePrefix}join <link> — Beitrittsanfrage einreichen\n${activePrefix}join accept <session> [id] — Anfrage annehmen (Team)\n${activePrefix}join deny <id> — Anfrage ablehnen (Team)\n${activePrefix}join list — Offene Anfragen anzeigen (Team)`
-          );
-        }
-        if (!/^https?:\/\/chat\.whatsapp\.com\//i.test(link)) {
-          return send('❌ Bitte gib einen gültigen WhatsApp-Gruppenlink an (https://chat.whatsapp.com/...).');
-        }
-
-        joinReqCounter++;
-        const reqId = 'JR' + String(joinReqCounter).padStart(3, '0');
-        joinreqs[reqId] = { id: reqId, sender, link, at: Date.now() };
-        save(FILES.joinreq, joinreqs);
-
-        try {
-          await sock.sendMessage(JOIN_REQUEST_GROUP, {
-            text: `📩 *Neue Beitrittsanfrage* #${reqId}\nVon: @${sender.split('@')[0]}\nLink: ${link}\n\nTeam kann annehmen mit:\n${activePrefix}join accept <session> ${reqId}`,
-            mentions: [sender]
-          });
-        } catch (e) {
-          console.error('[join] Konnte Anfrage nicht an Team-Gruppe senden:', e);
-        }
-
-        return send('✅ Deine Beitrittsanfrage wurde an das Team gesendet.');
-      }
-// leave
-if (cmd === 'leave') {
-  const isGroupChat = from?.endsWith('@g.us');
-
-  // Fall 1: Privatchat -> JID als Argument nötig
-  if (!isGroupChat) {
-    if (!isOwner) return send('Kein Zugriff.'); // im Privatchat nur Owner, kein CoOwner
-
-    const targetJid = args?.[0]?.trim();
-    if (!targetJid || !targetJid.endsWith('@g.us')) {
-      return send('Nutze: ?leave <gruppen-jid>\nBeispiel: ?leave 120363437195661019@g.us');
-    }
-
-    try {
-      await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: `Bot verlässt Gruppe: ${targetJid}` });
-      await sock.groupLeave(targetJid);
-      return send(`✅ Gruppe ${targetJid} verlassen.`);
-    } catch (e) {
-      return send('❌ Konnte Gruppe nicht verlassen (falsche JID oder Bot nicht Mitglied).');
-    }
-  }
-
-  // Fall 2: Innerhalb einer Gruppe -> bisheriges Verhalten
-  if (!(isOwner || isCoOwner)) return send('Kein Zugriff.');
-  try {
-    await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: `Bot verlässt Gruppe: ${from}` });
-    await sock.groupLeave(from);
-    return;
-  } catch (e) {
-    return send('❌ Konnte Gruppe nicht verlassen.');
-  }
-}
-
-      if (cmd === 'grouplist' || cmd === 'gl') {
-        if (!isOwner) return send('Kein Zugriff.');
-        try {
-          const groups = await sock.groupFetchAllParticipating();
-          let list = '📋 *Gruppenliste*\n\n';
-          for (const [id, group] of Object.entries(groups)) {
-            list += `*${group.subject || 'Unbekannt'}*\nID: ${id}\nMitglieder: ${group.participants?.length || 0}\n\n`;
-          }
-          await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: list });
-          return send('📨 Gruppenliste privat zugeschickt.');
-        } catch (error) {
-          return send('❌ Fehler beim Abrufen der Gruppenliste.');
-        }
-      }
-
-      if (cmd === 'broadcast') {
-        if (!(isOwner || isCoOwner)) return send('Kein Zugriff.');
-        const textMsg = args.join(' ');
-        if (!textMsg) return send('Usage: $broadcast <text>');
-        const chats = await sock.groupFetchAllParticipating();
-        const gids = Object.keys(chats).filter(gid => broadcastSettings[gid] !== false);
-        send(`📣 Broadcast an ${gids.length} Gruppen...`);
-        for (const g of gids) { try { await sock.sendMessage(g, { text: `📣 Broadcast:\n${textMsg}` }); await sleep(300); } catch {} }
-        return send('✅ Broadcast abgeschlossen.');
-      }
-
-      // PROFILE — persönliche Werte (unverändert wie bisher)
-if (cmd === 'profile') {
-  const u = users[sender];
-  return send(`📊 Profil:\nLevel: ${u.level}\nXP: ${u.xp}\nCoins: ${u.coins}\nNachrichten: ${u.msgCount}`);
-}
-
-// STATS — System-weite Statistik über ALLE Sessions
-if (cmd === 'stats') {
-  if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) {
-    return send(`❌ Kein Zugriff auf System-Statistiken. Nutze ${activePrefix}profile für deine persönlichen Werte.`);
-  }
-
-  await send('📊 Sammle System-Statistiken über alle Sessions, bitte warten...');
-
-  const totalCommands = ALL_COMMANDS.length;
-  const registeredUsersCount = Object.values(users).filter(u => u?.registered === true).length;
-  const totalUsersCount = Object.keys(users).length;
-
-  let totalGroups = 0;
-  const perSessionLines = [];
-  for (const [sName, sSock] of activeSessions.entries()) {
-    try {
-      const groups = await sSock.groupFetchAllParticipating();
-      const count = Object.keys(groups || {}).length;
-      totalGroups += count;
-      perSessionLines.push(`  • ${sName}: ${count} Gruppen`);
-    } catch (e) {
-      perSessionLines.push(`  • ${sName}: ⚠️ Fehler beim Abrufen`);
-    }
-  }
-
-  const out =
-    `📊 *— SYSTEM-STATISTIKEN (AINCRAD) —* 📊\n` +
-    `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
-    `⚔️ Verfügbare Befehle: ${totalCommands}\n` +
-    `📝 Registrierte Nutzer: ${registeredUsersCount}\n` +
-    `👥 Bekannte Nutzer (gesamt): ${totalUsersCount}\n` +
-    `🖥️ Aktive Sessions: ${activeSessions.size}\n` +
-    `🏯 Gruppen (über alle Sessions): ${totalGroups}\n` +
-    (perSessionLines.length ? `\n*Aufschlüsselung pro Session:*\n${perSessionLines.join('\n')}\n` : '') +
-    `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
-    `_Datenbank: lokale JSON-Dateien in /data (kein SQL/NoSQL-Server)_`;
-
-  return send(out);
-}
-      if (cmd === 'userinfo') {
-        const t = args[0] ? normalizeJid(args[0]) : sender;
-        ensureUser(t);
-        const u = users[t];
-        return send(`👤 ${t}\nLevel: ${u.level}\nXP: ${u.xp}\nCoins: ${u.coins}\nRank: ${ranks[t] || u.rank}`);
-      }
-// RANGLISTE (rein lesend, verändert niemals XP/Coins)
-      if (cmd === 'rangliste' || cmd === 'leaderboard' || cmd === 'rank') {
-        const sortBy = (args[0] || 'xp').toLowerCase();
-
-        const validSort = ['xp', 'level', 'coins'];
-        if (!validSort.includes(sortBy)) {
-          return send(`❌ Nutzung: ${activePrefix}rangliste <xp|level|coins>\nBeispiel: ${activePrefix}rangliste coins`);
-        }
-
-        const entries = Object.entries(users).filter(([jid, u]) => u && typeof u === 'object');
-
-        let sorted;
-        if (sortBy === 'coins') {
-          sorted = entries.sort((a, b) => (b[1].coins || 0) - (a[1].coins || 0));
-        } else {
-          // xp und level zusammen gewichten (wie bisheriger ?top)
-          sorted = entries.sort((a, b) => ((b[1].level || 1) * 1000 + (b[1].xp || 0)) - ((a[1].level || 1) * 1000 + (a[1].xp || 0)));
-        }
-
-        const topList = sorted.slice(0, 10);
-        if (!topList.length) return send('📊 Noch keine Spieler vorhanden.');
-
-        const medals = ['🥇', '🥈', '🥉'];
-        const lines = await Promise.all(topList.map(async ([jid, u], i) => {
-          const displayName = u.name || u.registrationName || await getNumberMention(jid, sock);
-          const rankIcon = medals[i] || `${i + 1}.`;
-          if (sortBy === 'coins') {
-            return `${rankIcon} ${displayName} — 💰 ${u.coins || 0} Coins`;
-          }
-          return `${rankIcon} ${displayName} — ⭐ Lv.${u.level || 1} (${u.xp || 0} XP)`;
-        }));
-
-        const mentions = topList.map(([jid]) => jid);
-        const titleMap = { xp: '⚔️ XP-Rangliste', level: '⚔️ Level-Rangliste', coins: '💰 Coins-Rangliste' };
-
-  return send(
-          `${titleMap[sortBy]}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n${lines.join('\n')}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n🔥 Ihr seid die Besten! 🔥`,
-          { mentions }
-        );
-      }    
-
-      
-            // YEETBAN
-      if (cmd === 'yeetban') {
-        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) return send('Kein Zugriff.');
-        let target = args[0];
-        try {
-          const ctx = m.message?.extendedTextMessage?.contextInfo;
-          if (!target && ctx?.participant) target = ctx.participant;
-          if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
-        } catch (e) {}
-        if (!target) return send('Usage: $yeetban <num|jid>');
-        const jid = normalizeJid(target);
-        if (isPrimaryOwner(jid)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gebannt/entfernt werden.');
-        const reason = args.slice(1).join(' ') || 'Kein Grund';
-        bans[jid] = { by: sender, at: new Date().toISOString(), reason };
-        save(FILES.bans, bans);
-        try {
-          const groups = await sock.groupFetchAllParticipating();
-          let removed = 0, failed = 0;
-          for (const gid of Object.keys(groups)) {
-            try {
-              const meta = await getGroupMetaSafe(gid);
-              if (!meta?.participants) { failed++; continue; }
-              const rawJid = jid.split('@')[0];
-              const targetParticipant = meta.participants.find(p => (p.id || '').split('@')[0] === rawJid);
-              if (!targetParticipant) { failed++; continue; }
-              await sock.groupParticipantsUpdate(gid, [targetParticipant.id], 'remove');
-              await sleep(500);
-              removed++;
-            } catch (e) { failed++; }
-          }
-          return send(`✅ Yeetban: ${jid} — entfernt aus ${removed} Gruppen, fehlgeschlagen: ${failed}`);
-        } catch (e) {
-          return send('❌ Yeetban fehlgeschlagen.');
-        }
-      }
-
-      // CREDITS
-      if (cmd === 'credits') {
-        if (!credits.list || credits.list.length === 0) {
-          return send('📋 Noch keine Credits eingetragen.');
-        }
-        let out = '✨ *Credits* ✨\n\n';
-        credits.list.forEach((c, i) => {
-          out += `${i + 1}. *${c.name}* — ${c.role}\n`;
-        });
-        out += '\n❤️ Danke euch allen!';
-        return send(out);
-      }
-
-      // ADDCREDIT
-      if (cmd === 'addcredit') {
-        if (!isAuthorized(sender, ['OWNER'])) return send('❌ Nur der Inhaber darf Credits hinzufügen.');
-        const input = args.join(' ');
-        const [name, role] = input.split('|').map(s => s?.trim());
-        if (!name || !role) {
-          return send(`❌ Nutzung: ${PREFIX}addcredit Name | Rolle\nBeispiel: ${PREFIX}addcredit Max | Coding Hilfe`);
-        }
-        credits.list.push({ name, role });
-        save(FILES.credits, credits);
-        return send(`✅ *${name}* wurde zu den Credits hinzugefügt.`);
-      }
-      // DELCREDIT
-      if (cmd === 'delcredit') {
-        if (!isAuthorized(sender, ['OWNER'])) return send('❌ Nur der Inhaber darf Credits entfernen.');
-        const index = parseInt(args[0]) - 1;
-        if (isNaN(index) || index < 0 || index >= credits.list.length) {
-          return send(`❌ Ungültige Nummer. Nutze ${PREFIX}credits um die Liste mit Nummern zu sehen.`);
-        }
-        const removed = credits.list.splice(index, 1)[0];
-        save(FILES.credits, credits);
-        return send(`🗑️ *${removed.name}* wurde aus den Credits entfernt.`);
-      }
- //dsgvo
-if (cmd === 'dsgvo') {
-  return send(DSGVO_TEXT.trim());
-}
-
-
-// Anti-Link Controls
-      if ((cmd === 'antilink-an' || cmd === 'antilink-aus') && isGroup) {
-        const groupMetadata = await getGroupMetaSafe(from);
-        const senderIsGroupAdmin = isGroupAdminJid(groupMetadata, sender);
-
-        if (!senderIsGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER', 'GROUPADMIN'])) {
-          return send('❌ Du musst Admin in dieser Gruppe sein.');
-        }
-
-        if (!groupSettings[from]) {
-          groupSettings[from] = { welcome: { enabled: false, message: 'Willkommen in der Gruppe {user}! 👋' }, antilink: { enabled: false } };
-        }
-        if (!groupSettings[from].antilink) groupSettings[from].antilink = { enabled: false };
-
-        if (cmd === 'antilink-an') {
-          groupSettings[from].antilink.enabled = true;
-          save(FILES.groupSettings, groupSettings);
-          return send('✅ Anti-Link aktiviert: Wer einen WhatsApp-Link postet, wird gekickt (Admins ausgenommen).');
-        }
-
-        if (cmd === 'antilink-aus') {
-          groupSettings[from].antilink.enabled = false;
-          save(FILES.groupSettings, groupSettings);
-          return send('✅ Anti-Link deaktiviert.');
-        }
-      }
-// YTMP3
-if (cmd === 'ytmp3') {
-  const fullText = args.join(' ').trim();
-  const urlMatch = fullText.match(/(https?:\/\/)?(www\.|music\.|m\.)?(youtube\.com\/(watch\?v=|shorts\/)|youtu\.be\/)[\w-]+(\S*)?/i);
-
-  if (!urlMatch) {
-    return send(`❌ Nutzung: ${PREFIX}ytmp3 <youtube-link>\n\nBeispiel:\n${PREFIX}ytmp3 https://youtu.be/dQw4w9WgXcQ`);
-  }
-
-  let url = urlMatch[0];
-  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-
-  const cooldownMsg = checkCooldown(sender, 'ytmp3');
-  if (cooldownMsg && !isOwner) return send(cooldownMsg);
-
-  await send('⏳ Lade Audio herunter, bitte warten...');
-
-  try {
-    const title = await getYoutubeTitle(url);
-    const filePath = await downloadYoutubeMp3(url);
-    const stats = fs.statSync(filePath);
-
-    if (stats.size > 95 * 1024 * 1024) {
-      fs.unlinkSync(filePath);
-      return send('❌ Die Datei ist zu groß für WhatsApp (>95MB).');
-    }
-
-    await sock.sendMessage(from, {
-      audio: fs.readFileSync(filePath),
-      mimetype: 'audio/mpeg',
-      fileName: `${title || 'audio'}.mp3`
-    }, { quoted: m });
-
-    fs.unlinkSync(filePath);
-  } catch (e) {
-    console.error('[ytmp3] Fehler:', e?.message || e);
-    return send('❌ Download fehlgeschlagen. Prüfe den Link oder versuche es später erneut.');
-  }
-  return;
-}
-const REACTION_COMMANDS = {
-  throw:  { emoji: "🤾", verb: "wirft",                 apiReaction: "throw" },
-  slap:   { emoji: "👋", verb: "verpasst eine Ohrfeige",  apiReaction: "slap" },
-  hug:    { emoji: "🤗", verb: "umarmt",                 apiReaction: "hug" },
-  kiss:   { emoji: "😘", verb: "küsst",                  apiReaction: "kiss" },
-  pat:    { emoji: "🤚", verb: "tätschelt",              apiReaction: "pat" },
-  poke:   { emoji: "👉", verb: "pikst",                  apiReaction: "poke" },
-  cuddle: { emoji: "🥰", verb: "kuschelt mit",           apiReaction: "cuddle" },
-  bite:   { emoji: "😬", verb: "beißt",                  apiReaction: "bite" },
-  punch:  { emoji: "🥊", verb: "verpasst einen Schlag",   apiReaction: "punch" },
-  sleep:  { emoji: "😴", verb: "schläft ein neben",       apiReaction: "sleep" },
-  angrystare: { emoji: "😠", verb: "starrt wütend" },
-  bleh: { emoji: "😝", verb: "streckt die Zunge raus" },
-  confused: { emoji: "😕", verb: "ist verwirrt" },
-  cry: { emoji: "😭", verb: "weint wegen " },
-  evillaugh: { emoji: "😈", verb: "lacht böse" },
-  facepalm: { emoji: "🤦", verb: "macht einen Facepalm" },
-  happy: { emoji: "😊", verb: "ist glücklich" },
-  laugh: { emoji: "😂", verb: "lacht" },
-  mad: { emoji: "😡", verb: "ist sauer" },
-  nuzzle: { emoji: "🥺", verb: "schmiegt sich an" },
-  no: { emoji: "🙅", verb: "sagt Nein" },
-  nosebleed: { emoji: "🩸", verb: "hat Nasenbluten" },
-  sad: { emoji: "😢", verb: "ist traurig" },
-  scared: { emoji: "😱", verb: "hat Angst" },
-  shout: { emoji: "📢", verb: "schreit" },
-  shy: { emoji: "🙈", verb: "ist schüchtern" },
-  sneeze: { emoji: "🤧", verb: "niest" },
-  surprised: { emoji: "😲", verb: "ist überrascht" },
-  tired: { emoji: "😴", verb: "ist müde" },
-  yes: { emoji: "🙆", verb: "sagt Ja" },
-  love: { emoji: "❤️", verb: "liebt", apiReaction: "love" },
-  blush: { emoji: "😳", verb: "wird rot wegen", apiReaction: "blush" },
-  handhold: { emoji: "🤝", verb: "hält die Hand von", apiReaction: "handhold" },
-  lick: { emoji: "👅", verb: "leckt", apiReaction: "lick" },
-  nervous: { emoji: "😅", verb: "ist nervös wegen", apiReaction: "nervous" },
-
-  // Zusätzliche Reactions über die Neko API (nekos.best) — kein API-Key nötig
-  kill:      { emoji: "☠️", verb: "erledigt",              source: "neko", nekoCategory: "punch" },
-  yeet:      { emoji: "🚀", verb: "yeetet",                 source: "neko", nekoCategory: "yeet" },
-  nuke:      { emoji: "☢️", verb: "nukt",                   source: "neko", nekoCategory: "punch" },
-  banish:    { emoji: "🌀", verb: "verbannt",               source: "neko", nekoCategory: "wave" },
-  stab:      { emoji: "🗡️", verb: "durchbohrt",             source: "neko", nekoCategory: "punch" },
-  smash:     { emoji: "🔨", verb: "zerschmettert",          source: "neko", nekoCategory: "punch" },
-  vaporize:  { emoji: "💥", verb: "pulverisiert",           source: "neko", nekoCategory: "punch" },
-  choke:     { emoji: "🫳", verb: "würgt",                  source: "neko", nekoCategory: "bite" },
-  kick:      { emoji: "🦵", verb: "verpasst einen Tritt",   source: "neko", nekoCategory: "kick" },
-  spin:      { emoji: "🌪️", verb: "wirbelt herum",          source: "neko", nekoCategory: "dance" },
-  facepalm2: { emoji: "🤦", verb: "macht einen Facepalm",   source: "neko", nekoCategory: "facepalm" },
-  glare:     { emoji: "👀", verb: "starrt böse an",         source: "neko", nekoCategory: "stare" },
-  smirk:     { emoji: "😏", verb: "grinst süffisant",       source: "neko", nekoCategory: "smug" },
-  cry2:      { emoji: "😭", verb: "heult wegen",            source: "neko", nekoCategory: "cry" },
-  highfive:  { emoji: "🙌", verb: "gibt ein High Five",     source: "neko", nekoCategory: "highfive" },
-  dance:     { emoji: "💃", verb: "tanzt mit",              source: "neko", nekoCategory: "dance" },
-};
-
-// ---- otakugifs (bestehend) ----
-async function getReactionGifUrl(reaction) {
-  const res = await fetch(`https://api.otakugifs.xyz/gif?reaction=${reaction}`);
-  if (!res.ok) throw new Error(`otakugifs API-Fehler: ${res.status}`);
-  const data = await res.json();
-  return data.url;
-}
-
-// ---- Neko API (nekos.best) — kein API-Key nötig ----
-async function getNekoGifUrl(category) {
-  const url = `https://nekos.best/api/v2/${category}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Neko-API-Fehler: ${res.status}`);
-  const data = await res.json();
-
-  if (!data.results?.length) throw new Error("Keine Neko-API-Treffer gefunden");
-
-  const pick = data.results[Math.floor(Math.random() * data.results.length)];
-  return pick.url;
-}
-
-// ---- Router, wählt automatisch die richtige API je nach config.source ----
-async function getGifUrl(cmd, config) {
-  if (config.source === "neko") {
-    return await getNekoGifUrl(config.nekoCategory || cmd);
-  }
-  // Default: otakugifs
-  return await getReactionGifUrl(config.apiReaction || cmd);
-}
-
-// NEU: Cache-Ordner für die Gif->mp4 Konvertierung (analog zu YTMP3_CACHE_DIR)
-const REACTION_GIF_CACHE_DIR = path.join(__dirname, 'cache', 'reaction-gifs');
-
-// NEU: lädt das Gif runter und wandelt es mit ffmpeg in ein echtes,
-// WhatsApp-kompatibles mp4 um. Das ist der eigentliche Fix -
-// rohe .gif-Bytes als "video" zu schicken spielt bei WhatsApp nicht ab.
-function fetchAndConvertGifToMp4(gifUrl) {
-  return new Promise(async (resolve, reject) => {
-    try {
-      fs.mkdirSync(REACTION_GIF_CACHE_DIR, { recursive: true });
-
-      const stamp = Date.now();
-      const gifPath = path.join(REACTION_GIF_CACHE_DIR, `${stamp}.gif`);
-      const mp4Path = path.join(REACTION_GIF_CACHE_DIR, `${stamp}.mp4`);
-
-      const res = await fetch(gifUrl);
-      if (!res.ok) throw new Error(`Gif-Download fehlgeschlagen: ${res.status}`);
-      const arrBuf = await res.arrayBuffer();
-      fs.writeFileSync(gifPath, Buffer.from(arrBuf));
-
-      // scale auf max. 480px Breite = schneller/leichter auf Termux
-      const cmd = `ffmpeg -y -i "${gifPath}" -movflags faststart -pix_fmt yuv420p -vf "scale='trunc(min(480,iw)/2)*2':'-2'" "${mp4Path}"`;
-
-      exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
-        try { fs.unlinkSync(gifPath); } catch (e) {}
-
-        if (err) {
-          console.error('[reaction-gif] ffmpeg-Fehler:', err.message);
-          return reject(err);
-        }
-
-        try {
-          const mp4Buffer = fs.readFileSync(mp4Path);
-          fs.unlinkSync(mp4Path);
-          resolve(mp4Buffer);
-        } catch (readErr) {
-          reject(readErr);
-        }
-      });
-    } catch (e) {
-      reject(e);
-    }
-  });
-}
-
-/* -----------------------------------------------------------
- * Command-Handler für alle Reaction-Commands
- * ---------------------------------------------------------*/
-
-if (REACTION_COMMANDS[cmd]) {
-  const config = REACTION_COMMANDS[cmd];
-
-  const ctx = m.message?.extendedTextMessage?.contextInfo;
-  const mentioned = ctx?.mentionedJid || [];
-  const repliedTo = ctx?.participant;
-  const target = mentioned[0] || repliedTo;
-
-  if (!target) {
-    return send(`❓ Wen soll ich ${cmd}en? Erwähne jemanden mit @user oder antworte auf seine Nachricht mit ${activePrefix}${cmd}`);
-  }
-
-  const targetJid = normalizeJid(target);
-  ensureUser(sender);
-  ensureUser(targetJid);
-
-  try {
-    const gifUrl = await getGifUrl(cmd, config);
-    const mp4Buffer = await fetchAndConvertGifToMp4(gifUrl);
-
-    if (!isTeamMember) {
-      try { await sock.sendPresenceUpdate('composing', from); } catch (e) {}
-      await sleep(1500);
-      try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
-    }
-
-    await sock.sendMessage(from, {
-      video: mp4Buffer,
-      gifPlayback: true,
-      mimetype: 'video/mp4',
-      caption: `${config.emoji} @${sender.split('@')[0]} ${config.verb} @${targetJid.split('@')[0]}!`,
-      mentions: [sender, targetJid],
-    }, { quoted: m });
-  } catch (err) {
-    console.error(`[${cmd}] Fehler:`, err);
-    return send('⚠️ Konnte gerade kein Gif holen, versuch\'s gleich nochmal.');
-  }
-  return;
-}
-// ---- NEU: Neko-Bilder (nekos.best) — png, nur für den Haupt-Owner ----
-const NEKO_IMAGE_CATEGORIES = ['neko', 'waifu', 'husbando', 'kitsune'];
-const NEKO_IMAGE_OWNER_JID = '27088878862400@lid';
-
-async function getNekoImageUrl(category) {
-  const url = `https://nekos.best/api/v2/${category}`;
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'application/json'
-    }
-  });
-  if (!res.ok) throw new Error(`Neko-API-Fehler: ${res.status}`);
-  const data = await res.json();
-
-  if (!data.results?.length) throw new Error("Keine Neko-API-Treffer gefunden");
-
-  return data.results[0];
-}
-
-if (NEKO_IMAGE_CATEGORIES.includes(cmd)) {
-  if (!isSameJid(sender, NEKO_IMAGE_OWNER_JID)) {
-    return send('❌ Dieser Befehl ist nur für den Haupt-Owner verfügbar.');
-  }
-
-  try {
-    const result = await getNekoImageUrl(cmd);
-    let caption = `🖼️ *${cmd}*`;
-    if (result.artist_name) caption += `\n🎨 Künstler: ${result.artist_name}`;
-    if (result.source_url) caption += `\n🔗 Quelle: ${result.source_url}`;
-
-    await sock.sendMessage(from, {
-      image: { url: result.url },
-      caption
-    }, { quoted: m });
-  } catch (err) {
-    console.error(`[${cmd}] Fehler:`, err);
-    return send('⚠️ Konnte gerade kein Bild holen, versuch\'s gleich nochmal.');
-  }
-  return;
-}
-// ---- Sticker-Teil unverändert ----
-const STICKER_CACHE_DIR = path.join(__dirname, 'cache', 'stickers');
-
-function bufferToSticker(inputBuffer, ext, isAnimated) {
-  return new Promise((resolve, reject) => {
-    fs.mkdirSync(STICKER_CACHE_DIR, { recursive: true });
-    const stamp = Date.now();
-    const inPath = path.join(STICKER_CACHE_DIR, `${stamp}_in.${ext}`);
-    const outPath = path.join(STICKER_CACHE_DIR, `${stamp}_out.webp`);
-    fs.writeFileSync(inPath, inputBuffer);
-
-    const filter = "scale=512:512:force_original_aspect_ratio=increase,crop=512:512,fps=15";
-
-    const cmd = isAnimated
-      ? `ffmpeg -y -i "${inPath}" -vf "${filter}" -t 6 -loop 0 -an -vsync 0 -c:v libwebp -lossless 0 -qscale 60 -preset default "${outPath}"`
-      : `ffmpeg -y -i "${inPath}" -vf "${filter}" -vframes 1 -c:v libwebp -lossless 1 -qscale 75 "${outPath}"`;
-
-    exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
-      try { fs.unlinkSync(inPath); } catch (e) {}
-      if (err) return reject(err);
-      try {
-        const buf = fs.readFileSync(outPath);
-        fs.unlinkSync(outPath);
-        resolve(buf);
-      } catch (e) { reject(e); }
-    });
-  });
-}
-async function addStickerExif(webpBuffer, packName, authorName) {
-  const img = new webp.Image();
-  await img.load(webpBuffer);
-
-  const json = {
-    'sticker-pack-id': 'sao-bot-' + Date.now(),
-    'sticker-pack-name': packName,
-    'sticker-pack-publisher': authorName,
-    'emojis': ['⚔️']
-  };
-
-  const exifAttr = Buffer.from([
-    0x49, 0x49, 0x2A, 0x00, 0x08, 0x00, 0x00, 0x00, 0x01, 0x00, 0x41, 0x57,
-    0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x16, 0x00, 0x00, 0x00
-  ]);
-  const jsonBuffer = Buffer.from(JSON.stringify(json), 'utf-8');
-  const exif = Buffer.concat([exifAttr, jsonBuffer]);
-  exif.writeUIntLE(jsonBuffer.length, 14, 4);
-
-  img.exif = exif;
-  return await img.save(null);
-}
-if (cmd === 'add') {
-  if (!isGroup) return send('❌ Nur in Gruppen.');
-  if (!hasAdminPerms(sender)) return send('❌ Kein Zugriff.');
-
-  const rawTarget = args[0];
-  if (!rawTarget) return send(`❌ Nutzung: ${activePrefix}add <nummer>\nBeispiel: ${activePrefix}add 4915123456789`);
-
-  const numberToAdd = rawTarget.replace(/[^0-9]/g, '');
-  if (!numberToAdd || numberToAdd.length < 6) {
-    return send('❌ Ungültige Nummer. Bitte mit Ländervorwahl angeben, z.B. 4915123456789 (ohne "+" oder Leerzeichen).');
-  }
-  const jid = `${numberToAdd}@s.whatsapp.net`;
-
-  // NEU: Vorab prüfen, ob die Nummer überhaupt bei WhatsApp registriert ist.
-  // Das erkennt man NICHT anhand der Datenschutzeinstellung (die lässt sich
-  // technisch nicht vorab abfragen), sondern nur ob der Account existiert.
-  try {
-    const check = await sock.onWhatsApp(jid);
-    const exists = Array.isArray(check) && check.length > 0 && check[0]?.exists;
-    if (!exists) {
-      return send(`❌ Die Nummer ${numberToAdd} ist nicht bei WhatsApp registriert.`);
-    }
-  } catch (e) {
-    console.error('[add] onWhatsApp-Check fehlgeschlagen:', e?.message || e);
-    // Wenn der Check selbst fehlschlägt, trotzdem weitermachen und den
-    // eigentlichen Hinzufügen-Versuch starten.
-  }
-
-  // Frische Metadaten holen, um sicherzugehen, dass der Admin-Status aktuell ist
-  const meta = await getGroupMetaSafe(from, true);
-  const allBotIds = [...getBotSelfIds(sock)];
-  const botPart = (meta?.participants || []).find(p => {
-    const pids = [p.id, p.id?.split('@')[0], `${p.id?.split('@')[0]}@s.whatsapp.net`].filter(Boolean).map(String);
-    return pids.some(pid => allBotIds.includes(pid));
-  });
-  const botIsAdmin = !!(botPart?.admin === 'admin' || botPart?.admin === 'superadmin' || botPart?.admin === true || botPart?.isAdmin === true);
-
-  if (!botIsAdmin) {
-    return send('❌ Ich bin kein Administrator in dieser Gruppe. Bitte mache mich zuerst zum Admin.');
-  }
-
-  // Bereits Mitglied?
-  const alreadyMember = (meta?.participants || []).some(p => {
-    const raw = (p.id || '').split('@')[0];
-    return raw === numberToAdd;
-  });
-  if (alreadyMember) return send(`ℹ️ ${numberToAdd} ist bereits Mitglied dieser Gruppe.`);
-
-  try {
-    const result = await sock.groupParticipantsUpdate(from, [jid], 'add');
-    const entry = Array.isArray(result) ? result[0] : result;
-    const status = String(entry?.status ?? '');
-
-    if (status === '200') {
-      return send(`✅ @${numberToAdd} wurde zur Gruppe hinzugefügt.`, { mentions: [jid] });
-    }
-
-    // Status 403/401 -> Datenschutzeinstellung der Nummer verhindert direktes
-    // Hinzufügen. In diesem Fall bietet Baileys oft einen invite_code an.
-    let inviteCode = null;
-    try {
-      const content = entry?.content;
-      if (Array.isArray(content)) {
-        const inviteNode = content.find(c => c?.tag === 'add_request');
-        inviteCode = inviteNode?.attrs?.code || null;
-      }
-    } catch (e) {}
-
-    if (inviteCode) {
-      try {
-        const inviteLink = `https://chat.whatsapp.com/${inviteCode}`;
-        await sock.sendMessage(jid, {
-          text: `👋 Du wurdest eingeladen, der Gruppe "${meta?.subject || ''}" beizutreten:\n${inviteLink}`
-        });
-        return send(`ℹ️ ${numberToAdd} konnte wegen der Datenschutzeinstellung ("Wer kann mich hinzufügen") nicht direkt hinzugefügt werden — ich habe stattdessen eine private Einladung per Nachricht geschickt.`);
-      } catch (e) {
-        return send(`⚠️ ${numberToAdd} konnte nicht direkt hinzugefügt werden (Datenschutzeinstellung) und die private Einladung ist fehlgeschlagen: ${e?.message || e}`);
-      }
-    }
-
-    const statusMessages = {
-      '403': 'Die Nummer erlaubt kein direktes Hinzufügen (Datenschutzeinstellung "Wer kann mich zu Gruppen hinzufügen") und akzeptiert auch keine automatische Einladung.',
-      '408': 'Zeitüberschreitung — die Nummer hat evtl. gerade WhatsApp Web/Mobile Probleme.',
-      '409': 'Die Nummer ist bereits Mitglied.',
-      '401': 'Die Nummer/der Account lässt sich grundsätzlich nicht kontaktieren (z.B. gesperrte oder spezielle System-Accounts).',
-    };
-
-    return send(`⚠️ Hinzufügen von ${numberToAdd} fehlgeschlagen.\nGrund: ${statusMessages[status] || `Status-Code ${status}`}`);
-  } catch (e) {
-    console.error('[add] Fehler:', e);
-    const msg = e?.data === 463 || String(e?.message).includes('account_reachout_restricted')
-      ? 'Diese Nummer/dieser Account lässt sich grundsätzlich nicht per automatischem Hinzufügen kontaktieren (z.B. spezielle System-/Business-Accounts wie MetaAI).'
-      : (e?.message || 'Unbekannter Fehler');
-    return send(`❌ Hinzufügen fehlgeschlagen: ${msg}`);
-  }
-}
-// STICKER
-if (cmd === 'sticker' || cmd === 's' || cmd === 'stiker') {
-  const ctx = m.message?.extendedTextMessage?.contextInfo;
-
-  let targetMsg = null;
-  let mediaType = null;
-
-  // Fall 1: Antwort auf Bild/GIF/Video/Sticker
-  if (ctx?.quotedMessage) {
-    const q = ctx.quotedMessage;
-    const quotedKey = {
-      remoteJid: from,
-      id: ctx.stanzaId,
-      fromMe: false,
-      participant: ctx.participant
-    };
-    if (q.imageMessage) {
-      targetMsg = { key: quotedKey, message: q };
-      mediaType = 'image';
-    } else if (q.videoMessage) {
-      targetMsg = { key: quotedKey, message: q };
-      mediaType = 'video';
-    } else if (q.stickerMessage) {
-      targetMsg = { key: quotedKey, message: q };
-      mediaType = q.stickerMessage.isAnimated ? 'animatedSticker' : 'sticker';
-    }
-  }
-
-  // Fall 2: Bild/Video direkt mit Befehl als Bildunterschrift
-  if (!targetMsg && m.message.imageMessage) { targetMsg = m; mediaType = 'image'; }
-  if (!targetMsg && m.message.videoMessage) { targetMsg = m; mediaType = 'video'; }
-
-  if (!targetMsg) {
-    return send('❓ Schick ein Bild/GIF direkt mit "' + activePrefix + cmd + '" als Bildunterschrift, oder antworte mit "' + activePrefix + cmd + '" auf ein Bild/Video/GIF.');
-  }
-
-  await send('⏳ Erstelle Sticker...');
-
-  try {
-    const buffer = await downloadMediaMessage(
-      targetMsg,
-      'buffer',
-      {},
-      { logger: P({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
-    );
-
-    let webpBuffer;
-
-    if (mediaType === 'sticker' || mediaType === 'animatedSticker') {
-      // Ist bereits ein gültiger WhatsApp-Sticker (webp) -> keine ffmpeg-Konvertierung nötig,
-      // die scheitert bei animierten Stickern am ffmpeg-WebP-Demuxer.
-      webpBuffer = buffer;
-    } else {
-      const isAnimated = mediaType === 'video';
-      const ext = (mediaType === 'video') ? 'mp4' : 'jpg';
-      webpBuffer = await bufferToSticker(buffer, ext, isAnimated);
-    }
-
-    const customName = args.join(' ').trim();
-    const packName = 'Sword Art Online Bot';
-    const authorName = customName ? packName + ' | ' + customName : packName;
-
-    webpBuffer = await addStickerExif(webpBuffer, packName, authorName);
-
-    await sock.sendMessage(from, { sticker: webpBuffer }, { quoted: m });
-  } catch (e) {
-    console.error('[sticker] Fehler:', e);
-    return send('❌ Sticker-Erstellung fehlgeschlagen. (ffmpeg/node-webpmux installiert?)');
-  }
-  return;
-}
-// SHOWUSER — Profil eines Users anzeigen (inkl. Registrierungsdatum & Ausrüstung)
-if (cmd === 'showuser') {
-  // 🔒 Berechtigungsprüfung: Team-Ränge + VIP dürfen diesen Command nutzen
-  if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD', 'VIP', 'SUPPORTER', 'TEST_SUPPORTER'])) {
-    return send('🚫 Dieser Befehl ist nur für Team-Mitglieder und VIPs verfügbar.');
-  }
-
-  const ctx = m.message?.extendedTextMessage?.contextInfo;
-  let target = args[0];
-  if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
-  if (!target && ctx?.participant) target = ctx.participant;
-  if (!target) target = sender; // ohne Angabe -> eigenes Profil
-
-  const targetJid = normalizeJid(target);
-  ensureUser(targetJid);
-  arena.ensureArenaFields(users, targetJid); // stellt sicher, dass .equipped existiert
-  const u = users[targetJid];
-
-  const displayName = u.name || u.registrationName || targetJid.split('@')[0];
-  const rank = ranks[targetJid] || u.rank || 'USER';
-  const registriert = u.registered ? '✅ Ja' : '❌ Nein';
-  const regDatum = u.registrationDate
-    ? new Date(u.registrationDate).toLocaleString('de-DE', { dateStyle: 'long', timeStyle: 'short' })
-    : '—';
-
-  const infoLines = [];
-  if (u.alter) infoLines.push('🎂 Alter: ' + u.alter);
-  if (u.hobbys) infoLines.push('🎯 Hobbys: ' + u.hobbys);
-  if (u.sexualitaet) infoLines.push('💫 Sexualität: ' + u.sexualitaet);
-  const infoBlock = infoLines.length ? '\n' + infoLines.join('\n') : '';
-
-  const marriage = marriages[targetJid];
-  let marriageLine = '💍 Status: Single';
-  if (marriage) {
-    const partnerUser = users[marriage.partner] || {};
-    const partnerName = partnerUser.name || partnerUser.registrationName || marriage.partner.split('@')[0];
-    marriageLine = `💍 Verheiratet mit: ${partnerName}`;
-  }
-
-  // 🎖️ Titel
-  const activeTitleObj = TITLES.find(t => t.id === u.activeTitle);
-  const titleLine = activeTitleObj
-    ? `🎖️ Titel: ${activeTitleObj.icon} "${activeTitleObj.name}"`
-    : '🎖️ Titel: Keiner';
-
-  // ⚔️ Ausrüstung aus dem Arena-System
-  // Owner-exklusive / geheime Items (z.B. Excalibur) werden für alle
-  // außer dem Haupt-Owner selbst als "Unbekannt" angezeigt, egal wer
-  // das Profil ansieht oder wessen Profil es ist.
-  const viewerIsPrimaryOwner = isPrimaryOwner(sender);
-
-  const formatGearLineForShowuser = (itemId) => {
-    if (!itemId) return '— (keine Ausrüstung)';
-    const it = ITEM_DB[itemId];
-    if (!it) return '— (unbekannt)';
-    if ((it.ownerOnly || it.secret) && !viewerIsPrimaryOwner) {
-      return '❓ Unbekannt';
-    }
-    return arena.formatItemLine(itemId, 1);
-  };
-
-  const weaponId = u.equipped?.weapon;
-  const armorId = u.equipped?.armor;
-  const weaponLine = formatGearLineForShowuser(weaponId);
-  const armorLine = formatGearLineForShowuser(armorId);
-  const gearBlock = `\n⚔️ *Ausrüstung*\n🗡️ Waffe: ${weaponLine}\n🛡️ Rüstung: ${armorLine}`;
-
-  const caption =
-    `👤 *Profil von ${displayName}*\n` +
-    `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
-    `🏅 Rang: ${prettyRank(rank)}\n` +
-    `${titleLine}\n` +
-    `⭐ Level: ${u.level || 1}\n` +
-    `✨ XP: ${u.xp || 0}\n` +
-    `💰 Coins: ${u.coins || 0}\n` +
-    `📨 Nachrichten: ${u.msgCount || 0}\n` +
-    `📝 Registriert: ${registriert}\n` +
-    `📅 Registrierungsdatum: ${regDatum}\n` +
-    `${marriageLine}${infoBlock}\n` +
-    `${gearBlock}`;
-
-  return send(caption, { mentions: [targetJid] });
-}
-// PARTNER (Gilden-Bündnisse anzeigen)
-if (cmd === 'partner' || cmd === 'partners' || cmd === 'buendnisse') {
-  if (!partners.list || partners.list.length === 0) {
-    return send('⚔️ *— GILDEN-BÜNDNISSE —* ⚔️\n\nAktuell bestehen keine Bündnisse mit anderen Gilden.');
-  }
-
-  const divider = '⚔️┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈⚔️';
-  let out = '⚔️ *— GILDEN-BÜNDNISSE —* ⚔️\n' + divider + '\n\n';
-  partners.list.forEach((p, i) => {
-    out += '🛡️ *' + p.name + '*\n🔗 ' + p.link + '\n\n';
-  });
-  out += divider + '\n_"Gemeinsam sind wir stärker." — Verbündete Gilden von AINCRAD_';
-  return send(out);
-}
-// ADDPARTNER
-if (cmd === 'addpartner') {
-  if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) {
-    return send('❌ Nur der Gildenmeister darf neue Bündnisse eingehen.');
-  }
-
-  const input = args.join(' ');
-  const parts = input.split('|').map(s => s ? s.trim() : s);
-  const name = parts[0];
-  const link = parts[1];
-
-  if (!name || !link) {
-    return send(
-      '❌ Nutzung: ' + activePrefix + 'addpartner Bot-Name | Link\n' +
-      'Beispiel: ' + activePrefix + 'addpartner Elucidator-Bot | https://chat.whatsapp.com/XXXXXXXX'
-    );
-  }
-
-  if (!/^https?:\/\//i.test(link)) {
-    return send('❌ Bitte gib einen gültigen Link an (muss mit http:// oder https:// beginnen).');
-  }
-
-  partners.list.push({ name: name, link: link, addedBy: sender, at: Date.now() });
-  save(FILES.partners, partners);
-
-  return send('✅ Bündnis mit *' + name + '* wurde geschlossen und in die Gildenchronik eingetragen! ⚔️');
-}
-
-// DELPARTNER
-if (cmd === 'delpartner') {
-  if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) {
-    return send('❌ Nur der Gildenmeister darf Bündnisse auflösen.');
-  }
-
-  const index = parseInt(args[0]) - 1;
-  if (isNaN(index) || index < 0 || index >= partners.list.length) {
-    return send('❌ Ungültige Nummer. Nutze ' + activePrefix + 'partner um die Liste mit Nummern zu sehen.');
-  }
-
-  const removed = partners.list.splice(index, 1)[0];
-  save(FILES.partners, partners);
-  return send('💔 Bündnis mit *' + removed.name + '* wurde aufgelöst.');
-}
-// NACHTSPERRE
-if (cmd === 'nachtsperre' || cmd === 'quiethours') {
-  if (!isGroup) return send('❌ Nur in Gruppen.');
-
-  const groupMetadata = await getGroupMetaSafe(from);
-  const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
-  if (!isGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) {
-    return send('❌ Du musst Admin in dieser Gruppe sein.');
-  }
-
-  const sub = (args[0] || '').toLowerCase();
-
-  if (sub === 'aus' || sub === 'off') {
-    delete groupLockSchedules[from];
-    save(FILES.groupLockSchedule, groupLockSchedules);
-    // Zur Sicherheit sofort wieder entsperren, falls sie gerade gesperrt ist
-    try { await sock.groupSettingUpdate(from, 'not_announcement'); } catch (e) {}
-    return send('✅ Nachtsperre deaktiviert. Die Gruppe ist dauerhaft offen.');
-  }
-
-  if (sub === 'status' || !sub) {
-    const entry = groupLockSchedules[from];
-    if (!entry) return send('ℹ️ Für diese Gruppe ist keine Nachtsperre aktiv.\n\nNutzung: ' + activePrefix + 'nachtsperre an 22:00 07:00');
-    return send('🌙 Nachtsperre aktiv:\nSperrt um ' + entry.start + ' Uhr\nÖffnet um ' + entry.end + ' Uhr');
-  }
-
-  if (sub === 'an' || sub === 'on') {
-    const start = args[1];
-    const end = args[2];
-    const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
-
-    if (!start || !end || !timeRegex.test(start) || !timeRegex.test(end)) {
-      return send('❌ Nutzung: ' + activePrefix + 'nachtsperre an <start HH:MM> <ende HH:MM>\nBeispiel: ' + activePrefix + 'nachtsperre an 22:00 07:00');
-    }
-
-    groupLockSchedules[from] = { start: start, end: end, setBy: sender };
-    save(FILES.groupLockSchedule, groupLockSchedules);
-
-    return send('✅ Nachtsperre aktiviert.\nSperrt täglich um ' + start + ' Uhr\nÖffnet täglich um ' + end + ' Uhr\n\nNur Admins können während der Sperrzeit schreiben.');
-  }
-
-  return send('❌ Nutzung: ' + activePrefix + 'nachtsperre an/aus/status');
-}
-const PIN_CACHE_DIR = path.join(__dirname, 'cache', 'pinterest');
-
-function downloadPinterestVideo(url) {
-  return new Promise((resolve, reject) => {
-    fs.mkdirSync(PIN_CACHE_DIR, { recursive: true });
-    const outPath = path.join(PIN_CACHE_DIR, `${Date.now()}.mp4`);
-
-    // -f bv*+ba/best -> beste Video+Audio-Spur (Pinterest liefert oft HLS/m3u8)
-    // --merge-output-format mp4 -> erzwingt sauberes mp4-Remuxing statt rohem Stream-Dump
-    // --postprocessor-args "ffmpeg:-movflags +faststart" -> macht die Datei WhatsApp-kompatibel
-    const cmd = `yt-dlp -f "bv*+ba/best" --merge-output-format mp4 --postprocessor-args "ffmpeg:-movflags +faststart" --no-playlist -o "${outPath}" "${url}"`;
-
-    exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
-      if (err) return reject(err);
-      if (!fs.existsSync(outPath)) return reject(new Error('Keine Videodatei erzeugt (evtl. ist der Pin ein Bild, kein Video).'));
-      resolve(outPath);
-    });
-  });
-}
-
-// PINTEREST DOWNLOADER
-if (cmd === 'pin' || cmd === 'pinterest' || cmd === 'pindl') {
-  const fullText = args.join(' ').trim();
-  const urlMatch = fullText.match(/(https?:\/\/)?(www\.)?(pinterest\.[a-z.]{2,}\/pin\/[\w-]+|pin\.it\/[\w-]+)/i);
-
-  if (!urlMatch) {
-    return send(`❌ Nutzung: ${activePrefix}pin <pinterest-link>\n\nBeispiel:\n${activePrefix}pin https://pin.it/abcd1234\noder\n${activePrefix}pin https://www.pinterest.com/pin/123456789/`);
-  }
-
-  let url = urlMatch[0];
-  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-
-  const cooldownMsg = checkCooldown(sender, 'pin');
-  if (cooldownMsg && !isOwner) return send(cooldownMsg);
-
-  await send('📌 Lade Pinterest-Video herunter, bitte warten...');
-
-  let videoPath;
-  try {
-    videoPath = await downloadPinterestVideo(url);
-    const stats = fs.statSync(videoPath);
-
-    if (stats.size > 95 * 1024 * 1024) {
-      fs.unlinkSync(videoPath);
-      return send('❌ Die Datei ist zu groß für WhatsApp (>95MB).');
-    }
-
-    await sock.sendMessage(from, {
-      video: fs.readFileSync(videoPath),
-      mimetype: 'video/mp4',
-      caption: '📌 Pinterest Video'
-    }, { quoted: m });
-
-    fs.unlinkSync(videoPath);
-  } catch (e) {
-    console.error('[pin] Fehler:', e?.message || e);
-    try { if (videoPath && fs.existsSync(videoPath)) fs.unlinkSync(videoPath); } catch {}
-    return send('❌ Download fehlgeschlagen. Prüfe den Link — er muss auf einen Pinterest-*Pin mit Video* zeigen (Bild-Pins funktionieren nicht), oder versuche es später erneut.');
-  }
-  return;
-}
-// ===== MURDER DRONES EDITS (automatische Suche) =====
-const MD_SEARCH_QUERIES = [
-  'murder drones edit', 'murder drones amv', 'murder drones edit shorts',
-  'uzi doorman edit', 'murder drones tiktok edit'
-];
-const MD_CACHE_DIR = path.join(__dirname, 'cache', 'murderdrones');
-
-function searchMdEditUrl() {
-  return new Promise((resolve, reject) => {
-    const query = MD_SEARCH_QUERIES[randInt(0, MD_SEARCH_QUERIES.length - 1)];
-    const cmd = `yt-dlp "ytsearch10:${query}" --get-id --no-playlist --match-filter "duration < 180"`;
-    exec(cmd, { maxBuffer: 1024 * 1024 * 10 }, (err, stdout) => {
-      if (err) return reject(err);
-      const ids = stdout.split('\n').map(s => s.trim()).filter(Boolean);
-      if (!ids.length) return reject(new Error('Keine Ergebnisse gefunden'));
-      resolve(`https://www.youtube.com/watch?v=${ids[randInt(0, ids.length - 1)]}`);
-    });
-  });
-}
-
-function downloadMdEdit(url) {
-  return new Promise((resolve, reject) => {
-    fs.mkdirSync(MD_CACHE_DIR, { recursive: true });
-    const outPath = path.join(MD_CACHE_DIR, `${Date.now()}.mp4`);
-    exec(`yt-dlp -f "mp4" --no-playlist -o "${outPath}" "${url}"`, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
-      if (err) return reject(err);
-      resolve(outPath);
-    });
-  });
-}
-
-// ===== SWORD ART ONLINE EDITS (automatische Suche) =====
-const SAO_SEARCH_QUERIES = [
-  'sword art online edit', 'sword art online amv', 'sao edit shorts',
-  'kirito asuna edit', 'sword art online tiktok edit'
-];
-const SAO_CACHE_DIR = path.join(__dirname, 'cache', 'saoedits');
-
-function searchSaoEditUrl() {
-  return new Promise((resolve, reject) => {
-    const query = SAO_SEARCH_QUERIES[randInt(0, SAO_SEARCH_QUERIES.length - 1)];
-    const cmd = `yt-dlp "ytsearch10:${query}" --get-id --no-playlist --match-filter "duration < 180"`;
-    exec(cmd, { maxBuffer: 1024 * 1024 * 10 }, (err, stdout) => {
-      if (err) return reject(err);
-      const ids = stdout.split('\n').map(s => s.trim()).filter(Boolean);
-      if (!ids.length) return reject(new Error('Keine Ergebnisse gefunden'));
-      resolve(`https://www.youtube.com/watch?v=${ids[randInt(0, ids.length - 1)]}`);
-    });
-  });
-}
-
-function downloadSaoEdit(url) {
-  return new Promise((resolve, reject) => {
-    fs.mkdirSync(SAO_CACHE_DIR, { recursive: true });
-    const outPath = path.join(SAO_CACHE_DIR, `${Date.now()}.mp4`);
-    exec(`yt-dlp -f "mp4" --no-playlist -o "${outPath}" "${url}"`, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
-      if (err) return reject(err);
-      resolve(outPath);
-    });
-  });
-}
-// MD
-if (cmd === 'md') {
-  await send('🔍 Suche einen Edit...');
-  try {
-    const url = await searchMdEditUrl();
-    await send('⏳ Lade Edit, bitte warten...');
-    const videoPath = await downloadMdEdit(url);
-    const stats = fs.statSync(videoPath);
-    if (stats.size > 95 * 1024 * 1024) {
-      fs.unlinkSync(videoPath);
-      return send('❌ Das gefundene Video ist zu groß für WhatsApp. Versuch es nochmal.');
-    }
-    await sock.sendMessage(from, {
-      video: fs.readFileSync(videoPath), caption: '🤖 Murder Drones Edit', mimetype: 'video/mp4'
-    }, { quoted: m });
-    fs.unlinkSync(videoPath);
-  } catch (e) {
-    console.error('[md] Fehler:', e?.message || e);
-    return send('❌ Konnte keinen passenden Edit finden oder herunterladen. Versuch es später erneut.');
-  }
-  return;
-}
-
-// SAO
-if (cmd === 'sao') {
-  await send('⚔️ Durchsuche die Aincrad-Archive nach einem Edit...');
-  try {
-    const url = await searchSaoEditUrl();
-    await send('⏳ Lade Edit, bitte warten...');
-    const videoPath = await downloadSaoEdit(url);
-    const stats = fs.statSync(videoPath);
-    if (stats.size > 95 * 1024 * 1024) {
-      fs.unlinkSync(videoPath);
-      return send('❌ Das gefundene Video ist zu groß für WhatsApp. Versuch es nochmal.');
-    }
-    await sock.sendMessage(from, {
-      video: fs.readFileSync(videoPath), caption: '⚔️ Sword Art Online Edit', mimetype: 'video/mp4'
-    }, { quoted: m });
-    fs.unlinkSync(videoPath);
-  } catch (e) {
-    console.error('[sao] Fehler:', e?.message || e);
-    return send('❌ Konnte keinen passenden Edit finden oder herunterladen. Versuch es später erneut.');
-  }
-  return;
-}
-
-// SAY (Hinweis: Berechtigungsprüfung habe ich beibehalten, dein altes Script hatte
-// keine — bei einem offenen "Bot sagt was ich will"-Befehl rate ich davon ab)
-if (cmd === 'say') {
-  if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) {
-    return send('❌ Kein Zugriff.');
-  }
-  const text = args.join(' ').trim();
-  if (!text) return send(`❌ Nutzung: ${activePrefix}say <nachricht>`);
-
-  if (isGroup) {
-    try {
-      await sock.sendMessage(from, {
-        delete: { remoteJid: from, id: m.key.id, fromMe: false, participant: sender }
-      });
-    } catch (e) {}
-  }
-  await sock.sendMessage(from, { text });
-  return;
-}
-// SETINFO
-if (cmd === 'setinfo') {
-  const feld = (args[0] || '').toLowerCase();
-  const wert = args.slice(1).join(' ').trim();
-  const erlaubteFelder = {
-    name: 'name', alter: 'alter', hobbys: 'hobbys', hobby: 'hobbys',
-    sexualitaet: 'sexualitaet', 'sexualität': 'sexualitaet'
-  };
-
-  if (!feld || !erlaubteFelder[feld] || !wert) {
-    return send(
-      `❌ Nutzung: ${activePrefix}setinfo <feld> <wert>\n\n` +
-      `Verfügbare Felder: name, alter, hobbys, sexualitaet\n\n` +
-      `Beispiele:\n${activePrefix}setinfo name Kirito\n${activePrefix}setinfo alter 22\n` +
-      `${activePrefix}setinfo hobbys Lesen, Gaming\n${activePrefix}setinfo sexualitaet Hetero`
-    );
-  }
-
-  const key = erlaubteFelder[feld];
-  if (key === 'alter') {
-    const num = parseInt(wert);
-    if (isNaN(num) || num < 1 || num > 120) return send('❌ Bitte gib ein gültiges Alter zwischen 1 und 120 an.');
-    users[sender].alter = num;
-  } else {
-    users[sender][key] = wert;
-  }
-  save(FILES.users, users);
-  return send(`✅ ${feld.charAt(0).toUpperCase() + feld.slice(1)} wurde gespeichert. Nutze ${activePrefix}me, um dein Profil anzuzeigen.`);
-}
-// BANCMD
-if (cmd === 'bancmd') {
-  if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Nur Owner/CoOwner.');
-  const target = args[0];
-  const action = (args[1] || 'ban').toLowerCase();
-  if (!target) return send(`Nutzung: ${PREFIX}bancmd <befehl> [ban|unban]`);
-
-  const tcmd = String(target).toLowerCase().replace(new RegExp(`^\\${PREFIX}`), '').trim();
-  if (!tcmd) return send('❌ Ungültiger Befehl.');
-
-  const protectedCmds = ['bancmd', 'unbancmd', 'help', 'menu'];
-  if (protectedCmds.includes(tcmd)) return send(`❌ Der Befehl "${tcmd}" kann nicht gesperrt werden.`);
-
-  if (action === 'unban') {
-    if (commandBans[tcmd]) {
-      delete commandBans[tcmd];
-      save(FILES.commandBans, commandBans);
-      return send(`✅ Befehl ${tcmd} wurde entsperrt.`);
-    }
-    return send(`ℹ️ Befehl ${tcmd} war nicht gesperrt.`);
-  }
-
-  commandBans[tcmd] = { by: sender, at: new Date().toISOString() };
-  save(FILES.commandBans, commandBans);
-  return send(`⛔ Befehl ${tcmd} wurde gesperrt und ist nur noch für Owner/CoOwner verfügbar.`);
-}
-// ⚔️ Arena-System: Kisten, Ausrüstung, Duelle, Leaderboard
-const arenaHandled = await arena.handle({
-  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
-  users, save, FILES, ensureUser, normalizeJid, isSameJid,
-  getNumberMention, randInt, sleep, isPrimaryOwner
-});
-if (arenaHandled) {
-  // Nach jedem Arena-Command (inkl. Duellen) automatisch prüfen,
-  // ob der aufrufende Spieler neue Titel/Achievements freigeschaltet hat.
-  await checkProgress({
-    users, save, FILES, send, activePrefix,
-    guilds, ownerJids: [OWNER_LID, OWNER_LID2, OWNER_PRIV, OWNER_PRIV2]
-  }, sender);
-  return;
-}
-
-const guildHandled = await guildSystem.handle({
-  cmd, args, sender, send, sock,
-  users, guilds, save, FILES, ensureUser, normalizeJid, isSameJid,
-  getNumberMention, activePrefix, m
-});
-if (guildHandled) {
-  // Auch nach Gilden-Aktionen prüfen (z.B. Gilde gegründet -> Gildenmeister-Titel)
-  await checkProgress({
-    users, save, FILES, send, activePrefix,
-    guilds, ownerJids: [OWNER_LID, OWNER_LID2, OWNER_PRIV, OWNER_PRIV2]
-  }, sender);
-  return;
-}
-
-const titleHandled = await titleSystem.handle({
-  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
-  users, guilds, save, FILES, ensureUser, normalizeJid, isSameJid,
-  ownerJids: [OWNER_LID, OWNER_LID2, OWNER_PRIV, OWNER_PRIV2]
-});
-if (titleHandled) return;
-const pokemonHandled = await pokemonSystem.handle({
-  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
-  users, save, FILES, ensureUser, normalizeJid, isSameJid,
-  getNumberMention, randInt, sleep, isPrimaryOwner
-});
-if (pokemonHandled) return;
-const bossEventHandled = await guildBoss.handle({
-  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
-  users, guilds, save, FILES, ensureUser, normalizeJid, isSameJid,
-  getNumberMention, randInt, sleep, isAuthorized,
-  ITEM_DB,
-  ensureArenaFields: arena.ensureArenaFields,
-  isPrimaryOwner   // NEU
-});
-if (bossEventHandled) return;
-const guildWarHandled = await guildWars.handle({
-  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
-  users, guilds, save, FILES, ensureUser, normalizeJid, isSameJid,
-  getNumberMention, randInt, sleep, isAuthorized,
-  ITEM_DB,
-  ensureArenaFields: arena.ensureArenaFields,
-  isPrimaryOwner
-});
-if (guildWarHandled) return;
-const demonSlayerHandled = await demonSlayer.handle({
-  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
-  users, save, FILES, ensureUser, normalizeJid, isSameJid,
-  getNumberMention, randInt, sleep, isPrimaryOwner
-});
-if (demonSlayerHandled) return;
-const soloLevelingHandled = await soloLeveling.handle({
-  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
-  users, save, FILES, ensureUser, normalizeJid, isSameJid,
-  getNumberMention, randInt, sleep, isPrimaryOwner
-});
-if (soloLevelingHandled) return;
-
-// OWNERMODE
-      if (cmd === 'ownermode' || cmd === 'om') {
-        if (!isOwner) return send('❌ Nur der Inhaber/Co-Inhaber darf diesen Befehl nutzen.');
-        const action = (args[0] || '').toLowerCase();
-        if (!action || action === 'status') return send(`👑 Owner Mode: ${OWNER_MODE ? 'AKTIV ✅ (alle anderen werden ignoriert)' : 'INAKTIV ❌'}`);
-        if (['on', 'enable', 'true'].includes(action)) { OWNER_MODE = true; saveBotState(); return send('✅ Owner Mode AKTIVIERT — nur noch Owner/CoOwner werden beantwortet, alle anderen Nachrichten werden ignoriert.'); }
-        if (['off', 'disable', 'false'].includes(action)) { OWNER_MODE = false; saveBotState(); return send('✅ Owner Mode DEAKTIVIERT — der Bot reagiert wieder auf alle.'); }
-        if (action === 'toggle') { OWNER_MODE = !OWNER_MODE; saveBotState(); return send(`🔁 Owner Mode: ${OWNER_MODE ? 'AKTIV ✅' : 'INAKTIV ❌'}`); }
-        return send('❌ Nutzung: $ownermode on|off|toggle|status');
-      }
-// RESET LEVEL
-if (cmd === 'resetlevel') {
-  if (!isAuthorized(sender, ['OWNER'])) return send('❌ Nur der Inhaber darf diesen Befehl nutzen.');
-
-  const ctx = m.message?.extendedTextMessage?.contextInfo;
-  let target = args[0];
-  if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
-  if (!target && ctx?.participant) target = ctx.participant;
-
-  if (!target) return send(`❌ Nutzung: ${PREFIX}resetlevel <@user|nummer>`);
-
-  const targetJid = normalizeJid(target);
-  ensureUser(targetJid);
-  const oldLevel = users[targetJid].level || 1;
-  const oldXp = users[targetJid].xp || 0;
-  users[targetJid].level = 1;
-  users[targetJid].xp = 0;
-  save(FILES.users, users);
-
-  return send(
-    `✅ Level von @${targetJid.split('@')[0]} wurde zurückgesetzt (vorher: Lv.${oldLevel}, ${oldXp} XP → jetzt: Lv.1, 0 XP).`,
-    { mentions: [targetJid] }
-  );
-}
-// BANCMDS — Liste aller aktuell gesperrten Befehle anzeigen
-if (cmd === 'bancmds' || cmd === 'bannedcmds' || cmd === 'listbancmd') {
-  if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Nur Owner/CoOwner.');
-
-  const entries = Object.entries(commandBans || {});
-  if (!entries.length) return send('✅ Aktuell sind keine Befehle gesperrt.');
-
-  const lines = await Promise.all(entries.map(async ([cmdName, info]) => {
-    const who = await getNumberMention(info.by, sock);
-    const when = info.at ? new Date(info.at).toLocaleString('de-DE') : '(unbekannt)';
-    return `⛔ ${activePrefix}${cmdName} — gesperrt von ${who} am ${when}`;
-  }));
-
-  const mentions = entries.map(([, info]) => info.by).filter(Boolean);
-  return send(`📋 *Gesperrte Befehle* (${entries.length}):\n\n${lines.join('\n')}`, { mentions });
-}
-// RESETCOOLDOWN
-if (cmd === 'resetcooldown' || cmd === 'resetcd') {
-  if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Nur der Inhaber/Co-Inhaber darf diesen Befehl nutzen.');
-
-  const ctx = m.message?.extendedTextMessage?.contextInfo;
-  let target = args[0];
-  if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
-  if (!target && ctx?.participant) target = ctx.participant;
-
-  if (!target) {
-    return send(`❌ Nutzung: ${activePrefix}resetcooldown <@user|nummer> [befehl]\nBeispiel: ${activePrefix}resetcooldown @user\n${activePrefix}resetcooldown @user fish`);
-  }
-
-  const targetJid = normalizeJid(target);
-  ensureUser(targetJid);
-
-  // Optionaler zweiter Parameter: ein einzelner Befehl statt aller Cooldowns.
-  // Falls target per @mention kam, ist args[0] die Mention selbst -> der
-  // Befehlsname steht dann in args[1]. Falls target per Nummer/JID kam,
-  // ebenfalls args[1]. Kurz: alles nach dem ersten Argument ist der Befehl.
-  const specificCmd = args.slice(1).join(' ').trim().toLowerCase().replace(new RegExp(`^\\${activePrefix}`), '');
-
-  if (!commandCooldowns.has(targetJid)) {
-    return send(`ℹ️ @${targetJid.split('@')[0]} hat aktuell keine aktiven Cooldowns.`, { mentions: [targetJid] });
-  }
-
-  const userCooldowns = commandCooldowns.get(targetJid);
-
-  if (specificCmd) {
-    if (!userCooldowns.has(specificCmd)) {
-      return send(`ℹ️ @${targetJid.split('@')[0]} hat aktuell keinen Cooldown für "${specificCmd}".`, { mentions: [targetJid] });
-    }
-    userCooldowns.delete(specificCmd);
-    return send(`✅ Cooldown für "${specificCmd}" von @${targetJid.split('@')[0]} wurde zurückgesetzt.`, { mentions: [targetJid] });
-  }
-
-  const count = userCooldowns.size;
-  commandCooldowns.delete(targetJid);
-  return send(`✅ Alle ${count} Cooldown(s) von @${targetJid.split('@')[0]} wurden zurückgesetzt.`, { mentions: [targetJid] });
-}
-// SETPASSWORT — Passwort für die Website setzen (nur im Privatchat)
-if (cmd === 'setpasswort' || cmd === 'setpassword') {
-  if (isGroup) {
-    return send('🔒 Aus Sicherheitsgründen funktioniert dieser Befehl nur im Privatchat mit mir. Schreib mir direkt eine Nachricht.');
-  }
-
-  const password = args.join(' ').trim();
-  if (!password || password.length < 4) {
-    return send(`❌ Nutzung: ${activePrefix}setpasswort <passwort>\nDas Passwort muss mindestens 4 Zeichen lang sein.`);
-  }
-  if (password.length > 100) {
-    return send('❌ Das Passwort ist zu lang (max. 100 Zeichen).');
-  }
-
-  ensureUser(sender);
-  const hadIdBefore = !!users[sender].webId;
-  const webId = setUserWebPassword(sender, password);
-
-  return send(
-    hadIdBefore
-      ? `✅ Dein Passwort wurde aktualisiert.\n🆔 Deine ID bleibt: *${webId}*\n\nNutze ID + Passwort, um dich auf der Website anzumelden.`
-      : `✅ Passwort gesetzt!\n🆔 Deine ID lautet: *${webId}*\n\nMerke dir ID + Passwort gut. Du kannst dir die ID jederzeit erneut anzeigen lassen mit ${activePrefix}myid.`
-  );
-}
-
-// MYID — eigene Web-ID anzeigen (nur im Privatchat)
-if (cmd === 'myid') {
-  if (isGroup) {
-    return send('🔒 Aus Sicherheitsgründen zeige ich deine ID nur im Privatchat. Schreib mir direkt eine Nachricht.');
-  }
-  ensureUser(sender);
-  const webId = users[sender].webId;
-  if (!webId) {
-    return send(`ℹ️ Du hast noch keine ID. Setze zuerst ein Passwort mit:\n${activePrefix}setpasswort <passwort>`);
-  }
-  return send(`🆔 Deine ID: *${webId}*\n\n(Passwort vergessen? Setze es neu mit ${activePrefix}setpasswort <neues-passwort> — die ID bleibt gleich.)`);
-}
-// KISTE AN ALLE — verschenkt jedem registrierten User X Kisten
-if (cmd === 'kisteall' || cmd === 'giftkisteall') {
-  if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
-
-  const amount = parseInt(args[0]) || 1;
-  // Alles nach der Zahl wird als Gruppen-Filter interpretiert (Name oder "gruppe" für aktuelle Gruppe)
-  const groupArg = args.slice(1).join(' ').trim();
-
-  if (amount < 1 || amount > 50) {
-    return send(
-      `❌ Nutzung:\n` +
-      `${activePrefix}kisteall [anzahl]  → alle registrierten Nutzer\n` +
-      `${activePrefix}kisteall [anzahl] gruppe  → nur aktuelle Gruppe\n` +
-      `${activePrefix}kisteall [anzahl] gruppe:<Gruppenname>  → nur bestimmte Gruppe\n` +
-      `(Erlaubt: 1-50 Kisten pro User)`
-    );
-  }
-
-  let targetJids = [];
-  let targetLabel = '';
-
-  if (groupArg.toLowerCase() === 'gruppe') {
-    // Nur die Gruppe, in der der Command ausgeführt wurde
-    const groupJid = m.key.remoteJid;
-    if (!groupJid?.endsWith('@g.us')) {
-      return send('❌ "gruppe" funktioniert nur, wenn der Command in einer Gruppe ausgeführt wird.');
-    }
-    let metadata;
-    try {
-      metadata = await sock.groupMetadata(groupJid);
-    } catch (e) {
-      return send('❌ Konnte Gruppenmitglieder nicht abrufen.');
-    }
-    targetJids = metadata.participants.map(p => p.id).filter(jid => users[jid]?.registered === true);
-    targetLabel = metadata.subject;
-
-  } else if (groupArg.toLowerCase().startsWith('gruppe:')) {
-    // Bestimmte Gruppe per Name, egal wo der Command ausgeführt wird
-    const searchName = groupArg.slice('gruppe:'.length).trim().toLowerCase();
-    if (!searchName) return send('❌ Bitte einen Gruppennamen angeben, z.B. gruppe:MeineGruppe');
-
-    let allGroups;
-    try {
-      allGroups = await sock.groupFetchAllParticipating();
-    } catch (e) {
-      return send('❌ Konnte Gruppenliste nicht abrufen.');
-    }
-
-    const match = Object.values(allGroups).find(g =>
-      g.subject?.toLowerCase().includes(searchName)
-    );
-
-    if (!match) {
-      return send(`❌ Keine Gruppe mit dem Namen "${searchName}" gefunden.`);
-    }
-
-    targetJids = match.participants.map(p => p.id).filter(jid => users[jid]?.registered === true);
-    targetLabel = match.subject;
-
-  } else {
-    // Global: alle registrierten Nutzer
-    targetJids = Object.keys(users).filter(jid => users[jid]?.registered === true);
-    targetLabel = 'alle Gruppen';
-  }
-
-  if (!targetJids.length) {
-    return send(`ℹ️ Keine registrierten Nutzer gefunden (${targetLabel || 'Ziel'}).`);
-  }
-
-  for (const jid of targetJids) {
-    if (!users[jid].items) users[jid].items = {};
-    users[jid].items['kiste'] = (users[jid].items['kiste'] || 0) + amount;
-  }
-  save(FILES.users, users);
-
-  return send(
-    `🎁 ${amount}x Kiste an ${targetJids.length} registrierte Nutzer verschenkt` +
-    (targetLabel ? ` (${targetLabel})` : '') + `!\n` +
-    `Öffne sie mit ${activePrefix}openkiste`
-  );
-}
-// Unbekannter Befehl
-const suggestion = findClosestCommand(cmd);
-if (suggestion) {
-  return send(
-    '⚠️ *SYSTEM-FEHLER* ⚠️\n' +
-    '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n' +
-    'Der Befehl "' + cmd + '" existiert nicht im Aincrad-System.\n\n' +
-    '🔍 *Ähnlichste Erkenntnis:*\n' +
-    '⌈ ' + activePrefix + suggestion.command + ' ⌋ — Übereinstimmung: ' + suggestion.similarity + '%\n\n' +
-    'Meintest du das, Schwertkämpfer?\n' +
-    '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n' +
-    '_Nutze ' + activePrefix + 'help für das vollständige Skill-Menü._'
-  );
-}
-return send(
-  '❓ *UNBEKANNTER BEFEHL* ❓\n' +
-  '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n' +
-  'Dieser Skill wurde noch nicht erlernt.\n' +
-  'Nutze ' + activePrefix + 'help oder ' + activePrefix + 'menu für das Command-Window.\n\n' +
-  'Falls du glaubst, dieser Skill sollte existieren, wende dich an Daddy Kirito unter ' + activePrefix + 'owner.'
-);
-    } catch (err) {
-      console.error('messages.upsert error:', err);
-      log('ERROR: ' + (err?.message || String(err)));
-    }
-  });
-
-  console.log('✅ Sword-art-online-bot Session "' + sessionName + '" gestartet.');
-  return sock;
-}
-// ========== MAIN ==========
-
-// Adapter: verbindet telegram-connect.js mit den bereits vorhandenen
-// Funktionen/Strukturen (startBot, activeSessions) dieser Datei.
-const sessionManager = {
-  // Startet eine neue Session (oder gibt die laufende zurück, falls schon aktiv)
-  startSession: (name, hooks) => startBot(name, hooks),
-
-  // Gibt den sock der Session zurück (oder undefined)
-  getSession: (name) => activeSessions.get(name),
-
-  // Liste aller aktiven Sessions im vom Telegram-Bot erwarteten Format
-  listSessions: () => [...activeSessions.entries()].map(([name, sock]) => ({
-    name,
-    connected: !!sock?.user,
-    jid: sock?.user?.id || null
-  })),
-
-  // Trennt eine Session (Login-Daten bleiben erhalten)
-  stopSession: async (name) => {
-    const targetSock = activeSessions.get(name);
-    if (!targetSock) throw new Error(`Session "${name}" ist nicht aktiv.`);
-    activeSessions.delete(name);
-    targetSock.ev.removeAllListeners();
-    try { await targetSock.logout(); } catch (e) {}
-    try { targetSock.end(new Error('stopped by telegram')); } catch (e) {}
-  },
-
-  // Stoppt eine Session UND löscht die Login-Daten von der Platte
-  deleteSession: async (name) => {
-    const targetPath = path.join(SESSIONS_DIR, name);
-    const normalizedTargetPath = path.normalize(targetPath);
-    if (!normalizedTargetPath.startsWith(SESSIONS_DIR)) {
-      throw new Error('Ungültiger Session-Name.');
-    }
-
-    const targetSock = activeSessions.get(name);
-    if (targetSock) {
-      activeSessions.delete(name);
-      targetSock.ev.removeAllListeners();
-      try { await targetSock.logout(); } catch (e) {}
-      try { targetSock.end(new Error('deleted by telegram')); } catch (e) {}
-    }
-
-    if (fs.existsSync(targetPath)) {
-      fs.rmSync(targetPath, { recursive: true, force: true });
-    }
-  }
-};
-
-initTelegramConnect(sessionManager);
-
-// ---- WhatsApp: bestehende Sessions laden oder eine neue ("default") starten ----
-(async () => {
-  let existingSessions = [];
-  try {
-    existingSessions = fs.readdirSync(SESSIONS_DIR, { withFileTypes: true })
-      .filter(d => d.isDirectory())
-      .map(d => d.name);
-  } catch (e) {
-    existingSessions = [];
-  }
-
-  if (existingSessions.length === 0) {
-
-    await startBot('default');
-  } else {
-
-    for (const sessionName of existingSessions) {
-      await startBot(sessionName);
-      await sleep(1000);
-    }
-  }
-})();
