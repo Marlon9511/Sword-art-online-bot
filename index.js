@@ -2758,3 +2758,1771 @@ if (cmd === 'divorce') {
         if (!isOwnMessage) {
           if (!isGroup) {
             return send('❌ In privaten Chats kann ich nur meine eigenen Nachrichten löschen.');
+}
+          let permitted = isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD']);
+          if (!permitted) {
+            const groupMetadata = await getGroupMetaSafe(from);
+            const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
+            permitted = !!isGroupAdmin;
+          }
+          if (!permitted) return send('❌ Du darfst nur eigene Nachrichten oder (als Admin) fremde Nachrichten löschen.');
+        }
+
+        const key = {
+          remoteJid: from,
+          id: ctx.stanzaId,
+          fromMe: isOwnMessage,
+          ...(isGroup ? { participant: quotedParticipant } : {})
+        };
+
+        try {
+          await sock.sendMessage(from, { delete: key });
+          return;
+        } catch (e) {
+          console.error('[delete] Fehler:', e);
+          return send('❌ Löschen fehlgeschlagen (ich brauche dafür ggf. Admin-Rechte in der Gruppe, wenn es nicht meine eigene Nachricht ist).');
+        }
+      }
+
+      if (cmd === 'balance') {
+        ensureUser(sender);
+        const u = users[sender];
+        return send(`💰 Coins: ${u.coins}\n⭐ Level: ${u.level}\nXP: ${u.xp}`);
+      }
+
+      if (cmd === 'addxp' && hasAdminPerms(sender)) {
+        const target = args[0];
+        const amount = parseInt(args[1]);
+        if (!target || isNaN(amount) || amount < 0) return send('❌ Nutzung: $addxp <@nutzer> <menge>');
+        const targetJid = normalizeJid(target);
+        ensureUser(targetJid);
+        users[targetJid].xp = (users[targetJid].xp || 0) + amount;
+        save(FILES.users, users);
+        return send(`✅ ${amount} XP an @${targetJid.split('@')[0]} geschenkt.`, { mentions: [targetJid] });
+      }
+
+      if (cmd === 'addcash' && hasAdminPerms(sender)) {
+        const target = args[0];
+        const amount = parseInt(args[1]);
+        if (!target || isNaN(amount) || amount < 0) return send('❌ Nutzung: $addcash <@nutzer> <menge>');
+        const targetJid = normalizeJid(target);
+        ensureUser(targetJid);
+        users[targetJid].coins = (users[targetJid].coins || 0) + amount;
+        save(FILES.users, users);
+        return send(`✅ ${amount} Coins an @${targetJid.split('@')[0]} geschenkt.`, { mentions: [targetJid] });
+      }
+
+      if (cmd === 'addvip' && hasAdminPerms(sender)) {
+        const target = args[0];
+        const duration = args[1];
+        if (!target || !duration) return send('❌ Nutzung: $addvip <@nutzer> <1d|12h|30m>');
+        const targetJid = normalizeJid(target);
+        if (!addVip(targetJid, duration)) return send('❌ Ungültiges Zeitformat.');
+        ensureUser(targetJid);
+        const expiry = new Date(vipExpiry.get(targetJid)).toLocaleString();
+        return send(`✅ VIP für @${targetJid.split('@')[0]} bis ${expiry}.`, { mentions: [targetJid] });
+      }
+
+      if (cmd === 'fish') {
+        const FISH_EVENTS = [
+          { chance: 20, rarity: 'common',    text: '🐟 *Flusswels* aus dem Fluss der Stadt der Anfänge gefangen! (+8 Coins)', coins: 8 },
+          { chance: 16, rarity: 'common',    text: '🐠 *Blauschuppen-Barsch* gefangen! (+15 Coins)', coins: 15, xp: 3 },
+          { chance: 12, rarity: 'uncommon',  text: '🐡 *Kugelfisch der ersten Ebene* gefangen! (+25 Coins)', coins: 25, xp: 5 },
+
+          { chance: 10, rarity: 'uncommon',  text: '💎 *Kristallforelle* aus dem Kristallwald-See schimmert in der Sonne! (+30 Coins)', coins: 30, xp: 8 },
+          { chance: 7,  rarity: 'rare',      text: '🌫️ *Nebelaal* (Floor 35) aus dem Sumpf gezogen! (+45 Coins)', coins: 45, xp: 10 },
+
+          { chance: 8,  rarity: 'common',    text: '🦀 *Kobold-Krebs* hat sich in der Angel verheddert. (+5 Coins)', coins: 5 },
+          { chance: 5,  rarity: 'rare',      text: '🐍 *Riesenaal* zerrt dich fast von der Plattform, gibt aber auf! (+40 Coins)', coins: 40, xp: 8 },
+
+          { chance: 4,  rarity: 'epic',      text: '🦈 *Sturmhai* (Floor 50) durchbricht die Wasseroberfläche! (+90 Coins)', coins: 90, xp: 20 },
+          { chance: 3,  rarity: 'epic',      text: '🎐 *Leuchtqualle der Tiefen* (Floor 75) taucht schimmernd auf! (+70 Coins)', coins: 70, xp: 15 },
+          { chance: 1.5, rarity: 'legendary', text: '🐉 *Drachenkarpfen* (Floor 90) — ein legendärer Feldboss-Fisch! (+180 Coins)', coins: 180, xp: 35 },
+          { chance: 0.4, rarity: 'legendary', text: '🐋 *Der Weiße Wal von Aincrad* — eine Systemlegende wird wahr! JACKPOT! (+600 Coins)', coins: 600, xp: 120 },
+
+          { chance: 3,  rarity: 'rare',      text: '📦 *Schatztruhe* am Grund des Sees entdeckt! (+200 Coins)', coins: 200, xp: 10 },
+          { chance: 2,  rarity: 'uncommon',  text: '📜 *Flaschenpost eines gefallenen Spielers* gefunden. (+50 Coins)', coins: 50, xp: 20 },
+
+          { chance: 2,  rarity: 'epic',      text: '⚔️ Im Netz verfangen: eine *SAO-Ausrüstungskiste*! Nutze {P}openkiste, um sie zu öffnen.', item: 'kiste', itemQty: 1, xp: 15 },
+          { chance: 3,  rarity: 'uncommon',  text: '💊 Eine *Heiltrank-Flasche* trieb vorbei und wurde eingesammelt.', item: 'potion', itemQty: 1 },
+          { chance: 3,  rarity: 'uncommon',  text: '🎁 Eine *mysteriöse Kiste* hing im Schilf fest.', item: 'box', itemQty: 1 },
+
+          { chance: 10, rarity: 'common',    text: '🌿 Nur Algen gefangen... Aincrad ist manchmal enttäuschend.' },
+          { chance: 8,  rarity: 'common',    text: '💨 Ein Fisch hat deinen Köder gestohlen und ist geflüchtet!' },
+          { chance: 4,  rarity: 'common',    text: '💦 Du bist ausgerutscht und ins eiskalte Wasser gefallen!' },
+          { chance: 3,  rarity: 'common',    text: '🦶 Ein *Kobold* hat dein Boot umgestoßen! (-30 Coins)', coins: -30 },
+          { chance: 2,  rarity: 'common',    text: '🪝 Deine Angel ist an einem Stein zerbrochen! (-10 Coins)', coins: -10 }
+        ];
+
+        const totalWeight = FISH_EVENTS.reduce((sum, e) => sum + e.chance, 0);
+        let random = Math.random() * totalWeight;
+        let selectedEvent = FISH_EVENTS[FISH_EVENTS.length - 1];
+        for (const event of FISH_EVENTS) {
+          random -= event.chance;
+          if (random <= 0) { selectedEvent = event; break; }
+        }
+
+        ensureUser(sender);
+
+        if (selectedEvent.coins) {
+          users[sender].coins = Math.max(0, (users[sender].coins || 0) + selectedEvent.coins);
+        }
+        if (selectedEvent.xp) {
+          users[sender].xp = (users[sender].xp || 0) + selectedEvent.xp;
+        }
+        if (selectedEvent.item) {
+          if (!users[sender].items) users[sender].items = {};
+          users[sender].items[selectedEvent.item] = (users[sender].items[selectedEvent.item] || 0) + (selectedEvent.itemQty || 1);
+        }
+        save(FILES.users, users);
+
+        const rarityTag = selectedEvent.rarity ? (RARITY_INFO[selectedEvent.rarity]?.emoji || '') : '';
+        const header = `🎣 *— ANGELN IN AINCRAD —* 🎣\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n`;
+        const footer = `\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈`;
+        const bodyText = selectedEvent.text.replace(/\{P\}/g, activePrefix);
+
+        return send(`${header}${rarityTag ? rarityTag + ' ' : ''}${bodyText}${footer}`);
+      }
+      if (cmd === 'give') {
+        const target = args[0];
+        const amount = parseInt(args[1]);
+        if (!target || isNaN(amount) || amount <= 0) return send('❌ Nutzung: $give <nummer|@mention> <betrag>');
+        const targetJid = normalizeJid(target);
+        if ((users[sender]?.coins || 0) < amount) return send('❌ Nicht genug Coins!');
+        ensureUser(sender);
+        ensureUser(targetJid);
+        if (isSameJid(sender, targetJid)) return send('❌ Du kannst dir nicht selbst Coins geben!');
+        users[sender].coins -= amount;
+        users[targetJid].coins = (users[targetJid].coins || 0) + amount;
+        save(FILES.users, users);
+        try { await sock.sendMessage(targetJid, { text: `💰 Du hast ${amount} Coins von @${sender.split('@')[0]} erhalten!`, mentions: [sender] }); } catch (e) {}
+        return send(`✅ ${amount} Coins an @${targetJid.split('@')[0]} gesendet!`, { mentions: [targetJid] });
+      }
+if (cmd === 'purge' || cmd === 'clearchat') {
+  if (!isGroup) return send('❌ Nur in Gruppen.');
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) {
+    const groupMetadata = await getGroupMetaSafe(from);
+    const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
+    if (!isGroupAdmin) return send('❌ Du musst Admin sein, um diesen Befehl zu nutzen.');
+  }
+
+  const fullHistory = groupMessageHistory.get(from) || [];
+  if (!fullHistory.length) {
+    return send('ℹ️ Keine gespeicherten Nachrichten zum Löschen vorhanden (ich kann nur Nachrichten löschen, die ich seit meinem Start gesehen habe).');
+  }
+
+  let limit = null;
+  if (args[0]) {
+    const parsed = parseInt(args[0]);
+    if (isNaN(parsed) || parsed <= 0) {
+      return send(`❌ Ungültige Zahl. Nutzung: ${PREFIX}purge [anzahl]\nBeispiel: ${PREFIX}purge 50`);
+    }
+    limit = parsed;
+  }
+
+  const toDelete = limit ? fullHistory.slice(-limit) : fullHistory;
+  const remaining = limit ? fullHistory.slice(0, -limit) : [];
+
+  await send(`🧹 Lösche ${toDelete.length} Nachricht(en), bitte warten...`);
+
+  let deleted = 0, failed = 0;
+  for (const entry of toDelete) {
+    try {
+      const isOwnMsg = !entry.participant;
+      await sock.sendMessage(from, {
+        delete: {
+          remoteJid: from,
+          id: entry.id,
+          fromMe: isOwnMsg,
+          ...(isOwnMsg ? {} : { participant: entry.participant })
+        }
+      });
+      deleted++;
+      await sleep(200);
+    } catch (e) {
+      failed++;
+    }
+  }
+
+  groupMessageHistory.set(from, remaining);
+  return send(`✅ Fertig: ${deleted} Nachricht(en) gelöscht, ${failed} fehlgeschlagen (z.B. schon gelöscht oder zu alt).`);
+}
+      if (cmd === 'work') {
+        const earn = randInt(50, 200);
+        users[sender].coins = (users[sender].coins || 0) + earn;
+        users[sender].xp = (users[sender].xp || 0) + 20;
+        save(FILES.users, users);
+        return send(`🛠 Du hast ${earn} Coins verdient!`);
+      }
+
+      if (cmd === 'daily') {
+        const now = Date.now();
+        const last = users[sender].lastDaily || 0;
+        if (now - last < 24 * 3600 * 1000) {
+          const hours = Math.floor((24 * 3600 * 1000 - (now - last)) / 3600000);
+          return send(`🕒 Wieder in ca. ${hours} Stunden verfügbar.`);
+        }
+        const amount = randInt(1, 1000);
+        users[sender].coins = (users[sender].coins || 0) + amount;
+        users[sender].lastDaily = now;
+        save(FILES.users, users);
+        return send(`🎁 Daily: +${amount} Coins!`);
+      }
+
+      const SHOP = {
+        potion: { price: 100, desc: 'Heilt 10 HP' },
+        box: { price: 500, desc: 'Zufälliger Gegenstand' },
+        vip: { price: 2000, desc: 'VIP-Rang' },
+        [ARENA_SHOP_ITEM.id]: { price: ARENA_SHOP_ITEM.price, desc: ARENA_SHOP_ITEM.desc }
+      };
+      if (cmd === 'shop') {
+        let out = '🛒 Shop:\n';
+        for (const [k, v] of Object.entries(SHOP)) out += `• ${k} — ${v.price} 💰 | ${v.desc}\n`;
+        return send(out);
+      }
+      if (cmd === 'buy') {
+        const item = args[0];
+        if (!item || !SHOP[item]) return send('Nutzung: $buy <item>');
+        if ((users[sender].coins || 0) < SHOP[item].price) return send('💸 Zu wenig Coins');
+        users[sender].coins -= SHOP[item].price;
+        users[sender].items[item] = (users[sender].items[item] || 0) + 1;
+        save(FILES.users, users);
+        return send(`✅ ${item} gekauft.`);
+      }
+      if (cmd === 'inventory') {
+        const inv = users[sender].items || {};
+        const out = Object.keys(inv).length ? Object.entries(inv).map(([k, v]) => `${k}: ${v}`).join('\n') : '(leer)';
+        return send(`🎒 Inventar:\n${out}`);
+      }
+     if (cmd === 'use') {
+  const it = (args[0] || '').toLowerCase();
+  if (!it) return send('Nutzung: $use <item>');
+  if (!users[sender].items || !users[sender].items[it]) return send('❌ Item nicht vorhanden. Prüfe mit $inventory die genaue Schreibweise.');
+
+  if (it === 'potion') {
+    users[sender].items[it] -= 1;
+    users[sender].xp = (users[sender].xp || 0) + 10;
+    save(FILES.users, users);
+    return send('💊 Trank verwendet: +10 XP');
+  }
+
+  if (it === 'box') {
+    users[sender].items[it] -= 1;
+    const coins = randInt(50, 300);
+    users[sender].coins = (users[sender].coins || 0) + coins;
+    save(FILES.users, users);
+    return send(`🎁 Box geöffnet: +${coins} Coins`);
+  }
+
+  if (it === 'vip') {
+    const VIP_DURATION = '7d';
+    if (!addVip(sender, VIP_DURATION)) {
+      return send('❌ Fehler beim Aktivieren des VIP-Status.');
+    }
+    users[sender].items[it] -= 1;
+    save(FILES.users, users);
+    const expiry = new Date(vipExpiry.get(sender)).toLocaleString('de-DE');
+    return send(`💎 VIP aktiviert! Gültig bis: ${expiry}`);
+  }
+
+  return send('Item verwendet.');
+}
+      if (cmd === 'slot') {
+        const bet = parseInt(args[0]) || 50;
+        if ((users[sender].coins || 0) < bet) return send('Zu wenig Coins.');
+        const spin = spinSlots();
+        const win = spin[0] === spin[1] && spin[1] === spin[2];
+        if (win) {
+          users[sender].coins += bet * 3;
+          users[sender].xp = (users[sender].xp || 0) + 50;
+          save(FILES.users, users);
+          return send(`🎰 | ${spin.join(' | ')} |\n🎉 Jackpot! +${bet * 3} Coins, +50 XP`);
+        } else {
+          users[sender].coins -= bet;
+          save(FILES.users, users);
+          return send(`🎰 | ${spin.join(' | ')} |\n😢 Verloren -${bet} Coins`);
+        }
+      }
+      if (cmd === 'rps') {
+        const choice = (args[0] || '').toLowerCase();
+        const valid = ['rock', 'paper', 'scissors', 'stein', 'papier', 'schere'];
+        if (!valid.includes(choice)) return send('Usage: $rps <rock|paper|scissors>');
+        const norm = (choice === 'stein') ? 'rock' : (choice === 'papier') ? 'paper' : (choice === 'schere') ? 'scissors' : choice;
+        const botOpt = ['rock', 'paper', 'scissors'][randInt(0, 2)];
+        const draw = norm === botOpt;
+        const win = (norm === 'rock' && botOpt === 'scissors') || (norm === 'paper' && botOpt === 'rock') || (norm === 'scissors' && botOpt === 'paper');
+        let res = `🤖 Ich: ${botOpt}\nDu: ${norm}\n`;
+        if (draw) res += 'Unentschieden 😐';
+        else if (win) { users[sender].coins = (users[sender].coins || 0) + 50; users[sender].xp = (users[sender].xp || 0) + 10; save(FILES.users, users); res += 'Du gewinnst! +50 Coins +10 XP 🎉'; }
+        else { users[sender].coins = Math.max(0, (users[sender].coins || 0) - 20); save(FILES.users, users); res += 'Du verlierst -20 Coins 😢'; }
+        return send(res);
+      }
+
+      if (cmd === 'blackjack' || cmd === 'bjstart' || cmd === 'bj') {
+        if (!users[sender]) ensureUser(sender);
+        if (users[sender].bj?.active) return send('Du hast bereits ein aktives Spiel. Nutze $hit oder $stand.');
+        const player = [bjDraw(), bjDraw()];
+        const dealer = [bjDraw(), bjDraw()];
+        users[sender].bj = { player, dealer, active: true };
+        save(FILES.users, users);
+        return send(`🃏 Blackjack!\nDeine Karten: ${player.map(c => c.value + c.suit).join(', ')}\nDealer zeigt: ${dealer[0].value + dealer[0].suit}\nNutze ${PREFIX}hit oder ${PREFIX}stand`);
+      }
+      if (cmd === 'hit') {
+        if (!users[sender]) ensureUser(sender);
+        if (!users[sender].bj?.active) return send(`Kein aktives Spiel. Starte mit ${PREFIX}blackjack`);
+        const bj = users[sender].bj;
+        bj.player.push(bjDraw());
+        const p = bjScore(bj.player);
+        let out = `Deine Karten: ${bj.player.map(c => c.value + c.suit).join(', ')}\nPunkte: ${p}`;
+        if (p > 21) {
+          out += '\n😢 Bust! Du verlierst.';
+          delete users[sender].bj;
+        } else if (p === 21) {
+          users[sender].coins = (users[sender].coins || 0) + 75;
+          users[sender].xp = (users[sender].xp || 0) + 40;
+          out += '\n🎉 Blackjack! Du gewinnst +75 Coins +40 XP';
+          delete users[sender].bj;
+        } else {
+          out += '\nNutze $hit oder $stand';
+        }
+        save(FILES.users, users);
+        return send(out);
+      }
+      if (cmd === 'stand') {
+        if (!users[sender]) ensureUser(sender);
+        if (!users[sender].bj?.active) return send(`Kein aktives Spiel. Starte mit ${PREFIX}blackjack`);
+        const bj = users[sender].bj;
+        const p = bjScore(bj.player);
+        let d = bjScore(bj.dealer);
+        while (d < 17) {
+          bj.dealer.push(bjDraw());
+          d = bjScore(bj.dealer);
+        }
+        let out = `Dealer-Karten: ${bj.dealer.map(c => c.value + c.suit).join(', ')}\nDealer: ${d}\nDu: ${p}`;
+        if (p > 21) {
+          out += '\n😢 Bust! Du verlierst.';
+        } else if (d > 21 || p > d) {
+          users[sender].coins = (users[sender].coins || 0) + 75;
+          users[sender].xp = (users[sender].xp || 0) + 40;
+          out += '\n🎉 Du gewinnst! +75 Coins +40 XP';
+        } else if (p === d) {
+          out += '\nUnentschieden';
+        } else {
+          out += '\nDealer gewinnt';
+        }
+        delete users[sender].bj;
+        save(FILES.users, users);
+        return send(out);
+      }
+
+      if (cmd === 'adopt') {
+        const type = (args[0] || '').toLowerCase();
+        if (!['dog', 'cat', 'bird'].includes(type)) return send('Usage: $adopt <dog|cat|bird>');
+        const name = args.slice(1).join(' ') || null;
+        pets[sender] = { type, name, xp: 0, hunger: 100, happiness: 100, lastFed: Date.now() };
+        save(FILES.pets, pets);
+        return send(`🐾 ${type} ${name ? 'mit Namen ' + name : ''} adoptiert!`);
+      }
+      if (cmd === 'petinfo' || cmd === 'pet') {
+        const p = pets[sender];
+        if (!p) return send('Du hast kein Haustier. $adopt <dog|cat|bird>');
+        return send(`🐶 ${p.type} ${p.name ? '- ' + p.name : ''}\nHunger: ${p.hunger}%\nGlück: ${p.happiness}%\nXP: ${p.xp}`);
+      }
+      if (cmd === 'feed') {
+        const p = pets[sender];
+        if (!p) return send('Du hast kein Haustier.');
+        p.hunger = Math.min(100, (p.hunger || 0) + 20);
+        p.happiness = Math.min(100, (p.happiness || 0) + 10);
+        p.lastFed = Date.now();
+        save(FILES.pets, pets);
+        return send(`🍖 ${p.type} gefüttert. Hunger: ${p.hunger}% Glück: ${p.happiness}%`);
+      }
+      if (cmd === 'play') {
+        const p = pets[sender];
+        if (!p) return send('Du hast kein Haustier.');
+        p.happiness = Math.min(100, (p.happiness || 0) + 20);
+        p.xp = (p.xp || 0) + 5;
+        save(FILES.pets, pets);
+        return send(`🎾 Mit ${p.type} gespielt. Glück: ${p.happiness}% XP: ${p.xp}`);
+      }
+
+      if (cmd === 'support' || cmd === 'ticket') {
+        const text = args.join(' ') || 'Kein Text';
+        ticketCounter++;
+        const ticketId = ticketCounter.toString().padStart(4, '0');
+        tickets[ticketId] = { id: ticketId, sender, message: text, status: 'open', timestamp: Date.now() };
+        save(FILES.tickets, tickets);
+        try {
+          await sock.sendMessage(SUPPORT_CONFIG.TICKET_GROUP, {
+            text: `🎫 Neues Ticket #${ticketId}\nVon: ${await getNumberMention(sender, sock)}\n\nNachricht:\n${text}`,
+            mentions: [sender]
+          });
+          return send(`✅ Ticket #${ticketId} erstellt.`);
+        } catch (e) {
+          return send('❌ Fehler beim Erstellen des Tickets.');
+        }
+      }
+      if (cmd === 'tickets') {
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'MOD', 'SUPPORTER', 'TEST_SUPPORTER'])) return send('Kein Zugriff.');
+        const filter = (args[0] || '').toLowerCase();
+        let ticket = null;
+
+        if (filter) {
+          ticket = tickets[filter] || tickets[filter.padStart(4, '0')];
+        }
+
+        if (ticket) {
+          const messageText = ticket.message || ticket.text || 'Keine Nachricht';
+          return send(
+            `🎫 Ticket #${ticket.id}\n` +
+            `Status: ${ticket.status}\n` +
+            `Von: ${await getNumberMention(ticket.sender, sock)}\n` +
+            `Nachricht: ${messageText}\n` +
+            `Antwort: ${ticket.answer || 'Keine'}\n` +
+            `Erstellt: ${new Date(ticket.timestamp).toLocaleString()}`,
+            { mentions: [ticket.sender] }
+          );
+        }
+
+        const ticketValues = Object.values(tickets);
+        const visibleTickets = ticketValues.filter(t => !filter || filter === 'all' || t.status.toLowerCase() === filter);
+        const mentions = [...new Set(visibleTickets.map(t => t.sender))];
+        const listLines = await Promise.all(visibleTickets.map(async t => {
+          const msg = String(t.message || t.text || '').slice(0, 50);
+          return `${t.id} | ${t.status} | ${await getNumberMention(t.sender, sock)} | ${msg}${msg.length >= 50 ? '…' : ''}`;
+        }));
+        const list = listLines.join('\n') || '(keine)';
+        const subtitle = filter ? ` (${filter === 'all' ? 'alle' : filter})` : '';
+        return send(`🎫 Tickets${subtitle}:\n${list}`, { mentions });
+      }
+      if (cmd === 'closeticket') {
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'MOD', 'SUPPORTER', 'TEST_SUPPORTER'])) return send('Kein Zugriff.');
+        const id = args[0];
+        if (!id || !tickets[id]) return send('Usage: $closeticket <id>');
+        tickets[id].status = 'closed';
+        save(FILES.tickets, tickets);
+        return send(`✅ Ticket ${id} geschlossen.`);
+      }
+
+      if (cmd === 'cleartickets' || cmd === 'clearalltickets' || cmd === 'ticketsclear') {
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
+        const count = Object.keys(tickets).length;
+        if (!count) return send('ℹ️ Es sind bereits keine Tickets vorhanden.');
+
+        for (const key of Object.keys(tickets)) delete tickets[key];
+        save(FILES.tickets, tickets);
+        ticketCounter = 0;
+
+        return send(`✅ ${count} Ticket(s) wurden gelöscht. Zähler zurückgesetzt — das nächste Ticket beginnt wieder bei #0001.`);
+      }
+      if (cmd === 'todo' || cmd === 'todos') {
+        const sub = (args[0] || '').toLowerCase();
+        if (!sub || sub === 'list') {
+          const all = Object.values(teamTodos);
+          if (!all.length) return send('📝 Keine Team-Todos.');
+          const now = Date.now();
+          const lines = all.map(t => {
+            let line = `${t.id} [${t.status}] - ${t.text}`;
+            if (t.assignee) line += ` (→ @${t.assignee.split('@')[0]})`;
+            if (t.deadline) {
+              const days = Math.ceil((t.deadline - now) / (1000 * 60 * 60 * 24));
+              line += ` [Fällig: ${new Date(t.deadline).toLocaleDateString('de-DE')} (${days > 0 ? `in ${days} Tagen` : days === 0 ? 'heute' : 'überfällig'})]`;
+            }
+            return line + (t.status === 'done' ? ' ✅' : '');
+          });
+          return send(`📝 Team-Todos:\n${lines.join('\n')}`);
+        }
+        if (sub === 'add') {
+          const text = args.slice(1).join(' ');
+          if (!text) return send('Usage: $todo add <text>');
+          todoCounter++;
+          const tdId = `TD${String(todoCounter).padStart(3, '0')}`;
+          teamTodos[tdId] = { id: tdId, text, creator: sender, status: 'open', created: Date.now() };
+          save(FILES.teamTodos, teamTodos);
+          return send(`✅ Todo ${tdId} erstellt.`);
+        }
+        if (sub === 'done' || sub === 'complete') {
+          const id = args[1] || args[0];
+          if (!id || !teamTodos[id]) return send('Usage: $todo done <id>');
+          teamTodos[id].status = 'done';
+          teamTodos[id].doneBy = sender;
+          save(FILES.teamTodos, teamTodos);
+          return send(`✅ Todo ${id} erledigt.`);
+        }
+        if (sub === 'remove' || sub === 'rm') {
+          if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) return send('Kein Zugriff.');
+          const id = args[1] || args[0];
+          if (!id || !teamTodos[id]) return send('Usage: $todo remove <id>');
+          delete teamTodos[id];
+          save(FILES.teamTodos, teamTodos);
+          return send(`🗑️ Todo ${id} entfernt.`);
+        }
+        return send('Usage: $todo add <text> | list | done <id> | remove <id>');
+      }
+
+      if (cmd === 'usertodo' || cmd === 'usertodos') {
+        const sub = (args[0] || '').toLowerCase();
+
+        if (sub === 'add') {
+          const text = args.slice(1).join(' ').trim();
+          if (!text) return send(`❌ Nutzung: ${PREFIX}usertodo add <befehlsvorschlag>`);
+          userTodoCounter++;
+          const utId = `UT${String(userTodoCounter).padStart(3, '0')}`;
+          userTodos[utId] = {
+            id: utId,
+            text,
+            sender,
+            status: 'open',
+            created: Date.now()
+          };
+          save(FILES.userTodos, userTodos);
+          return send(`✅ Dein Vorschlag wurde gespeichert (${utId})! Der Owner schaut sich das an.`);
+        }
+
+        if (sub === 'done' || sub === 'complete') {
+          if (!isOwner) return send('❌ Nur der Owner kann Vorschläge als erledigt markieren.');
+          const id = args[1];
+          if (!id || !userTodos[id]) return send(`Usage: ${PREFIX}usertodo done <id>`);
+          userTodos[id].status = 'done';
+          userTodos[id].doneBy = sender;
+          save(FILES.userTodos, userTodos);
+          return send(`✅ Vorschlag ${id} als erledigt markiert.`);
+        }
+        if (sub === 'remove' || sub === 'rm' || sub === 'delete') {
+          if (!isOwner) return send('❌ Nur der Owner kann Vorschläge entfernen.');
+          const id = args[1];
+          if (!id || !userTodos[id]) return send(`Usage: ${PREFIX}usertodo remove <id>`);
+          delete userTodos[id];
+          save(FILES.userTodos, userTodos);
+          return send(`🗑️ Vorschlag ${id} entfernt.`);
+        }
+
+        if (!sub || sub === 'list') {
+          if (!isOwner) return send('❌ Nur der Owner kann sich die Vorschlagsliste ansehen. Nutze stattdessen: ' + PREFIX + 'usertodo add <text>');
+          const all = Object.values(userTodos);
+          if (!all.length) return send('📋 Es liegen noch keine User-Vorschläge vor.');
+          const lines = await Promise.all(all.map(async t => {
+            const who = await getNumberMention(t.sender, sock);
+            const status = t.status === 'done' ? '✅' : '🕓';
+            return `${status} ${t.id} — ${t.text}\n   von: ${who}`;
+          }));
+          const mentions = all.map(t => t.sender);
+          return send(`📋 *Von Usern vorgeschlagene Befehle*\n\n${lines.join('\n\n')}\n\n_${PREFIX}usertodo done <id> / ${PREFIX}usertodo remove <id>_`, { mentions });
+        }
+
+        return send(`Usage: ${PREFIX}usertodo add <text>${isOwner ? ` | list | done <id> | remove <id>` : ''}`);
+      }
+
+if (cmd === 'ban') {
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
+
+        const ctx = m.message?.extendedTextMessage?.contextInfo;
+        let t = args[0];
+        if ((!t || t === 'kick' || t === 'remove') && ctx?.mentionedJid?.length) t = ctx.mentionedJid[0];
+        if ((!t || t === 'kick' || t === 'remove') && ctx?.participant) t = ctx.participant;
+
+        if (!t) return send('Usage: $ban <@user|num|jid> [kick]');
+        const jid = normalizeJid(t);
+        if (isPrimaryOwner(jid)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gebannt werden.');
+        const reason = args.slice(1).filter(a => a !== 'kick' && a !== 'remove' && !a.startsWith('@')).join(' ') || 'Kein Grund';
+        bans[jid] = { by: sender, at: new Date().toISOString(), reason };
+        save(FILES.bans, bans);
+        if (args.includes('kick') || args.includes('remove')) {
+          try {
+            const groups = await sock.groupFetchAllParticipating();
+            for (const gid of Object.keys(groups)) {
+              try { await sock.groupParticipantsUpdate(gid, [jid], 'remove'); await sleep(200); } catch {}
+            }
+          } catch (e) {}
+        }
+        try { await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: `🚫 Gebannt: ${jid}\nDurch: ${sender}\nGrund: ${reason}` }); } catch {}
+        return send(`🚫 @${jid.split('@')[0]} gebannt.`, { mentions: [jid] });
+      }
+      if (cmd === 'banlist') {
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
+        const list = Object.entries(bans).map(([j, b]) => `${j} — ${b.reason}`).join('\n') || '(keine)';
+        return send(`🚫 Banliste:\n${list}`);
+      }
+      if (cmd === 'unban') {
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
+
+        const ctx = m.message?.extendedTextMessage?.contextInfo;
+        let t = args[0];
+        if (!t && ctx?.mentionedJid?.length) t = ctx.mentionedJid[0];
+        if (!t && ctx?.participant) t = ctx.participant;
+
+        if (!t) return send('Usage: $unban <@user|num|jid>');
+        const jid = normalizeJid(t);
+        delete bans[jid];
+        save(FILES.bans, bans);
+        return send(`✅ @${jid.split('@')[0]} entbannt.`, { mentions: [jid] });
+      }
+
+      if (cmd === 'kick') {
+        const ctx = m.message?.extendedTextMessage?.contextInfo;
+        let target = args[0];
+        if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+        if (!target) return send('Usage: $kick <num|jid|@user>');
+        if (isPrimaryOwner(target)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gekickt werden.');
+
+       let permitted = isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD']);
+        let groupMetadata;
+        if (!permitted && isGroup) {
+          groupMetadata = await getGroupMetaSafe(from, true);
+          const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
+          permitted = !!isGroupAdmin;
+        }
+        if (!permitted) return send('❌ Du musst Admin/Mod/Gruppenadmin sein, um kicken zu können.');
+
+        groupMetadata = groupMetadata || await getGroupMetaSafe(from);
+        const normalizedTarget = normalizeJid(target);
+        const rawId = target.replace(/^@/, '').split('@')[0];
+
+        const targetParticipant = groupMetadata?.participants?.find(p =>
+          isSameJid(p.id, normalizedTarget) ||
+          (p.id || '').split('@')[0] === rawId
+        );
+
+        if (!targetParticipant) return send('❌ Benutzer nicht gefunden.');
+
+        console.log('[kick-debug] Ziel:', { id: targetParticipant.id, jid: normalizedTarget, raw: rawId });
+
+        try {
+          await sock.groupParticipantsUpdate(from, [targetParticipant.id], 'remove');
+          return send(`✅ @${targetParticipant.id.split('@')[0]} entfernt.`, { mentions: [targetParticipant.id] });
+        } catch (e) {
+          console.error('[kick] Fehler:', e?.message, e?.response?.status);
+          if (e?.message?.includes('not admin') || e?.message?.includes('admin')) {
+            return send('❌ Ich bin kein Gruppenadmin und kann niemanden kicken.');
+          }
+          return send('❌ Kicken fehlgeschlagen: ' + (e?.message || 'Unbekannter Fehler'));
+        }
+      }
+
+     if (cmd === 'warn') {
+        let permitted = isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD']);
+        if (!permitted && isGroup) {
+          const groupMetadata = await getGroupMetaSafe(from, true);
+          permitted = isGroupAdminJid(groupMetadata, sender);
+        }
+        if (!permitted) return send('❌ Du musst Admin/Mod/Gruppenadmin sein, um zu verwarnen.');
+
+        const t = args[0]; const reason = args.slice(1).join(' ') || 'Kein Grund';
+        if (!t) return send('Usage: $warn <num|jid> <grund>');
+        const jid = normalizeJid(t);
+        ensureUser(jid);
+        users[jid].warns = users[jid].warns || [];
+        users[jid].warns.push({ by: sender, reason, at: new Date().toISOString() });
+        save(FILES.users, users);
+        return send(`⚠ ${jid} verwarnt.`);
+      }
+      if (cmd === 'clearwarns') {
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
+        const t = args[0]; if (!t) return send('Usage: $clearwarns <num|jid>');
+        const jid = normalizeJid(t);
+        if (users[jid]) users[jid].warns = [];
+        save(FILES.users, users);
+        return send(`✅ Warns entfernt für ${jid}`);
+      }
+if (cmd === 'warns') {
+        let permitted = isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD']);
+        if (!permitted && isGroup) {
+          const groupMetadata = await getGroupMetaSafe(from, true);
+          permitted = isGroupAdminJid(groupMetadata, sender);
+        }
+        if (!permitted) return send('❌ Du musst Admin/Mod/Gruppenadmin sein.');
+
+        const t = args[0];
+        if (!t) return send('Usage: $warns <num|jid>');
+        const jid = normalizeJid(t);
+        const warnList = users[jid]?.warns || [];
+
+        if (!warnList.length) return send(`✅ @${jid.split('@')[0]} hat keine Verwarnungen.`, { mentions: [jid] });
+
+        const lines = warnList.map((w, i) =>
+          `${i + 1}. ${w.reason} — von @${w.by.split('@')[0]} (${new Date(w.at).toLocaleString('de-DE')})`
+        );
+
+        return send(
+          `⚠️ *Verwarnungen von @${jid.split('@')[0]}* (${warnList.length}):\n\n${lines.join('\n')}\n\n_Entfernen mit ${activePrefix}unwarn @user <nummer>_`,
+          { mentions: [jid, ...warnList.map(w => w.by)] }
+        );
+      }
+
+if (cmd === 'promote') {
+  if (!isGroup) return send('❌ Nur in Gruppen.');
+
+  const groupMetadata = await getGroupMetaSafe(from, true);
+  const senderJid = m.key.participant || m.key.remoteJid;
+  const senderIsGroupAdmin = isSenderGroupAdmin(groupMetadata, senderJid);
+
+  if (!isOwner && !senderIsGroupAdmin) {
+    return send('Nur Owner/Co-Owner oder Gruppenadmins dürfen promoten.');
+  }
+
+  const ctx = m.message?.extendedTextMessage?.contextInfo;
+  let target = args[0];
+  if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+  if (!target && ctx?.participant) target = ctx.participant;
+  if (!target) return send('Usage: $promote <num|jid|@user>');
+
+  const jid = normalizeJid(target);
+  const rawId = jid.split('@')[0];
+  const targetParticipant = groupMetadata?.participants?.find(p =>
+    isSameJid(p.id, jid) || (p.id || '').split('@')[0] === rawId
+  );
+  if (!targetParticipant) return send('❌ Benutzer nicht in dieser Gruppe gefunden.');
+
+  try {
+    await sock.groupParticipantsUpdate(from, [targetParticipant.id], 'promote');
+    groupMetaCache.delete(from);
+    return send(`✅ @${targetParticipant.id.split('@')[0]} wurde zum Gruppenadmin befördert.`, { mentions: [targetParticipant.id] });
+  } catch (e) {
+    console.error('[promote] Fehler:', e?.message || e);
+    return send('❌ Beförderung fehlgeschlagen (bin ich Gruppenadmin?).');
+  }
+}
+if (cmd === 'demote') {
+  if (!isGroup) return send('❌ Nur in Gruppen.');
+
+  const groupMetadata = await getGroupMetaSafe(from, true);
+  const senderJid = m.key.participant || m.key.remoteJid;
+  const senderIsGroupAdmin = isSenderGroupAdmin(groupMetadata, senderJid);
+
+  if (!isOwner && !senderIsGroupAdmin) {
+    return send('Nur Owner/Co-Owner oder Gruppenadmins dürfen demoten.');
+  }
+
+  const ctx = m.message?.extendedTextMessage?.contextInfo;
+  let target = args[0];
+  if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+  if (!target && ctx?.participant) target = ctx.participant;
+  if (!target) return send('Usage: $demote <num|jid|@user>');
+
+  const jid = normalizeJid(target);
+  const rawId = jid.split('@')[0];
+  const targetParticipant = groupMetadata?.participants?.find(p =>
+    isSameJid(p.id, jid) || (p.id || '').split('@')[0] === rawId
+  );
+  if (!targetParticipant) return send('❌ Benutzer nicht in dieser Gruppe gefunden.');
+
+  try {
+    await sock.groupParticipantsUpdate(from, [targetParticipant.id], 'demote');
+    groupMetaCache.delete(from);
+
+    const normJid = normalizeJid(targetParticipant.id);
+    if (ranks[normJid] === 'ADMIN') {
+      ranks[normJid] = 'USER';
+      save(FILES.ranks, ranks);
+    }
+    if (users[normJid] && users[normJid].rank === 'ADMIN') {
+      users[normJid].rank = 'USER';
+      save(FILES.users, users);
+    }
+    ROLES.ADMIN = (ROLES.ADMIN || []).filter(id => !isSameJid(id, normJid));
+
+    return send(`✅ @${targetParticipant.id.split('@')[0]} wurde als Gruppenadmin entfernt.`, { mentions: [targetParticipant.id] });
+  } catch (e) {
+    console.error('[demote] Fehler:', e?.message || e);
+    return send('❌ Herabstufung fehlgeschlagen (bin ich Gruppenadmin?).');
+  }
+}
+
+      if (cmd === 'setrank') {
+        if (!isOwner) return send('❌ Nur der Inhaber.');
+        const r = (args[args.length - 1] || '').toUpperCase();
+        if (!r) return send('Usage: $setrank <@mention|num|jid> <OWNER|COOWNER|ADMIN|MOD|VIP|USER>');
+
+        const allowed = ['OWNER', 'COOWNER', 'ADMIN', 'MOD', 'VIP', 'USER'];
+        if (!allowed.includes(r)) return send('Ungültiger Rang.');
+
+        let jid;
+        const mentioned = m.message?.extendedTextMessage?.contextInfo?.mentionedJid;
+        if (mentioned && mentioned.length > 0) {
+          jid = mentioned[0];
+        } else {
+          jid = normalizeJid(args[0]);
+        }
+
+        if (!jid) return send('Usage: $setrank <@mention|num|jid> <OWNER|COOWNER|ADMIN|MOD|VIP|USER>');
+
+        if (isPrimaryOwner(jid) && r !== 'OWNER') {
+          return send('❌ Der Haupt-Owner ist geschützt und kann nicht heruntergestuft werden.');
+        }
+
+        if (r === 'OWNER') {
+          ranks[jid] = 'OWNER';
+          if (!ROLES.OWNER.some(id => isSameJid(id, jid))) ROLES.OWNER.push(jid);
+        } else if (r === 'COOWNER') {
+          for (const k of Object.keys(ranks)) { if (ranks[k] === 'COOWNER' && !isPrimaryOwner(k)) ranks[k] = 'USER'; }
+          ranks[jid] = 'COOWNER'; COOWNER_LID = jid;
+        } else {
+          ranks[jid] = r;
+        }
+
+        protectPrimaryOwner();
+
+        try {
+          save(FILES.ranks, ranks);
+          save(FILES.users, users);
+          save(FILES.owner, { ownerLid: OWNER_LID, ownerPriv: OWNER_PRIV, coownerLid: COOWNER_LID, roles: ROLES });
+        } catch (e) {}
+
+        return send(`✅ Rang von ${await getNumberMention(jid, sock)} auf ${r} gesetzt.`, { mentions: [jid] });
+      }
+if (cmd === 'datadelete') {
+        if (!isOwner) return send('❌ Nur der Inhaber.');
+        const t = args[0]; if (!t) return send('Usage: $datadelete <num|jid>');
+        const jid = normalizeJid(t);
+        if (isPrimaryOwner(jid)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gelöscht/gebannt werden.');
+        delete users[jid]; delete pets[jid]; delete ranks[jid];
+        for (const rid of Object.keys(joinreqs)) {
+          if (joinreqs[rid]?.sender && isSameJid(joinreqs[rid].sender, jid)) delete joinreqs[rid];
+        }
+        for (const id of Object.keys(tickets)) {
+          if (tickets[id]?.user && isSameJid(tickets[id].user, jid)) delete tickets[id];
+        }
+        deletedUsers[jid] = { by: sender, at: new Date().toISOString() };
+        bans[jid] = { by: sender, at: new Date().toISOString(), reason: 'Data deleted by owner' };
+        save(FILES.users, users); save(FILES.pets, pets); save(FILES.ranks, ranks);
+        save(FILES.joinreq, joinreqs); save(FILES.tickets, tickets);
+        save(FILES.deleted, deletedUsers); save(FILES.bans, bans);
+        try { await sock.sendMessage(jid, { text: '🚫 Dein Account wurde gelöscht.' }); } catch (e) {}
+        return send(`✅ Daten von ${jid} gelöscht.`);
+      }
+if (cmd === 'selfpromote' || cmd === 'sp') {
+  try {
+    if (!from?.endsWith('@g.us')) return send('⚠ Nur in Gruppen.');
+    if (
+      sender !== OWNER_LID &&
+      sender !== OWNER_LID2 &&
+      sender !== OWNER_PRIV &&
+      sender !== OWNER_PRIV2 &&
+      sender !== COOWNER_LID
+    ) return send('⛔ Nur der Owner kann diesen Befehl nutzen.');
+    await sock.groupParticipantsUpdate(from, [sender], 'promote');
+    return send('🔰 Selfpromote ausgeführt.');
+  } catch (e) {
+    return send('❌ Selfpromote fehlgeschlagen.');
+  }
+}
+
+if (cmd === 'selfdemote' || cmd === 'sd') {
+  try {
+    if (!from?.endsWith('@g.us')) return send('⚠ Nur in Gruppen.');
+    if (
+      sender !== OWNER_LID &&
+      sender !== OWNER_LID2 &&
+      sender !== OWNER_PRIV &&
+      sender !== OWNER_PRIV2 &&
+      sender !== COOWNER_LID
+    ) return send('⛔ Nur der Owner kann diesen Befehl nutzen.');
+    await sock.groupParticipantsUpdate(from, [sender], 'demote');
+    return send('🔱 Selfdemote ausgeführt.');
+  } catch (e) {
+    return send('❌ Selfdemote fehlgeschlagen.');
+  }
+}
+
+      if (cmd === 'join') {
+        const sub = (args[0] || '').toLowerCase();
+
+        if (sub === 'accept') {
+          if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'MOD'])) return send('❌ Nur Team (Owner/CoOwner/Mod) darf Beitrittsanfragen annehmen.');
+
+          const sessionArg = args[1];
+          if (!sessionArg) return send(`❌ Nutzung: ${activePrefix}join accept <session> [id]\nBeispiel: ${activePrefix}join accept default`);
+
+          const targetSock = activeSessions.get(sessionArg);
+          if (!targetSock) return send(`❌ Session "${sessionArg}" ist nicht aktiv. Aktive Sessions: ${[...activeSessions.keys()].join(', ') || '(keine)'}`);
+
+          const idArg = args[2];
+          let reqId, reqEntry;
+          if (idArg) {
+            reqEntry = joinreqs[idArg];
+            reqId = idArg;
+          } else {
+            const sorted = Object.entries(joinreqs).sort((a, b) => (a[1].at || 0) - (b[1].at || 0));
+            if (!sorted.length) return send('ℹ️ Keine offenen Beitrittsanfragen vorhanden.');
+            [reqId, reqEntry] = sorted[0];
+          }
+
+          if (!reqEntry) return send(`❌ Anfrage "${idArg}" nicht gefunden.`);
+
+          const reqLink = reqEntry.link;
+          const match = reqLink.match(/chat\.whatsapp\.com\/(?:invite\/)?([A-Za-z0-9_-]+)/i);
+          const code = match ? match[1] : reqLink.trim();
+          if (!code) return send('❌ Konnte keinen gültigen Einladungscode aus dem gespeicherten Link extrahieren.');
+
+          try {
+            try {
+              await targetSock.groupGetInviteInfo(code);
+            } catch (infoErr) {
+              const msg = infoErr?.message || String(infoErr);
+              if (msg.includes('410') || msg.toLowerCase().includes('gone')) {
+                return send('❌ Dieser Einladungslink ist ungültig oder abgelaufen.');
+              }
+              if (msg.includes('401') || msg.toLowerCase().includes('unauthorized')) {
+                return send('❌ Kein Zugriff auf diesen Link (evtl. wurde der Bot bereits entfernt/blockiert).');
+              }
+            }
+
+            const result = await targetSock.groupAcceptInvite(code);
+            delete joinreqs[reqId];
+            save(FILES.joinreq, joinreqs);
+
+            try {
+              await sock.sendMessage(JOIN_REQUEST_GROUP, {
+                text: `✅ Anfrage #${reqId} angenommen — Session "${sessionArg}" ist der Gruppe beigetreten${result ? ` (${result})` : ''}.\nAngenommen von: @${sender.split('@')[0]}`,
+                mentions: [sender]
+              });
+            } catch (e) {}
+
+            try {
+              await sock.sendMessage(reqEntry.sender, { text: `✅ Deine Beitrittsanfrage wurde angenommen! Der Bot (Session: ${sessionArg}) ist deiner Gruppe beigetreten.` });
+            } catch (e) {}
+
+            return send(`✅ Erfolgreich beigetreten${result ? `: ${result}` : ''} (Session: ${sessionArg})`);
+          } catch (e) {
+            console.error('[join accept] Fehler beim Beitritt:', e);
+            const msg = e?.message || String(e);
+            let explanation = msg;
+            if (msg.includes('conflict') || msg.includes('409')) explanation = 'Bot ist bereits Mitglied dieser Gruppe.';
+            else if (msg.includes('410') || msg.toLowerCase().includes('gone')) explanation = 'Der Link ist ungültig oder abgelaufen.';
+            else if (msg.includes('401')) explanation = 'Kein Zugriff — evtl. wurde der Bot aus der Gruppe entfernt oder blockiert.';
+            else if (msg.includes('429')) explanation = 'Zu viele Beitrittsversuche — bitte kurz warten und erneut versuchen.';
+            return send(`❌ Beitritt fehlgeschlagen: ${explanation}`);
+          }
+        }
+
+        if (sub === 'deny' || sub === 'decline' || sub === 'reject') {
+          if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'MOD'])) return send('❌ Nur Team (Owner/CoOwner/Mod) darf Beitrittsanfragen ablehnen.');
+          const idArg = args[1];
+          if (!idArg || !joinreqs[idArg]) return send(`❌ Nutzung: ${activePrefix}join deny <id>`);
+          const entry = joinreqs[idArg];
+          delete joinreqs[idArg];
+          save(FILES.joinreq, joinreqs);
+          try { await sock.sendMessage(entry.sender, { text: '❌ Deine Beitrittsanfrage wurde abgelehnt.' }); } catch (e) {}
+          return send(`✅ Anfrage #${idArg} abgelehnt.`);
+        }
+
+        if (sub === 'list') {
+          if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'MOD'])) return send('❌ Nur Team (Owner/CoOwner/Mod) darf die Liste einsehen.');
+          const entries = Object.entries(joinreqs);
+          if (!entries.length) return send('ℹ️ Keine offenen Beitrittsanfragen.');
+          const lines = entries.map(([id, e]) => `${id} | von @${e.sender.split('@')[0]} | ${e.link}`);
+          return send(`📋 Offene Beitrittsanfragen:\n${lines.join('\n')}`, { mentions: entries.map(([, e]) => e.sender) });
+        }
+
+        const link = args[0];
+        if (!link) {
+          return send(
+            `❌ Nutzung:\n${activePrefix}join <link> — Beitrittsanfrage einreichen\n${activePrefix}join accept <session> [id] — Anfrage annehmen (Team)\n${activePrefix}join deny <id> — Anfrage ablehnen (Team)\n${activePrefix}join list — Offene Anfragen anzeigen (Team)`
+          );
+        }
+        if (!/^https?:\/\/chat\.whatsapp\.com\//i.test(link)) {
+          return send('❌ Bitte gib einen gültigen WhatsApp-Gruppenlink an (https://chat.whatsapp.com/...).');
+        }
+
+        joinReqCounter++;
+        const reqId = 'JR' + String(joinReqCounter).padStart(3, '0');
+        joinreqs[reqId] = { id: reqId, sender, link, at: Date.now() };
+        save(FILES.joinreq, joinreqs);
+
+        try {
+          await sock.sendMessage(JOIN_REQUEST_GROUP, {
+            text: `📩 *Neue Beitrittsanfrage* #${reqId}\nVon: @${sender.split('@')[0]}\nLink: ${link}\n\nTeam kann annehmen mit:\n${activePrefix}join accept <session> ${reqId}`,
+            mentions: [sender]
+          });
+        } catch (e) {
+          console.error('[join] Konnte Anfrage nicht an Team-Gruppe senden:', e);
+        }
+
+        return send('✅ Deine Beitrittsanfrage wurde an das Team gesendet.');
+      }
+if (cmd === 'leave') {
+  const isGroupChat = from?.endsWith('@g.us');
+
+  if (!isGroupChat) {
+    if (!isOwner) return send('Kein Zugriff.');
+
+    const targetJid = args?.[0]?.trim();
+    if (!targetJid || !targetJid.endsWith('@g.us')) {
+      return send('Nutze: ?leave <gruppen-jid>\nBeispiel: ?leave 120363437195661019@g.us');
+    }
+
+    try {
+      await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: `Bot verlässt Gruppe: ${targetJid}` });
+      await sock.groupLeave(targetJid);
+      return send(`✅ Gruppe ${targetJid} verlassen.`);
+    } catch (e) {
+      return send('❌ Konnte Gruppe nicht verlassen (falsche JID oder Bot nicht Mitglied).');
+    }
+  }
+
+  if (!(isOwner || isCoOwner)) return send('Kein Zugriff.');
+  try {
+    await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: `Bot verlässt Gruppe: ${from}` });
+    await sock.groupLeave(from);
+    return;
+  } catch (e) {
+    return send('❌ Konnte Gruppe nicht verlassen.');
+  }
+}
+
+      if (cmd === 'grouplist' || cmd === 'gl') {
+        if (!isOwner) return send('Kein Zugriff.');
+        try {
+          const groups = await sock.groupFetchAllParticipating();
+          let list = '📋 *Gruppenliste*\n\n';
+          for (const [id, group] of Object.entries(groups)) {
+            list += `*${group.subject || 'Unbekannt'}*\nID: ${id}\nMitglieder: ${group.participants?.length || 0}\n\n`;
+          }
+          await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: list });
+          return send('📨 Gruppenliste privat zugeschickt.');
+        } catch (error) {
+          return send('❌ Fehler beim Abrufen der Gruppenliste.');
+        }
+      }
+
+      if (cmd === 'broadcast') {
+        if (!(isOwner || isCoOwner)) return send('Kein Zugriff.');
+        const textMsg = args.join(' ');
+        if (!textMsg) return send('Usage: $broadcast <text>');
+        const chats = await sock.groupFetchAllParticipating();
+        const gids = Object.keys(chats).filter(gid => broadcastSettings[gid] !== false);
+        send(`📣 Broadcast an ${gids.length} Gruppen...`);
+        for (const g of gids) { try { await sock.sendMessage(g, { text: `📣 Broadcast:\n${textMsg}` }); await sleep(300); } catch {} }
+        return send('✅ Broadcast abgeschlossen.');
+      }
+
+if (cmd === 'profile') {
+  const u = users[sender];
+  return send(`📊 Profil:\nLevel: ${u.level}\nXP: ${u.xp}\nCoins: ${u.coins}\nNachrichten: ${u.msgCount}`);
+}
+
+if (cmd === 'stats') {
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) {
+    return send(`❌ Kein Zugriff auf System-Statistiken. Nutze ${activePrefix}profile für deine persönlichen Werte.`);
+  }
+
+  await send('📊 Sammle System-Statistiken über alle Sessions, bitte warten...');
+
+  const totalCommands = ALL_COMMANDS.length;
+  const registeredUsersCount = Object.values(users).filter(u => u?.registered === true).length;
+  const totalUsersCount = Object.keys(users).length;
+
+  let totalGroups = 0;
+  const perSessionLines = [];
+  for (const [sName, sSock] of activeSessions.entries()) {
+    try {
+      const groups = await sSock.groupFetchAllParticipating();
+      const count = Object.keys(groups || {}).length;
+      totalGroups += count;
+      perSessionLines.push(`  • ${sName}: ${count} Gruppen`);
+    } catch (e) {
+      perSessionLines.push(`  • ${sName}: ⚠️ Fehler beim Abrufen`);
+    }
+  }
+
+  const out =
+    `📊 *— SYSTEM-STATISTIKEN (AINCRAD) —* 📊\n` +
+    `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+    `⚔️ Verfügbare Befehle: ${totalCommands}\n` +
+    `📝 Registrierte Nutzer: ${registeredUsersCount}\n` +
+    `👥 Bekannte Nutzer (gesamt): ${totalUsersCount}\n` +
+    `🖥️ Aktive Sessions: ${activeSessions.size}\n` +
+    `🏯 Gruppen (über alle Sessions): ${totalGroups}\n` +
+    (perSessionLines.length ? `\n*Aufschlüsselung pro Session:*\n${perSessionLines.join('\n')}\n` : '') +
+    `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+    `_Datenbank: lokale JSON-Dateien in /data (kein SQL/NoSQL-Server)_`;
+
+  return send(out);
+}
+      if (cmd === 'userinfo') {
+        const t = args[0] ? normalizeJid(args[0]) : sender;
+        ensureUser(t);
+        const u = users[t];
+        return send(`👤 ${t}\nLevel: ${u.level}\nXP: ${u.xp}\nCoins: ${u.coins}\nRank: ${ranks[t] || u.rank}`);
+      }
+      if (cmd === 'rangliste' || cmd === 'leaderboard' || cmd === 'rank') {
+        const sortBy = (args[0] || 'xp').toLowerCase();
+
+        const validSort = ['xp', 'level', 'coins'];
+        if (!validSort.includes(sortBy)) {
+          return send(`❌ Nutzung: ${activePrefix}rangliste <xp|level|coins>\nBeispiel: ${activePrefix}rangliste coins`);
+        }
+
+        const entries = Object.entries(users).filter(([jid, u]) => u && typeof u === 'object');
+
+        let sorted;
+        if (sortBy === 'coins') {
+          sorted = entries.sort((a, b) => (b[1].coins || 0) - (a[1].coins || 0));
+        } else {
+          sorted = entries.sort((a, b) => ((b[1].level || 1) * 1000 + (b[1].xp || 0)) - ((a[1].level || 1) * 1000 + (a[1].xp || 0)));
+        }
+
+        const topList = sorted.slice(0, 10);
+        if (!topList.length) return send('📊 Noch keine Spieler vorhanden.');
+
+        const medals = ['🥇', '🥈', '🥉'];
+        const lines = await Promise.all(topList.map(async ([jid, u], i) => {
+          const displayName = u.name || u.registrationName || await getNumberMention(jid, sock);
+          const rankIcon = medals[i] || `${i + 1}.`;
+          if (sortBy === 'coins') {
+            return `${rankIcon} ${displayName} — 💰 ${u.coins || 0} Coins`;
+          }
+          return `${rankIcon} ${displayName} — ⭐ Lv.${u.level || 1} (${u.xp || 0} XP)`;
+        }));
+
+        const mentions = topList.map(([jid]) => jid);
+const titleMap = { xp: '⚔️ XP-Rangliste', level: '⚔️ Level-Rangliste', coins: '💰 Coins-Rangliste' };
+
+  return send(
+          `${titleMap[sortBy]}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n${lines.join('\n')}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n🔥 Ihr seid die Besten! 🔥`,
+          { mentions }
+        );
+      }
+
+      if (cmd === 'yeetban') {
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) return send('Kein Zugriff.');
+        let target = args[0];
+        try {
+          const ctx = m.message?.extendedTextMessage?.contextInfo;
+          if (!target && ctx?.participant) target = ctx.participant;
+          if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+        } catch (e) {}
+        if (!target) return send('Usage: $yeetban <num|jid>');
+        const jid = normalizeJid(target);
+        if (isPrimaryOwner(jid)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gebannt/entfernt werden.');
+        const reason = args.slice(1).join(' ') || 'Kein Grund';
+        bans[jid] = { by: sender, at: new Date().toISOString(), reason };
+        save(FILES.bans, bans);
+        try {
+          const groups = await sock.groupFetchAllParticipating();
+          let removed = 0, failed = 0;
+          for (const gid of Object.keys(groups)) {
+            try {
+              const meta = await getGroupMetaSafe(gid);
+              if (!meta?.participants) { failed++; continue; }
+              const rawJid = jid.split('@')[0];
+              const targetParticipant = meta.participants.find(p => (p.id || '').split('@')[0] === rawJid);
+              if (!targetParticipant) { failed++; continue; }
+              await sock.groupParticipantsUpdate(gid, [targetParticipant.id], 'remove');
+              await sleep(500);
+              removed++;
+            } catch (e) { failed++; }
+          }
+          return send(`✅ Yeetban: ${jid} — entfernt aus ${removed} Gruppen, fehlgeschlagen: ${failed}`);
+        } catch (e) {
+          return send('❌ Yeetban fehlgeschlagen.');
+        }
+      }
+
+      if (cmd === 'credits') {
+        if (!credits.list || credits.list.length === 0) {
+          return send('📋 Noch keine Credits eingetragen.');
+        }
+        let out = '✨ *Credits* ✨\n\n';
+        credits.list.forEach((c, i) => {
+          out += `${i + 1}. *${c.name}* — ${c.role}\n`;
+        });
+        out += '\n❤️ Danke euch allen!';
+        return send(out);
+      }
+
+      if (cmd === 'addcredit') {
+        if (!isAuthorized(sender, ['OWNER'])) return send('❌ Nur der Inhaber darf Credits hinzufügen.');
+        const input = args.join(' ');
+        const [name, role] = input.split('|').map(s => s?.trim());
+        if (!name || !role) {
+          return send(`❌ Nutzung: ${PREFIX}addcredit Name | Rolle\nBeispiel: ${PREFIX}addcredit Max | Coding Hilfe`);
+        }
+        credits.list.push({ name, role });
+        save(FILES.credits, credits);
+        return send(`✅ *${name}* wurde zu den Credits hinzugefügt.`);
+      }
+      if (cmd === 'delcredit') {
+        if (!isAuthorized(sender, ['OWNER'])) return send('❌ Nur der Inhaber darf Credits entfernen.');
+        const index = parseInt(args[0]) - 1;
+        if (isNaN(index) || index < 0 || index >= credits.list.length) {
+          return send(`❌ Ungültige Nummer. Nutze ${PREFIX}credits um die Liste mit Nummern zu sehen.`);
+        }
+        const removed = credits.list.splice(index, 1)[0];
+        save(FILES.credits, credits);
+        return send(`🗑️ *${removed.name}* wurde aus den Credits entfernt.`);
+      }
+if (cmd === 'dsgvo') {
+  return send(DSGVO_TEXT.trim());
+}
+
+      if ((cmd === 'antilink-an' || cmd === 'antilink-aus') && isGroup) {
+        const groupMetadata = await getGroupMetaSafe(from);
+        const senderIsGroupAdmin = isGroupAdminJid(groupMetadata, sender);
+
+        if (!senderIsGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER', 'GROUPADMIN'])) {
+          return send('❌ Du musst Admin in dieser Gruppe sein.');
+        }
+
+        if (!groupSettings[from]) {
+          groupSettings[from] = { welcome: { enabled: false, message: 'Willkommen in der Gruppe {user}! 👋' }, antilink: { enabled: false } };
+        }
+        if (!groupSettings[from].antilink) groupSettings[from].antilink = { enabled: false };
+
+        if (cmd === 'antilink-an') {
+          groupSettings[from].antilink.enabled = true;
+          save(FILES.groupSettings, groupSettings);
+          return send('✅ Anti-Link aktiviert: Wer einen WhatsApp-Link postet, wird gekickt (Admins ausgenommen).');
+        }
+
+        if (cmd === 'antilink-aus') {
+          groupSettings[from].antilink.enabled = false;
+          save(FILES.groupSettings, groupSettings);
+          return send('✅ Anti-Link deaktiviert.');
+        }
+      }
+if (cmd === 'ytmp3') {
+  const fullText = args.join(' ').trim();
+  const urlMatch = fullText.match(/(https?:\/\/)?(www\.|music\.|m\.)?(youtube\.com\/(watch\?v=|shorts\/)|youtu\.be\/)[\w-]+(\S*)?/i);
+
+  if (!urlMatch) {
+    return send(`❌ Nutzung: ${PREFIX}ytmp3 <youtube-link>\n\nBeispiel:\n${PREFIX}ytmp3 https://youtu.be/dQw4w9WgXcQ`);
+  }
+
+  let url = urlMatch[0];
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+
+  const cooldownMsg = checkCooldown(sender, 'ytmp3');
+  if (cooldownMsg && !isOwner) return send(cooldownMsg);
+
+  await send('⏳ Lade Audio herunter, bitte warten...');
+
+  try {
+    const title = await getYoutubeTitle(url);
+    const filePath = await downloadYoutubeMp3(url);
+    const stats = fs.statSync(filePath);
+
+    if (stats.size > 95 * 1024 * 1024) {
+      fs.unlinkSync(filePath);
+      return send('❌ Die Datei ist zu groß für WhatsApp (>95MB).');
+    }
+
+    await sock.sendMessage(from, {
+      audio: fs.readFileSync(filePath),
+      mimetype: 'audio/mpeg',
+      fileName: `${title || 'audio'}.mp3`
+    }, { quoted: m });
+
+    fs.unlinkSync(filePath);
+  } catch (e) {
+    console.error('[ytmp3] Fehler:', e?.message || e);
+    return send('❌ Download fehlgeschlagen. Prüfe den Link oder versuche es später erneut.');
+  }
+  return;
+}
+const REACTION_COMMANDS = {
+  throw:  { emoji: "🤾", verb: "wirft",                 apiReaction: "throw" },
+  slap:   { emoji: "👋", verb: "verpasst eine Ohrfeige",  apiReaction: "slap" },
+  hug:    { emoji: "🤗", verb: "umarmt",                 apiReaction: "hug" },
+  kiss:   { emoji: "😘", verb: "küsst",                  apiReaction: "kiss" },
+  pat:    { emoji: "🤚", verb: "tätschelt",              apiReaction: "pat" },
+  poke:   { emoji: "👉", verb: "pikst",                  apiReaction: "poke" },
+  cuddle: { emoji: "🥰", verb: "kuschelt mit",           apiReaction: "cuddle" },
+  bite:   { emoji: "😬", verb: "beißt",                  apiReaction: "bite" },
+  punch:  { emoji: "🥊", verb: "verpasst einen Schlag",   apiReaction: "punch" },
+  sleep:  { emoji: "😴", verb: "schläft ein neben",       apiReaction: "sleep" },
+  angrystare: { emoji: "😠", verb: "starrt wütend" },
+  bleh: { emoji: "😝", verb: "streckt die Zunge raus" },
+  confused: { emoji: "😕", verb: "ist verwirrt" },
+  cry: { emoji: "😭", verb: "weint wegen " },
+  evillaugh: { emoji: "😈", verb: "lacht böse" },
+  facepalm: { emoji: "🤦", verb: "macht einen Facepalm" },
+  happy: { emoji: "😊", verb: "ist glücklich" },
+  laugh: { emoji: "😂", verb: "lacht" },
+  mad: { emoji: "😡", verb: "ist sauer" },
+  nuzzle: { emoji: "🥺", verb: "schmiegt sich an" },
+  no: { emoji: "🙅", verb: "sagt Nein" },
+  nosebleed: { emoji: "🩸", verb: "hat Nasenbluten" },
+  sad: { emoji: "😢", verb: "ist traurig" },
+  scared: { emoji: "😱", verb: "hat Angst" },
+  shout: { emoji: "📢", verb: "schreit" },
+  shy: { emoji: "🙈", verb: "ist schüchtern" },
+  sneeze: { emoji: "🤧", verb: "niest" },
+  surprised: { emoji: "😲", verb: "ist überrascht" },
+  tired: { emoji: "😴", verb: "ist müde" },
+  yes: { emoji: "🙆", verb: "sagt Ja" },
+  love: { emoji: "❤️", verb: "liebt", apiReaction: "love" },
+  blush: { emoji: "😳", verb: "wird rot wegen", apiReaction: "blush" },
+  handhold: { emoji: "🤝", verb: "hält die Hand von", apiReaction: "handhold" },
+  lick: { emoji: "👅", verb: "leckt", apiReaction: "lick" },
+  nervous: { emoji: "😅", verb: "ist nervös wegen", apiReaction: "nervous" },
+
+  kill:      { emoji: "☠️", verb: "erledigt",              source: "neko", nekoCategory: "punch" },
+  yeet:      { emoji: "🚀", verb: "yeetet",                 source: "neko", nekoCategory: "yeet" },
+  nuke:      { emoji: "☢️", verb: "nukt",                   source: "neko", nekoCategory: "punch" },
+  banish:    { emoji: "🌀", verb: "verbannt",               source: "neko", nekoCategory: "wave" },
+  stab:      { emoji: "🗡️", verb: "durchbohrt",             source: "neko", nekoCategory: "punch" },
+  smash:     { emoji: "🔨", verb: "zerschmettert",          source: "neko", nekoCategory: "punch" },
+  vaporize:  { emoji: "💥", verb: "pulverisiert",           source: "neko", nekoCategory: "punch" },
+  choke:     { emoji: "🫳", verb: "würgt",                  source: "neko", nekoCategory: "bite" },
+  kick:      { emoji: "🦵", verb: "verpasst einen Tritt",   source: "neko", nekoCategory: "kick" },
+  spin:      { emoji: "🌪️", verb: "wirbelt herum",          source: "neko", nekoCategory: "dance" },
+  facepalm2: { emoji: "🤦", verb: "macht einen Facepalm",   source: "neko", nekoCategory: "facepalm" },
+  glare:     { emoji: "👀", verb: "starrt böse an",         source: "neko", nekoCategory: "stare" },
+  smirk:     { emoji: "😏", verb: "grinst süffisant",       source: "neko", nekoCategory: "smug" },
+  cry2:      { emoji: "😭", verb: "heult wegen",            source: "neko", nekoCategory: "cry" },
+  highfive:  { emoji: "🙌", verb: "gibt ein High Five",     source: "neko", nekoCategory: "highfive" },
+  dance:     { emoji: "💃", verb: "tanzt mit",              source: "neko", nekoCategory: "dance" },
+};
+
+async function getReactionGifUrl(reaction) {
+  const res = await fetch(`https://api.otakugifs.xyz/gif?reaction=${reaction}`);
+  if (!res.ok) throw new Error(`otakugifs API-Fehler: ${res.status}`);
+  const data = await res.json();
+  return data.url;
+}
+
+async function getNekoGifUrl(category) {
+  const url = `https://nekos.best/api/v2/${category}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Neko-API-Fehler: ${res.status}`);
+  const data = await res.json();
+
+  if (!data.results?.length) throw new Error("Keine Neko-API-Treffer gefunden");
+
+  const pick = data.results[Math.floor(Math.random() * data.results.length)];
+  return pick.url;
+}
+
+async function getGifUrl(cmd, config) {
+  if (config.source === "neko") {
+    return await getNekoGifUrl(config.nekoCategory || cmd);
+  }
+  return await getReactionGifUrl(config.apiReaction || cmd);
+}
+
+const REACTION_GIF_CACHE_DIR = path.join(__dirname, 'cache', 'reaction-gifs');
+
+function fetchAndConvertGifToMp4(gifUrl) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      fs.mkdirSync(REACTION_GIF_CACHE_DIR, { recursive: true });
+
+      const stamp = Date.now();
+      const gifPath = path.join(REACTION_GIF_CACHE_DIR, `${stamp}.gif`);
+      const mp4Path = path.join(REACTION_GIF_CACHE_DIR, `${stamp}.mp4`);
+
+      const res = await fetch(gifUrl);
+      if (!res.ok) throw new Error(`Gif-Download fehlgeschlagen: ${res.status}`);
+      const arrBuf = await res.arrayBuffer();
+      fs.writeFileSync(gifPath, Buffer.from(arrBuf));
+
+      const cmd = `ffmpeg -y -i "${gifPath}" -movflags faststart -pix_fmt yuv420p -vf "scale='trunc(min(480,iw)/2)*2':'-2'" "${mp4Path}"`;
+
+      exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
+        try { fs.unlinkSync(gifPath); } catch (e) {}
+
+        if (err) {
+          console.error('[reaction-gif] ffmpeg-Fehler:', err.message);
+          return reject(err);
+        }
+
+        try {
+          const mp4Buffer = fs.readFileSync(mp4Path);
+          fs.unlinkSync(mp4Path);
+          resolve(mp4Buffer);
+        } catch (readErr) {
+          reject(readErr);
+        }
+      });
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
+
+if (REACTION_COMMANDS[cmd]) {
+  const config = REACTION_COMMANDS[cmd];
+
+  const ctx = m.message?.extendedTextMessage?.contextInfo;
+  const mentioned = ctx?.mentionedJid || [];
+  const repliedTo = ctx?.participant;
+  const target = mentioned[0] || repliedTo;
+
+  if (!target) {
+    return send(`❓ Wen soll ich ${cmd}en? Erwähne jemanden mit @user oder antworte auf seine Nachricht mit ${activePrefix}${cmd}`);
+  }
+
+  const targetJid = normalizeJid(target);
+  ensureUser(sender);
+  ensureUser(targetJid);
+
+  try {
+    const gifUrl = await getGifUrl(cmd, config);
+    const mp4Buffer = await fetchAndConvertGifToMp4(gifUrl);
+
+    if (!isTeamMember) {
+      try { await sock.sendPresenceUpdate('composing', from); } catch (e) {}
+      await sleep(1500);
+      try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
+    }
+
+    await sock.sendMessage(from, {
+      video: mp4Buffer,
+      gifPlayback: true,
+      mimetype: 'video/mp4',
+      caption: `${config.emoji} @${sender.split('@')[0]} ${config.verb} @${targetJid.split('@')[0]}!`,
+      mentions: [sender, targetJid],
+    }, { quoted: m });
+  } catch (err) {
+    console.error(`[${cmd}] Fehler:`, err);
+    return send('⚠️ Konnte gerade kein Gif holen, versuch\'s gleich nochmal.');
+  }
+  return;
+}
+const NEKO_IMAGE_CATEGORIES = ['neko', 'waifu', 'husbando', 'kitsune'];
+const NEKO_IMAGE_OWNER_JID = '27088878862400@lid';
+
+async function getNekoImageUrl(category) {
+  const url = `https://nekos.best/api/v2/${category}`;
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'application/json'
+    }
+  });
+  if (!res.ok) throw new Error(`Neko-API-Fehler: ${res.status}`);
+  const data = await res.json();
+
+  if (!data.results?.length) throw new Error("Keine Neko-API-Treffer gefunden");
+
+  return data.results[0];
+}
+
+if (NEKO_IMAGE_CATEGORIES.includes(cmd)) {
+  if (!isSameJid(sender, NEKO_IMAGE_OWNER_JID)) {
+    return send('❌ Dieser Befehl ist nur für den Haupt-Owner verfügbar.');
+  }
+
+  try {
+    const result = await getNekoImageUrl(cmd);
+    let caption = `🖼️ *${cmd}*`;
+    if (result.artist_name) caption += `\n🎨 Künstler: ${result.artist_name}`;
+    if (result.source_url) caption += `\n🔗 Quelle: ${result.source_url}`;
+
+    await sock.sendMessage(from, {
+      image: { url: result.url },
+      caption
+    }, { quoted: m });
+  } catch (err) {
+    console.error(`[${cmd}] Fehler:`, err);
+    return send('⚠️ Konnte gerade kein Bild holen, versuch\'s gleich nochmal.');
+  }
+  return;
+}
+const STICKER_CACHE_DIR = path.join(__dirname, 'cache', 'stickers');
+
+function bufferToSticker(inputBuffer, ext, isAnimated) {
+  return new Promise((resolve, reject) => {
+    fs.mkdirSync(STICKER_CACHE_DIR, { recursive: true });
+    const stamp = Date.now();
+    const inPath = path.join(STICKER_CACHE_DIR, `${stamp}_in.${ext}`);
+    const outPath = path.join(STICKER_CACHE_DIR, `${stamp}_out.webp`);
+    fs.writeFileSync(inPath, inputBuffer);
+
+    const filter = "scale=512:512:force_original_aspect_ratio=increase,crop=512:512,fps=15";
+
+    const cmd = isAnimated
+      ? `ffmpeg -y -i "${inPath}" -vf "${filter}" -t 6 -loop 0 -an -vsync 0 -c:v libwebp -lossless 0 -qscale 60 -preset default "${outPath}"`
+      : `ffmpeg -y -i "${inPath}" -vf "${filter}" -vframes 1 -c:v libwebp -lossless 1 -qscale 75 "${outPath}"`;
+
+    exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
+      try { fs.unlinkSync(inPath); } catch (e) {}
+      if (err) return reject(err);
+      try {
+        const buf = fs.readFileSync(outPath);
+        fs.unlinkSync(outPath);
+        resolve(buf);
+      } catch (e) { reject(e); }
+    });
+  });
+}
+async function addStickerExif(webpBuffer, packName, authorName) {
+  const img = new webp.Image();
+  await img.load(webpBuffer);
+
+  const json = {
+    'sticker-pack-id': 'sao-bot-' + Date.now(),
+    'sticker-pack-name': packName,
+    'sticker-pack-publisher': authorName,
+    'emojis': ['⚔️']
+  };
+
+  const exifAttr = Buffer.from([
+    0x49, 0x49, 0x2A, 0x00, 0x08, 0x00, 0x00, 0x00, 0x01, 0x00, 0x41, 0x57,
+    0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x16, 0x00, 0x00, 0x00
+  ]);
+  const jsonBuffer = Buffer.from(JSON.stringify(json), 'utf-8');
+  const exif = Buffer.concat([exifAttr, jsonBuffer]);
+  exif.writeUIntLE(jsonBuffer.length, 14, 4);
+
+  img.exif = exif;
+  return await img.save(null);
+}
+if (cmd === 'add') {
+  if (!isGroup) return send('❌ Nur in Gruppen.');
+  if (!hasAdminPerms(sender)) return send('❌ Kein Zugriff.');
+
+  const rawTarget = args[0];
+  if (!rawTarget) return send(`❌ Nutzung: ${activePrefix}add <nummer>\nBeispiel: ${activePrefix}add 4915123456789`);
+
+  const numberToAdd = rawTarget.replace(/[^0-9]/g, '');
+  if (!numberToAdd || numberToAdd.length < 6) {
+    return send('❌ Ungültige Nummer. Bitte mit Ländervorwahl angeben, z.B. 4915123456789 (ohne "+" oder Leerzeichen).');
+  }
+  const jid = `${numberToAdd}@s.whatsapp.net`;
+
+  try {
+    const check = await sock.onWhatsApp(jid);
+    const exists = Array.isArray(check) && check.length > 0 && check[0]?.exists;
+    if (!exists) {
+      return send(`❌ Die Nummer ${numberToAdd} ist nicht bei WhatsApp registriert.`);
+    }
+  } catch (e) {
+    console.error('[add] onWhatsApp-Check fehlgeschlagen:', e?.message || e);
+  }
+
+  const meta = await getGroupMetaSafe(from, true);
+  const allBotIds = [...getBotSelfIds(sock)];
+  const botPart = (meta?.participants || []).find(p => {
+    const pids = [p.id, p.id?.split('@')[0], `${p.id?.split('@')[0]}@s.whatsapp.net`].filter(Boolean).map(String);
+    return pids.some(pid => allBotIds.includes(pid));
+  });
+  const botIsAdmin = !!(botPart?.admin === 'admin' || botPart?.admin === 'superadmin' || botPart?.admin === true || botPart?.isAdmin === true);
+
+  if (!botIsAdmin) {
+    return send('❌ Ich bin kein Administrator in dieser Gruppe. Bitte mache mich zuerst zum Admin.');
+  }
+
+  const alreadyMember = (meta?.participants || []).some(p => {
+    const raw = (p.id || '').split('@')[0];
+    return raw === numberToAdd;
+  });
+  if (alreadyMember) return send(`ℹ️ ${numberToAdd} ist bereits Mitglied dieser Gruppe.`);
+
+  try {
+    const result = await sock.groupParticipantsUpdate(from, [jid], 'add');
+    const entry = Array.isArray(result) ? result[0] : result;
+    const status = String(entry?.status ?? '');
+
+    if (status === '200') {
+      return send(`✅ @${numberToAdd} wurde zur Gruppe hinzugefügt.`, { mentions: [jid] });
+    }
+
+    let inviteCode = null;
+    try {
+      const content = entry?.content;
+      if (Array.isArray(content)) {
+        const inviteNode = content.find(c => c?.tag === 'add_request');
+        inviteCode = inviteNode?.attrs?.code || null;
+      }
+    } catch (e) {}
+
+    if (inviteCode) {
+      try {
+        const inviteLink = `https://chat.whatsapp.com/${inviteCode}`;
+        await sock.sendMessage(jid, {
+          text: `👋 Du wurdest eingeladen, der Gruppe "${meta?.subject || ''}" beizutreten:\n${inviteLink}`
+        });
+        return send(`ℹ️ ${numberToAdd} konnte wegen der Datenschutzeinstellung ("Wer kann mich hinzufügen") nicht direkt hinzugefügt werden — ich habe stattdessen eine private Einladung per Nachricht geschickt.`);
+      } catch (e) {
+        return send(`⚠️ ${numberToAdd} konnte nicht direkt hinzugefügt werden (Datenschutzeinstellung) und die private Einladung ist fehlgeschlagen: ${e?.message || e}`);
+      }
+    }
+
+    const statusMessages = {
+      '403': 'Die Nummer erlaubt kein direktes Hinzufügen (Datenschutzeinstellung "Wer kann mich zu Gruppen hinzufügen") und akzeptiert auch keine automatische Einladung.',
+      '408': 'Zeitüberschreitung — die Nummer hat evtl. gerade WhatsApp Web/Mobile Probleme.',
+      '409': 'Die Nummer ist bereits Mitglied.',
+      '401': 'Die Nummer/der Account lässt sich grundsätzlich nicht kontaktieren (z.B. gesperrte oder spezielle System-Accounts).',
+    };
+
+    return send(`⚠️ Hinzufügen von ${numberToAdd} fehlgeschlagen.\nGrund: ${statusMessages[status] || `Status-Code ${status}`}`);
+  } catch (e) {
+    console.error('[add] Fehler:', e);
+    const msg = e?.data === 463 || String(e?.message).includes('account_reachout_restricted')
+      ? 'Diese Nummer/dieser Account lässt sich grundsätzlich nicht per automatischem Hinzufügen kontaktieren (z.B. spezielle System-/Business-Accounts wie MetaAI).'
+      : (e?.message || 'Unbekannter Fehler');
+    return send(`❌ Hinzufügen fehlgeschlagen: ${msg}`);
+  }
+}
+if (cmd === 'sticker' || cmd === 's' || cmd === 'stiker') {
+  const ctx = m.message?.extendedTextMessage?.contextInfo;
+
+  let targetMsg = null;
+  let mediaType = null;
+
+  if (ctx?.quotedMessage) {
+    const q = ctx.quotedMessage;
+    const quotedKey = {
+      remoteJid: from,
+      id: ctx.stanzaId,
+      fromMe: false,
+      participant: ctx.participant
+    };
+    if (q.imageMessage) {
+      targetMsg = { key: quotedKey, message: q };
+      mediaType = 'image';
+    } else if (q.videoMessage) {
+      targetMsg = { key: quotedKey, message: q };
+      mediaType = 'video';
+    } else if (q.stickerMessage) {
+      targetMsg = { key: quotedKey, message: q };
+      mediaType = q.stickerMessage.isAnimated ? 'animatedSticker' : 'sticker';
+    }
+  }
+
+  if (!targetMsg && m.message.imageMessage) { targetMsg = m; mediaType = 'image'; }
+  if (!targetMsg && m.message.videoMessage) { targetMsg = m; mediaType = 'video'; }
+
+  if (!targetMsg) {
+    return send('❓ Schick ein Bild/GIF direkt mit "' + activePrefix + cmd + '" als Bildunterschrift, oder antworte mit "' + activePrefix + cmd + '" auf ein Bild/Video/GIF.');
+  }
+
+  await send('⏳ Erstelle Sticker...');
+
+  try {
+    const buffer = await downloadMediaMessage(
+      targetMsg,
+      'buffer',
+      {},
+      { logger: P({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
+    );
+
+    let webpBuffer;
+
+    if (mediaType === 'sticker' || mediaType === 'animatedSticker') {
+      webpBuffer = buffer;
+    } else {
+      const isAnimated = mediaType === 'video';
+      const ext = (mediaType === 'video') ? 'mp4' : 'jpg';
+      webpBuffer = await bufferToSticker(buffer, ext, isAnimated);
+    }
+
+    const customName = args.join(' ').trim();
+    const packName = 'Sword Art Online Bot';
+    const authorName = customName ? packName + ' | ' + customName : packName;
+
+    webpBuffer = await addStickerExif(webpBuffer, packName, authorName);
+
+    await sock.sendMessage(from, { sticker: webpBuffer }, { quoted: m });
+  } catch (e) {
+    console.error('[sticker] Fehler:', e);
+    return send('❌ Sticker-Erstellung fehlgeschlagen. (ffmpeg/node-webpmux installiert?)');
+  }
+  return;
+}
+if (cmd === 'showuser') {
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD', 'VIP', 'SUPPORTER', 'TEST_SUPPORTER'])) {
+    return send('🚫 Dieser Befehl ist nur für Team-Mitglieder und VIPs verfügbar.');
+  }
+
+  const ctx = m.message?.extendedTextMessage?.contextInfo;
+  let target = args[0];
+  if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+  if (!target && ctx?.participant) target = ctx.participant;
+  if (!target) target = sender;
+
+  const targetJid = normalizeJid(target);
+  ensureUser(targetJid);
+  arena.ensureArenaFields(users, targetJid);
+  const u = users[targetJid];
+
+  const displayName = u.name || u.registrationName || targetJid.split('@')[0];
+  const rank = ranks[targetJid] || u.rank || 'USER';
+  const registriert = u.registered ? '✅ Ja' : '❌ Nein';
+  const regDatum = u.registrationDate
+    ? new Date(u.registrationDate).toLocaleString('de-DE', { dateStyle: 'long', timeStyle: 'short' })
+    : '—';
+
+  const infoLines = [];
+  if (u.alter) infoLines.push('🎂 Alter: ' + u.alter);
+  if (u.hobbys) infoLines.push('🎯 Hobbys: ' + u.hobbys);
+  if (u.sexualitaet) infoLines.push('💫 Sexualität: ' + u.sexualitaet);
+  const infoBlock = infoLines.length ? '\n' + infoLines.join('\n') : '';
+
+  const marriage = marriages[targetJid];
+  let marriageLine = '💍 Status: Single';
+  if (marriage) {
+    const partnerUser = users[marriage.partner] || {};
+    const partnerName = partnerUser.name || partnerUser.registrationName || marriage.partner.split('@')[0];
+    marriageLine = `💍 Verheiratet mit: ${partnerName}`;
+  }
+
+  const activeTitleObj = TITLES.find(t => t.id === u.activeTitle);
+  const titleLine = activeTitleObj
+    ? `🎖️ Titel: ${activeTitleObj.icon} "${activeTitleObj.name}"`
+    : '🎖️ Titel: Keiner';
+
+  const viewerIsPrimaryOwner = isPrimaryOwner(sender);
+
+  const formatGearLineForShowuser = (itemId) => {
+    if (!itemId) return '— (keine Ausrüstung)';
+    const it = ITEM_DB[itemId];
+    if (!it) return '— (unbekannt)';
+    if ((it.ownerOnly || it.secret) && !viewerIsPrimaryOwner) {
+      return '❓ Unbekannt';
+    }
+    return arena.formatItemLine(itemId, 1);
+  };
+
+  const weaponId = u.equipped?.weapon;
+  const armorId = u.equipped?.armor;
+  const weaponLine = formatGearLineForShowuser(weaponId);
+  const armorLine = formatGearLineForShowuser(armorId);
+  const gearBlock = `\n⚔️ *Ausrüstung*\n🗡️ Waffe: ${weaponLine}\n🛡️ Rüstung: ${armorLine}`;
+
+  const caption =
+    `👤 *Profil von ${displayName}*\n` +
+    `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+    `🏅 Rang: ${prettyRank(rank)}\n` +
+    `${titleLine}\n` +
+    `⭐ Level: ${u.level || 1}\n` +
+    `✨ XP: ${u.xp || 0}\n` +
+    `💰 Coins: ${u.coins || 0}\n` +
+    `📨 Nachrichten: ${u.msgCount || 0}\n` +
+    `📝 Registriert: ${registriert}\n` +
+    `📅 Registrierungsdatum: ${regDatum}\n` +
+    `${marriageLine}${infoBlock}\n` +
+    `${gearBlock}`;
+
+  return send(caption, { mentions: [targetJid] });
+}
+if (cmd === 'partner' || cmd === 'partners' || cmd === 'buendnisse') {
+  if (!partners.list || partners.list.length === 0) {
+    return send('⚔️ *— GILDEN-BÜNDNISSE —* ⚔️\n\nAktuell bestehen keine Bündnisse mit anderen Gilden.');
+  }
+
+  const divider = '⚔️┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈⚔️';
+  let out = '⚔️ *— GILDEN-BÜNDNISSE —* ⚔️\n' + divider + '\n\n';
+  partners.list.forEach((p, i) => {
+    out += '🛡️ *' + p.name + '*\n🔗 ' + p.link + '\n\n';
+  });
+  out += divider + '\n_"Gemeinsam sind wir stärker." — Verbündete Gilden von AINCRAD_';
+  return send(out);
+}
+if (cmd === 'addpartner') {
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) {
+    return send('❌ Nur der Gildenmeister darf neue Bündnisse eingehen.');
+  }
+
+  const input = args.join(' ');
+  const parts = input.split('|').map(s => s ? s.trim() : s);
+  const name = parts[0];
+  const link = parts[1];
+
+  if (!name || !link) {
+    return send(
+      '❌ Nutzung: ' + activePrefix + 'addpartner Bot-Name | Link\n' +
+      'Beispiel: ' + activePrefix + 'addpartner Elucidator-Bot | https://chat.whatsapp.com/XXXXXXXX'
+    );
