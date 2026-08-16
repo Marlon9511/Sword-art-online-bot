@@ -405,7 +405,7 @@ function normalizeJid(jid) {
   return num ? `${num}@s.whatsapp.net` : jid;
 }
 
-// Bitchkick: Roh-Nummer -> @s.whatsapp.net JID (jede Formatierung wird toleriert)
+
 function normalizeNumber(input) {
   const num = String(input || '').replace(/[^0-9]/g, '');
   if (!num) return null;
@@ -475,8 +475,7 @@ function isGroupAdminJid(groupMeta, jid) {
   );
 }
 
-// Bitchkick: prüft ob der BOT selbst (nicht der Sender) in der Gruppe Admin ist.
-// Nutzt getBotSelfIds(sock), daher muss sock als Parameter übergeben werden.
+
 function isBotAdminInGroup(groupMeta, sock) {
   if (!groupMeta?.participants) return false;
   const allBotIds = [...getBotSelfIds(sock)];
@@ -574,7 +573,7 @@ let credits = load(FILES.credits.file) || { list: [] };
 let officialGroup = load(FILES.officialGroup.file) || { link: 'https://chat.whatsapp.com/DBiDcF2s16FEWiGKyZA7Nl' };
 if (!officialGroup.link) officialGroup.link = 'https://chat.whatsapp.com/DBiDcF2s16FEWiGKyZA7Nl';
 
-// Bitchkick: Kick-Listen pro Gruppe -> { "<groupJid>": ["<jid>", ...] }
+
 let bitchkickData = load(FILES.bitchkick.file) || {};
 
 console.log('Loaded ranks:', ranks);
@@ -864,7 +863,7 @@ const ITEM_DB = {
     bossBonus: 0.30
   },
 
-  // ---- SECRET-POOL WAFFEN (via Kiste, 1:1000-Chance) ----
+  // ---- SECRET-POOL WAFFEN 
   w_secret_dualblades: {
     name: 'Holzstab',
     trueName: 'Kiritos Doppelklingen (Dual Blades)',
@@ -1221,7 +1220,7 @@ async function updateBotProfile() {
       }
       const settings = groupSettings[groupId];
 
-      // ---- BITCHKICK: automatisches Entfernen von gelisteten Nummern ----
+      
       if (action === 'add') {
         const groupKickList = bitchkickData[groupId] || [];
         if (groupKickList.length) {
@@ -1259,7 +1258,7 @@ async function updateBotProfile() {
         const welcomeMsg = settings.welcome.message || 'Willkommen in der Gruppe! 👋';
 
         for (const rawParticipant of participants) {
-          // Robust: participant kann ein String ODER ein Objekt { id, ... } sein
+          
           const participantJid = typeof rawParticipant === 'string'
             ? rawParticipant
             : (rawParticipant?.id || rawParticipant?.jid || null);
@@ -1297,7 +1296,7 @@ const m = messages[0];
       const sender = normalizeJid(rawParticipant);
       const isGroup = typeof from === 'string' && from.endsWith('@g.us');
 
-      // 🔒 OWNER MODE — ignoriert wirklich ALLES von Nicht-Ownern (auch AFK, Antilink, XP etc.)
+      // 🔒 OWNER MODE 
       if (OWNER_MODE && !isAuthorized(sender, ['OWNER', 'COOWNER']) && !m.key.fromMe) {
         return;
       }
@@ -1336,7 +1335,7 @@ if (!m.key.fromMe && pendingApplications.has(sender)) {
     return;
   }
 
-  // Alle Fragen beantwortet -> an Owner senden
+  
   pendingApplications.delete(sender);
   const a = appState.answers;
 
@@ -1365,8 +1364,8 @@ if (!m.key.fromMe && pendingApplications.has(sender)) {
   }
   return;
 }
-// Levenshtein-Distanz: misst, wie "ähnlich" zwei Strings sind
-function levenshtein(a, b) {
+
+
   const m = a.length, n = b.length;
   const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
   for (let i = 0; i <= m; i++) dp[i][0] = i;
