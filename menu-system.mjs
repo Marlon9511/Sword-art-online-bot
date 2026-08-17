@@ -29,6 +29,7 @@ function buildMainLayer(ctx) {
   t += `▸ ${PREFIX}menu pokemon — Pokémon-System\n`;
   t += `▸ ${PREFIX}menu demonslayer — Dämonentöter-System\n`;
   t += `▸ ${PREFIX}menu hunter — Solo-Leveling Hunter-System\n`;
+  t += `▸ ${PREFIX}menu naruto — Naruto-Charaktersystem\n`;
   t += `▸ ${PREFIX}menu social — Interaktions-Skills (hug, kiss, pat, ...)\n`;
   t += `▸ ${PREFIX}menu fun — Fun & Action Skills (kill, yeet, nuke, ...)\n`;
   t += `▸ ${PREFIX}menu chat — Gilden-Chat & Gruppeneinstellungen\n`;
@@ -106,6 +107,18 @@ function buildSoloLevelingLayer(ctx) {
     .map(l => l.replace(/\{P\}/g, PREFIX))
     .join('\n');
   t += `\n\n🌑 _"Arise." — Nur wahre Hunter überleben die Gates._`;
+  return t;
+}
+
+function buildNarutoLayer(ctx) {
+  const { PREFIX, NARUTO_HELP_TEXT } = ctx;
+  let t = `🍥 *NARUTO-SYSTEM*\n${DIVIDER}\n`;
+  t += (NARUTO_HELP_TEXT || '(keine Daten verfügbar)')
+    .split('\n')
+    .filter(Boolean)
+    .map(l => l.replace(/\{P\}/g, PREFIX))
+    .join('\n');
+  t += `\n\n🍥 _"Das ist mein Weg des Ninja!" — Wähle deinen Charakter und werde zur Legende._`;
   return t;
 }
 
@@ -247,6 +260,7 @@ const LAYERS = {
   pokemon:     { build: buildPokemonLayer,     aliases: ['poke', 'pokedex'] },
   demonslayer: { build: buildDemonSlayerLayer, aliases: ['dämonentöter', 'daemonslayer', 'ds', 'atmung'] },
   hunter:      { build: buildSoloLevelingLayer, aliases: ['solo', 'sololeveling', 'jaeger', 'hunter-system'] },
+  naruto:      { build: buildNarutoLayer,      aliases: ['nrt', 'shinobi', 'konoha'] },
   social:      { build: buildSocialLayer,      aliases: ['interaktion', 'interaction'] },
   fun:         { build: buildFunLayer,         aliases: ['action', 'giphy'] },
   chat:        { build: buildChatLayer,        aliases: ['gruppe', 'group', 'gilden-chat'] },
@@ -277,6 +291,7 @@ function buildNavRows(ctx) {
     pokemon:     { title: '🐾 Pokémon',        desc: 'Fangen, Leveln, Kämpfen' },
     demonslayer: { title: '👹 Dämonentöter',   desc: 'Atemstile & Dämonen-Boss' },
     hunter:      { title: '⚡ Hunter',          desc: 'Solo-Leveling System' },
+    naruto:      { title: '🍥 Naruto',         desc: 'Charaktere, Jutsu & Duelle' },
     social:      { title: '💞 Social',         desc: 'Interaktions-Skills' },
     fun:         { title: '💀 Fun & Action',   desc: 'Giphy-Reactions' },
     chat:        { title: '💬 Gilden-Chat',    desc: 'Chat- & Gruppeneinstellungen' },
@@ -285,7 +300,7 @@ function buildNavRows(ctx) {
     owner:       { title: '👑 System-Admin',    desc: 'Kayaba-Rechte' }
   };
 
-  const order = ['main', 'arena', 'gilde', 'titel', 'pokemon', 'demonslayer', 'hunter', 'social', 'fun', 'chat', 'support', 'admin', 'owner'];
+  const order = ['main', 'arena', 'gilde', 'titel', 'pokemon', 'demonslayer', 'hunter', 'naruto', 'social', 'fun', 'chat', 'support', 'admin', 'owner'];
   const rows = [];
 
   for (const key of order) {
