@@ -4894,6 +4894,13 @@ const soloLevelingHandled = await soloLeveling.handle({
 });
 if (soloLevelingHandled) return;
 
+const narutoHandled = await naruto.handle({
+  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
+  users, save, FILES, ensureUser, normalizeJid, isSameJid,
+  getNumberMention, randInt, sleep, isPrimaryOwner
+});
+if (narutoHandled) return;
+
       if (cmd === 'ownermode' || cmd === 'om') {
         if (!isOwner) return send('❌ Nur der Inhaber/Co-Inhaber darf diesen Befehl nutzen.');
         const action = (args[0] || '').toLowerCase();
