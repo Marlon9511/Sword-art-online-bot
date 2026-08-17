@@ -1863,7 +1863,8 @@ if (cmd === 'help' || cmd === 'menu') {
   ARENA_HELP_TEXT, GUILD_HELP_TEXT, TITLE_HELP_TEXT, POKEMON_HELP_TEXT,
   GUILDWAR_HELP_TEXT,
   DS_HELP_TEXT: demonSlayer.DS_HELP_TEXT,
-  SL_HELP_TEXT: soloLeveling.SL_HELP_TEXT
+  SL_HELP_TEXT: soloLeveling.SL_HELP_TEXT,
+  NARUTO_HELP_TEXT: naruto.NARUTO_HELP_TEXT
 });
   try {
     const videoPath = await downloadShortIfNeeded();
@@ -1878,7 +1879,6 @@ if (cmd === 'help' || cmd === 'menu') {
   }
   return;
 }
-
  const GAME_COMMANDS = [
   'daily', 'work', 'blackjack', 'bj', 'bjstart', 'hit', 'stand',
   'slot', 'rps', 'fish', 'adopt', 'pet', 'petinfo', 'feed', 'play',
