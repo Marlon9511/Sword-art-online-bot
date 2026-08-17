@@ -4526,3 +4526,648 @@ if (cmd === 'addpartner') {
       '❌ Nutzung: ' + activePrefix + 'addpartner Bot-Name | Link\n' +
       'Beispiel: ' + activePrefix + 'addpartner Elucidator-Bot | https://chat.whatsapp.com/XXXXXXXX'
     );
+}
+
+  if (!/^https?:\/\//i.test(link)) {
+    return send('❌ Bitte gib einen gültigen Link an (muss mit http:// oder https:// beginnen).');
+  }
+
+  partners.list.push({ name: name, link: link, addedBy: sender, at: Date.now() });
+  save(FILES.partners, partners);
+
+  return send('✅ Bündnis mit *' + name + '* wurde geschlossen und in die Gildenchronik eingetragen! ⚔️');
+}
+
+if (cmd === 'delpartner') {
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) {
+    return send('❌ Nur der Gildenmeister darf Bündnisse auflösen.');
+  }
+
+  const index = parseInt(args[0]) - 1;
+  if (isNaN(index) || index < 0 || index >= partners.list.length) {
+    return send('❌ Ungültige Nummer. Nutze ' + activePrefix + 'partner um die Liste mit Nummern zu sehen.');
+  }
+
+  const removed = partners.list.splice(index, 1)[0];
+  save(FILES.partners, partners);
+  return send('💔 Bündnis mit *' + removed.name + '* wurde aufgelöst.');
+}
+if (cmd === 'nachtsperre' || cmd === 'quiethours') {
+  if (!isGroup) return send('❌ Nur in Gruppen.');
+
+  const groupMetadata = await getGroupMetaSafe(from);
+  const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
+  if (!isGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) {
+    return send('❌ Du musst Admin in dieser Gruppe sein.');
+  }
+
+  const sub = (args[0] || '').toLowerCase();
+
+  if (sub === 'aus' || sub === 'off') {
+    delete groupLockSchedules[from];
+    save(FILES.groupLockSchedule, groupLockSchedules);
+    try { await sock.groupSettingUpdate(from, 'not_announcement'); } catch (e) {}
+    return send('✅ Nachtsperre deaktiviert. Die Gruppe ist dauerhaft offen.');
+  }
+
+  if (sub === 'status' || !sub) {
+    const entry = groupLockSchedules[from];
+    if (!entry) return send('ℹ️ Für diese Gruppe ist keine Nachtsperre aktiv.\n\nNutzung: ' + activePrefix + 'nachtsperre an 22:00 07:00');
+    return send('🌙 Nachtsperre aktiv:\nSperrt um ' + entry.start + ' Uhr\nÖffnet um ' + entry.end + ' Uhr');
+  }
+
+  if (sub === 'an' || sub === 'on') {
+    const start = args[1];
+    const end = args[2];
+    const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+    if (!start || !end || !timeRegex.test(start) || !timeRegex.test(end)) {
+      return send('❌ Nutzung: ' + activePrefix + 'nachtsperre an <start HH:MM> <ende HH:MM>\nBeispiel: ' + activePrefix + 'nachtsperre an 22:00 07:00');
+    }
+
+    groupLockSchedules[from] = { start: start, end: end, setBy: sender };
+    save(FILES.groupLockSchedule, groupLockSchedules);
+
+    return send('✅ Nachtsperre aktiviert.\nSperrt täglich um ' + start + ' Uhr\nÖffnet täglich um ' + end + ' Uhr\n\nNur Admins können während der Sperrzeit schreiben.');
+  }
+
+  return send('❌ Nutzung: ' + activePrefix + 'nachtsperre an/aus/status');
+}
+const PIN_CACHE_DIR = path.join(__dirname, 'cache', 'pinterest');
+
+function downloadPinterestVideo(url) {
+  return new Promise((resolve, reject) => {
+    fs.mkdirSync(PIN_CACHE_DIR, { recursive: true });
+    const outPath = path.join(PIN_CACHE_DIR, `${Date.now()}.mp4`);
+
+    const cmd = `yt-dlp -f "bv*+ba/best" --merge-output-format mp4 --postprocessor-args "ffmpeg:-movflags +faststart" --no-playlist -o "${outPath}" "${url}"`;
+
+    exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
+      if (err) return reject(err);
+      if (!fs.existsSync(outPath)) return reject(new Error('Keine Videodatei erzeugt (evtl. ist der Pin ein Bild, kein Video).'));
+      resolve(outPath);
+    });
+  });
+}
+
+if (cmd === 'pin' || cmd === 'pinterest' || cmd === 'pindl') {
+  const fullText = args.join(' ').trim();
+  const urlMatch = fullText.match(/(https?:\/\/)?(www\.)?(pinterest\.[a-z.]{2,}\/pin\/[\w-]+|pin\.it\/[\w-]+)/i);
+
+  if (!urlMatch) {
+    return send(`❌ Nutzung: ${activePrefix}pin <pinterest-link>\n\nBeispiel:\n${activePrefix}pin https://pin.it/abcd1234\noder\n${activePrefix}pin https://www.pinterest.com/pin/123456789/`);
+  }
+
+  let url = urlMatch[0];
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+
+  const cooldownMsg = checkCooldown(sender, 'pin');
+  if (cooldownMsg && !isOwner) return send(cooldownMsg);
+
+  await send('📌 Lade Pinterest-Video herunter, bitte warten...');
+
+  let videoPath;
+  try {
+    videoPath = await downloadPinterestVideo(url);
+    const stats = fs.statSync(videoPath);
+
+    if (stats.size > 95 * 1024 * 1024) {
+      fs.unlinkSync(videoPath);
+      return send('❌ Die Datei ist zu groß für WhatsApp (>95MB).');
+    }
+
+    await sock.sendMessage(from, {
+      video: fs.readFileSync(videoPath),
+      mimetype: 'video/mp4',
+      caption: '📌 Pinterest Video'
+    }, { quoted: m });
+
+    fs.unlinkSync(videoPath);
+  } catch (e) {
+    console.error('[pin] Fehler:', e?.message || e);
+    try { if (videoPath && fs.existsSync(videoPath)) fs.unlinkSync(videoPath); } catch {}
+    return send('❌ Download fehlgeschlagen. Prüfe den Link — er muss auf einen Pinterest-*Pin mit Video* zeigen (Bild-Pins funktionieren nicht), oder versuche es später erneut.');
+  }
+  return;
+}
+const MD_SEARCH_QUERIES = [
+  'murder drones edit', 'murder drones amv', 'murder drones edit shorts',
+  'uzi doorman edit', 'murder drones tiktok edit'
+];
+const MD_CACHE_DIR = path.join(__dirname, 'cache', 'murderdrones');
+
+function searchMdEditUrl() {
+  return new Promise((resolve, reject) => {
+    const query = MD_SEARCH_QUERIES[randInt(0, MD_SEARCH_QUERIES.length - 1)];
+    const cmd = `yt-dlp "ytsearch10:${query}" --get-id --no-playlist --match-filter "duration < 180"`;
+    exec(cmd, { maxBuffer: 1024 * 1024 * 10 }, (err, stdout) => {
+      if (err) return reject(err);
+      const ids = stdout.split('\n').map(s => s.trim()).filter(Boolean);
+      if (!ids.length) return reject(new Error('Keine Ergebnisse gefunden'));
+      resolve(`https://www.youtube.com/watch?v=${ids[randInt(0, ids.length - 1)]}`);
+    });
+  });
+}
+
+function downloadMdEdit(url) {
+  return new Promise((resolve, reject) => {
+    fs.mkdirSync(MD_CACHE_DIR, { recursive: true });
+    const outPath = path.join(MD_CACHE_DIR, `${Date.now()}.mp4`);
+    exec(`yt-dlp -f "mp4" --no-playlist -o "${outPath}" "${url}"`, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
+      if (err) return reject(err);
+      resolve(outPath);
+    });
+  });
+}
+
+const SAO_SEARCH_QUERIES = [
+  'sword art online edit', 'sword art online amv', 'sao edit shorts',
+  'kirito asuna edit', 'sword art online tiktok edit'
+];
+const SAO_CACHE_DIR = path.join(__dirname, 'cache', 'saoedits');
+
+function searchSaoEditUrl() {
+  return new Promise((resolve, reject) => {
+    const query = SAO_SEARCH_QUERIES[randInt(0, SAO_SEARCH_QUERIES.length - 1)];
+    const cmd = `yt-dlp "ytsearch10:${query}" --get-id --no-playlist --match-filter "duration < 180"`;
+    exec(cmd, { maxBuffer: 1024 * 1024 * 10 }, (err, stdout) => {
+      if (err) return reject(err);
+      const ids = stdout.split('\n').map(s => s.trim()).filter(Boolean);
+      if (!ids.length) return reject(new Error('Keine Ergebnisse gefunden'));
+      resolve(`https://www.youtube.com/watch?v=${ids[randInt(0, ids.length - 1)]}`);
+    });
+  });
+}
+
+function downloadSaoEdit(url) {
+  return new Promise((resolve, reject) => {
+    fs.mkdirSync(SAO_CACHE_DIR, { recursive: true });
+    const outPath = path.join(SAO_CACHE_DIR, `${Date.now()}.mp4`);
+    exec(`yt-dlp -f "mp4" --no-playlist -o "${outPath}" "${url}"`, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
+      if (err) return reject(err);
+      resolve(outPath);
+    });
+  });
+}
+if (cmd === 'md') {
+  await send('🔍 Suche einen Edit...');
+  try {
+    const url = await searchMdEditUrl();
+    await send('⏳ Lade Edit, bitte warten...');
+    const videoPath = await downloadMdEdit(url);
+    const stats = fs.statSync(videoPath);
+    if (stats.size > 95 * 1024 * 1024) {
+      fs.unlinkSync(videoPath);
+      return send('❌ Das gefundene Video ist zu groß für WhatsApp. Versuch es nochmal.');
+    }
+    await sock.sendMessage(from, {
+      video: fs.readFileSync(videoPath), caption: '🤖 Murder Drones Edit', mimetype: 'video/mp4'
+    }, { quoted: m });
+    fs.unlinkSync(videoPath);
+  } catch (e) {
+    console.error('[md] Fehler:', e?.message || e);
+    return send('❌ Konnte keinen passenden Edit finden oder herunterladen. Versuch es später erneut.');
+  }
+  return;
+}
+
+if (cmd === 'sao') {
+  await send('⚔️ Durchsuche die Aincrad-Archive nach einem Edit...');
+  try {
+    const url = await searchSaoEditUrl();
+    await send('⏳ Lade Edit, bitte warten...');
+    const videoPath = await downloadSaoEdit(url);
+    const stats = fs.statSync(videoPath);
+    if (stats.size > 95 * 1024 * 1024) {
+      fs.unlinkSync(videoPath);
+      return send('❌ Das gefundene Video ist zu groß für WhatsApp. Versuch es nochmal.');
+    }
+    await sock.sendMessage(from, {
+      video: fs.readFileSync(videoPath), caption: '⚔️ Sword Art Online Edit', mimetype: 'video/mp4'
+    }, { quoted: m });
+    fs.unlinkSync(videoPath);
+  } catch (e) {
+    console.error('[sao] Fehler:', e?.message || e);
+    return send('❌ Konnte keinen passenden Edit finden oder herunterladen. Versuch es später erneut.');
+  }
+  return;
+}
+
+if (cmd === 'say') {
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) {
+    return send('❌ Kein Zugriff.');
+  }
+  const text = args.join(' ').trim();
+  if (!text) return send(`❌ Nutzung: ${activePrefix}say <nachricht>`);
+
+  if (isGroup) {
+    try {
+      await sock.sendMessage(from, {
+        delete: { remoteJid: from, id: m.key.id, fromMe: false, participant: sender }
+      });
+    } catch (e) {}
+  }
+  await sock.sendMessage(from, { text });
+  return;
+}
+if (cmd === 'setinfo') {
+  const feld = (args[0] || '').toLowerCase();
+  const wert = args.slice(1).join(' ').trim();
+  const erlaubteFelder = {
+    name: 'name', alter: 'alter', hobbys: 'hobbys', hobby: 'hobbys',
+    sexualitaet: 'sexualitaet', 'sexualität': 'sexualitaet'
+  };
+
+  if (!feld || !erlaubteFelder[feld] || !wert) {
+    return send(
+      `❌ Nutzung: ${activePrefix}setinfo <feld> <wert>\n\n` +
+      `Verfügbare Felder: name, alter, hobbys, sexualitaet\n\n` +
+      `Beispiele:\n${activePrefix}setinfo name Kirito\n${activePrefix}setinfo alter 22\n` +
+      `${activePrefix}setinfo hobbys Lesen, Gaming\n${activePrefix}setinfo sexualitaet Hetero`
+    );
+  }
+
+  const key = erlaubteFelder[feld];
+  if (key === 'alter') {
+    const num = parseInt(wert);
+    if (isNaN(num) || num < 1 || num > 120) return send('❌ Bitte gib ein gültiges Alter zwischen 1 und 120 an.');
+    users[sender].alter = num;
+  } else {
+    users[sender][key] = wert;
+  }
+  save(FILES.users, users);
+  return send(`✅ ${feld.charAt(0).toUpperCase() + feld.slice(1)} wurde gespeichert. Nutze ${activePrefix}me, um dein Profil anzuzeigen.`);
+}
+if (cmd === 'bancmd') {
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Nur Owner/CoOwner.');
+  const target = args[0];
+  const action = (args[1] || 'ban').toLowerCase();
+  if (!target) return send(`Nutzung: ${PREFIX}bancmd <befehl> [ban|unban]`);
+
+  const tcmd = String(target).toLowerCase().replace(new RegExp(`^\\${PREFIX}`), '').trim();
+  if (!tcmd) return send('❌ Ungültiger Befehl.');
+
+  const protectedCmds = ['bancmd', 'unbancmd', 'help', 'menu'];
+  if (protectedCmds.includes(tcmd)) return send(`❌ Der Befehl "${tcmd}" kann nicht gesperrt werden.`);
+
+  if (action === 'unban') {
+    if (commandBans[tcmd]) {
+      delete commandBans[tcmd];
+      save(FILES.commandBans, commandBans);
+      return send(`✅ Befehl ${tcmd} wurde entsperrt.`);
+    }
+    return send(`ℹ️ Befehl ${tcmd} war nicht gesperrt.`);
+  }
+
+  commandBans[tcmd] = { by: sender, at: new Date().toISOString() };
+  save(FILES.commandBans, commandBans);
+  return send(`⛔ Befehl ${tcmd} wurde gesperrt und ist nur noch für Owner/CoOwner verfügbar.`);
+}
+const arenaHandled = await arena.handle({
+  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
+  users, save, FILES, ensureUser, normalizeJid, isSameJid,
+  getNumberMention, randInt, sleep, isPrimaryOwner
+});
+if (arenaHandled) {
+  await checkProgress({
+    users, save, FILES, send, activePrefix,
+    guilds, ownerJids: [OWNER_LID, OWNER_LID2, OWNER_PRIV, OWNER_PRIV2]
+  }, sender);
+  return;
+}
+
+const guildHandled = await guildSystem.handle({
+  cmd, args, sender, send, sock,
+  users, guilds, save, FILES, ensureUser, normalizeJid, isSameJid,
+  getNumberMention, activePrefix, m
+});
+if (guildHandled) {
+  await checkProgress({
+    users, save, FILES, send, activePrefix,
+    guilds, ownerJids: [OWNER_LID, OWNER_LID2, OWNER_PRIV, OWNER_PRIV2]
+  }, sender);
+  return;
+}
+
+const titleHandled = await titleSystem.handle({
+  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
+  users, guilds, save, FILES, ensureUser, normalizeJid, isSameJid,
+  ownerJids: [OWNER_LID, OWNER_LID2, OWNER_PRIV, OWNER_PRIV2]
+});
+if (titleHandled) return;
+const pokemonHandled = await pokemonSystem.handle({
+  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
+  users, save, FILES, ensureUser, normalizeJid, isSameJid,
+  getNumberMention, randInt, sleep, isPrimaryOwner
+});
+if (pokemonHandled) return;
+const bossEventHandled = await guildBoss.handle({
+  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
+  users, guilds, save, FILES, ensureUser, normalizeJid, isSameJid,
+  getNumberMention, randInt, sleep, isAuthorized,
+  ITEM_DB,
+  ensureArenaFields: arena.ensureArenaFields,
+ensureArenaFields: arena.ensureArenaFields,
+  isPrimaryOwner
+});
+if (guildWarHandled) return;
+const demonSlayerHandled = await demonSlayer.handle({
+  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
+  users, save, FILES, ensureUser, normalizeJid, isSameJid,
+  getNumberMention, randInt, sleep, isPrimaryOwner
+});
+if (demonSlayerHandled) return;
+const soloLevelingHandled = await soloLeveling.handle({
+  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
+  users, save, FILES, ensureUser, normalizeJid, isSameJid,
+  getNumberMention, randInt, sleep, isPrimaryOwner
+});
+if (soloLevelingHandled) return;
+
+      if (cmd === 'ownermode' || cmd === 'om') {
+        if (!isOwner) return send('❌ Nur der Inhaber/Co-Inhaber darf diesen Befehl nutzen.');
+        const action = (args[0] || '').toLowerCase();
+        if (!action || action === 'status') return send(`👑 Owner Mode: ${OWNER_MODE ? 'AKTIV ✅ (alle anderen werden ignoriert)' : 'INAKTIV ❌'}`);
+        if (['on', 'enable', 'true'].includes(action)) { OWNER_MODE = true; saveBotState(); return send('✅ Owner Mode AKTIVIERT — nur noch Owner/CoOwner werden beantwortet, alle anderen Nachrichten werden ignoriert.'); }
+        if (['off', 'disable', 'false'].includes(action)) { OWNER_MODE = false; saveBotState(); return send('✅ Owner Mode DEAKTIVIERT — der Bot reagiert wieder auf alle.'); }
+        if (action === 'toggle') { OWNER_MODE = !OWNER_MODE; saveBotState(); return send(`🔁 Owner Mode: ${OWNER_MODE ? 'AKTIV ✅' : 'INAKTIV ❌'}`); }
+        return send('❌ Nutzung: $ownermode on|off|toggle|status');
+      }
+if (cmd === 'resetlevel') {
+  if (!isAuthorized(sender, ['OWNER'])) return send('❌ Nur der Inhaber darf diesen Befehl nutzen.');
+
+  const ctx = m.message?.extendedTextMessage?.contextInfo;
+  let target = args[0];
+  if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+  if (!target && ctx?.participant) target = ctx.participant;
+
+  if (!target) return send(`❌ Nutzung: ${PREFIX}resetlevel <@user|nummer>`);
+
+  const targetJid = normalizeJid(target);
+  ensureUser(targetJid);
+  const oldLevel = users[targetJid].level || 1;
+  const oldXp = users[targetJid].xp || 0;
+  users[targetJid].level = 1;
+  users[targetJid].xp = 0;
+  save(FILES.users, users);
+
+  return send(
+    `✅ Level von @${targetJid.split('@')[0]} wurde zurückgesetzt (vorher: Lv.${oldLevel}, ${oldXp} XP → jetzt: Lv.1, 0 XP).`,
+    { mentions: [targetJid] }
+  );
+}
+if (cmd === 'bancmds' || cmd === 'bannedcmds' || cmd === 'listbancmd') {
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Nur Owner/CoOwner.');
+
+  const entries = Object.entries(commandBans || {});
+  if (!entries.length) return send('✅ Aktuell sind keine Befehle gesperrt.');
+
+  const lines = await Promise.all(entries.map(async ([cmdName, info]) => {
+    const who = await getNumberMention(info.by, sock);
+    const when = info.at ? new Date(info.at).toLocaleString('de-DE') : '(unbekannt)';
+    return `⛔ ${activePrefix}${cmdName} — gesperrt von ${who} am ${when}`;
+  }));
+
+  const mentions = entries.map(([, info]) => info.by).filter(Boolean);
+  return send(`📋 *Gesperrte Befehle* (${entries.length}):\n\n${lines.join('\n')}`, { mentions });
+}
+if (cmd === 'resetcooldown' || cmd === 'resetcd') {
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Nur der Inhaber/Co-Inhaber darf diesen Befehl nutzen.');
+
+  const ctx = m.message?.extendedTextMessage?.contextInfo;
+  let target = args[0];
+  if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+  if (!target && ctx?.participant) target = ctx.participant;
+
+  if (!target) {
+    return send(`❌ Nutzung: ${activePrefix}resetcooldown <@user|nummer> [befehl]\nBeispiel: ${activePrefix}resetcooldown @user\n${activePrefix}resetcooldown @user fish`);
+  }
+
+  const targetJid = normalizeJid(target);
+  ensureUser(targetJid);
+
+  const specificCmd = args.slice(1).join(' ').trim().toLowerCase().replace(new RegExp(`^\\${activePrefix}`), '');
+
+  if (!commandCooldowns.has(targetJid)) {
+    return send(`ℹ️ @${targetJid.split('@')[0]} hat aktuell keine aktiven Cooldowns.`, { mentions: [targetJid] });
+  }
+
+  const userCooldowns = commandCooldowns.get(targetJid);
+
+  if (specificCmd) {
+    if (!userCooldowns.has(specificCmd)) {
+      return send(`ℹ️ @${targetJid.split('@')[0]} hat aktuell keinen Cooldown für "${specificCmd}".`, { mentions: [targetJid] });
+    }
+    userCooldowns.delete(specificCmd);
+    return send(`✅ Cooldown für "${specificCmd}" von @${targetJid.split('@')[0]} wurde zurückgesetzt.`, { mentions: [targetJid] });
+  }
+
+  const count = userCooldowns.size;
+  commandCooldowns.delete(targetJid);
+  return send(`✅ Alle ${count} Cooldown(s) von @${targetJid.split('@')[0]} wurden zurückgesetzt.`, { mentions: [targetJid] });
+}
+if (cmd === 'setpasswort' || cmd === 'setpassword') {
+  if (isGroup) {
+    return send('🔒 Aus Sicherheitsgründen funktioniert dieser Befehl nur im Privatchat mit mir. Schreib mir direkt eine Nachricht.');
+  }
+
+  const password = args.join(' ').trim();
+  if (!password || password.length < 4) {
+    return send(`❌ Nutzung: ${activePrefix}setpasswort <passwort>\nDas Passwort muss mindestens 4 Zeichen lang sein.`);
+  }
+  if (password.length > 100) {
+    return send('❌ Das Passwort ist zu lang (max. 100 Zeichen).');
+  }
+
+  ensureUser(sender);
+  const hadIdBefore = !!users[sender].webId;
+  const webId = setUserWebPassword(sender, password);
+
+  return send(
+    hadIdBefore
+      ? `✅ Dein Passwort wurde aktualisiert.\n🆔 Deine ID bleibt: *${webId}*\n\nNutze ID + Passwort, um dich auf der Website anzumelden.`
+      : `✅ Passwort gesetzt!\n🆔 Deine ID lautet: *${webId}*\n\nMerke dir ID + Passwort gut. Du kannst dir die ID jederzeit erneut anzeigen lassen mit ${activePrefix}myid.`
+  );
+}
+
+if (cmd === 'myid') {
+  if (isGroup) {
+    return send('🔒 Aus Sicherheitsgründen zeige ich deine ID nur im Privatchat. Schreib mir direkt eine Nachricht.');
+  }
+  ensureUser(sender);
+  const webId = users[sender].webId;
+  if (!webId) {
+    return send(`ℹ️ Du hast noch keine ID. Setze zuerst ein Passwort mit:\n${activePrefix}setpasswort <passwort>`);
+  }
+  return send(`🆔 Deine ID: *${webId}*\n\n(Passwort vergessen? Setze es neu mit ${activePrefix}setpasswort <neues-passwort> — die ID bleibt gleich.)`);
+}
+if (cmd === 'kisteall' || cmd === 'giftkisteall') {
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
+
+  const amount = parseInt(args[0]) || 1;
+  const groupArg = args.slice(1).join(' ').trim();
+
+  if (amount < 1 || amount > 50) {
+    return send(
+      `❌ Nutzung:\n` +
+      `${activePrefix}kisteall [anzahl]  → alle registrierten Nutzer\n` +
+      `${activePrefix}kisteall [anzahl] gruppe  → nur aktuelle Gruppe\n` +
+      `${activePrefix}kisteall [anzahl] gruppe:<Gruppenname>  → nur bestimmte Gruppe\n` +
+      `(Erlaubt: 1-50 Kisten pro User)`
+    );
+  }
+
+  let targetJids = [];
+  let targetLabel = '';
+
+  if (groupArg.toLowerCase() === 'gruppe') {
+    const groupJid = m.key.remoteJid;
+    if (!groupJid?.endsWith('@g.us')) {
+      return send('❌ "gruppe" funktioniert nur, wenn der Command in einer Gruppe ausgeführt wird.');
+    }
+    let metadata;
+    try {
+      metadata = await sock.groupMetadata(groupJid);
+    } catch (e) {
+      return send('❌ Konnte Gruppenmitglieder nicht abrufen.');
+    }
+    targetJids = metadata.participants.map(p => p.id).filter(jid => users[jid]?.registered === true);
+    targetLabel = metadata.subject;
+
+  } else if (groupArg.toLowerCase().startsWith('gruppe:')) {
+    const searchName = groupArg.slice('gruppe:'.length).trim().toLowerCase();
+    if (!searchName) return send('❌ Bitte einen Gruppennamen angeben, z.B. gruppe:MeineGruppe');
+
+    let allGroups;
+    try {
+      allGroups = await sock.groupFetchAllParticipating();
+    } catch (e) {
+      return send('❌ Konnte Gruppenliste nicht abrufen.');
+    }
+
+    const match = Object.values(allGroups).find(g =>
+      g.subject?.toLowerCase().includes(searchName)
+    );
+
+    if (!match) {
+      return send(`❌ Keine Gruppe mit dem Namen "${searchName}" gefunden.`);
+    }
+
+    targetJids = match.participants.map(p => p.id).filter(jid => users[jid]?.registered === true);
+    targetLabel = match.subject;
+
+  } else {
+    targetJids = Object.keys(users).filter(jid => users[jid]?.registered === true);
+    targetLabel = 'alle Gruppen';
+  }
+
+  if (!targetJids.length) {
+    return send(`ℹ️ Keine registrierten Nutzer gefunden (${targetLabel || 'Ziel'}).`);
+  }
+
+  for (const jid of targetJids) {
+    if (!users[jid].items) users[jid].items = {};
+    users[jid].items['kiste'] = (users[jid].items['kiste'] || 0) + amount;
+  }
+  save(FILES.users, users);
+
+  return send(
+    `🎁 ${amount}x Kiste an ${targetJids.length} registrierte Nutzer verschenkt` +
+    (targetLabel ? ` (${targetLabel})` : '') + `!\n` +
+    `Öffne sie mit ${activePrefix}openkiste`
+  );
+}
+const suggestion = findClosestCommand(cmd);
+if (suggestion) {
+  return send(
+    '⚠️ *SYSTEM-FEHLER* ⚠️\n' +
+    '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n' +
+    'Der Befehl "' + cmd + '" existiert nicht im Aincrad-System.\n\n' +
+    '🔍 *Ähnlichste Erkenntnis:*\n' +
+    '⌈ ' + activePrefix + suggestion.command + ' ⌋ — Übereinstimmung: ' + suggestion.similarity + '%\n\n' +
+    'Meintest du das, Schwertkämpfer?\n' +
+    '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n' +
+    '_Nutze ' + activePrefix + 'help für das vollständige Skill-Menü._'
+  );
+}
+return send(
+  '❓ *UNBEKANNTER BEFEHL* ❓\n' +
+  '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n' +
+  'Dieser Skill wurde noch nicht erlernt.\n' +
+  'Nutze ' + activePrefix + 'help oder ' + activePrefix + 'menu für das Command-Window.\n\n' +
+  'Falls du glaubst, dieser Skill sollte existieren, wende dich an Daddy Kirito unter ' + activePrefix + 'owner.'
+);
+    } catch (err) {
+      console.error('messages.upsert error:', err);
+      log('ERROR: ' + (err?.message || String(err)));
+    }
+  });
+
+  console.log('✅ Sword-art-online-bot Session "' + sessionName + '" gestartet.');
+  return sock;
+}
+
+const sessionManager = {
+  startSession: (name, hooks) => startBot(name, hooks),
+
+  getSession: (name) => activeSessions.get(name),
+
+  listSessions: () => [...activeSessions.entries()].map(([name, sock]) => ({
+    name,
+    connected: !!sock?.user,
+    jid: sock?.user?.id || null
+  })),
+
+  stopSession: async (name) => {
+    const targetSock = activeSessions.get(name);
+    if (!targetSock) throw new Error(`Session "${name}" ist nicht aktiv.`);
+    activeSessions.delete(name);
+    targetSock.ev.removeAllListeners();
+    try { await targetSock.logout(); } catch (e) {}
+    try { targetSock.end(new Error('stopped by telegram')); } catch (e) {}
+  },
+
+  deleteSession: async (name) => {
+    const targetPath = path.join(SESSIONS_DIR, name);
+    const normalizedTargetPath = path.normalize(targetPath);
+    if (!normalizedTargetPath.startsWith(SESSIONS_DIR)) {
+      throw new Error('Ungültiger Session-Name.');
+    }
+
+    const targetSock = activeSessions.get(name);
+    if (targetSock) {
+      activeSessions.delete(name);
+      targetSock.ev.removeAllListeners();
+      try { await targetSock.logout(); } catch (e) {}
+      try { targetSock.end(new Error('deleted by telegram')); } catch (e) {}
+    }
+
+    if (fs.existsSync(targetPath)) {
+      fs.rmSync(targetPath, { recursive: true, force: true });
+    }
+  }
+};
+
+initTelegramConnect(sessionManager);
+
+(async () => {
+  let existingSessions = [];
+  try {
+    existingSessions = fs.readdirSync(SESSIONS_DIR, { withFileTypes: true })
+      .filter(d => d.isDirectory())
+      .map(d => d.name);
+  } catch (e) {
+    existingSessions = [];
+  }
+
+  if (existingSessions.length === 0) {
+
+    await startBot('default');
+  } else {
+
+    for (const sessionName of existingSessions) {
+      await startBot(sessionName);
+      await sleep(1000);
+    }
+  }
+})();
