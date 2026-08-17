@@ -4867,7 +4867,15 @@ const bossEventHandled = await guildBoss.handle({
   getNumberMention, randInt, sleep, isAuthorized,
   ITEM_DB,
   ensureArenaFields: arena.ensureArenaFields,
-ensureArenaFields: arena.ensureArenaFields,
+  isPrimaryOwner
+});
+if (bossEventHandled) return;
+const guildWarHandled = await guildWars.handle({
+  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
+  users, guilds, save, FILES, ensureUser, normalizeJid, isSameJid,
+  getNumberMention, randInt, sleep, isAuthorized,
+  ITEM_DB,
+  ensureArenaFields: arena.ensureArenaFields,
   isPrimaryOwner
 });
 if (guildWarHandled) return;
