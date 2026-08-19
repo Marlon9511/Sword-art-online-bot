@@ -27,6 +27,7 @@ import { createGuildWarSystem, GUILDWAR_COMMANDS, GUILDWAR_HELP_TEXT } from './g
 import { createDemonSlayerSystem } from './demonslayer-system.mjs';
 import { createSoloLevelingSystem } from './sololeveling-system.mjs';
 import { createNarutoSystem } from './naruto-system.mjs';
+import { createLidSystem } from './lid-system.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('⚠️ Unhandled Rejection:', reason?.message || reason);
@@ -257,6 +258,7 @@ const guildWars = createGuildWarSystem(DATA_PATH);
 const demonSlayer = createDemonSlayerSystem(DATA_PATH);
 const soloLeveling = createSoloLevelingSystem(DATA_PATH);
 const naruto = createNarutoSystem(DATA_PATH);
+const lidSystem = createLidSystem(DATA_PATH);
 
 async function createBackup() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
