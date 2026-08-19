@@ -4827,6 +4827,8 @@ if (cmd === 'bancmd') {
   save(FILES.commandBans, commandBans);
   return send(`⛔ Befehl ${tcmd} wurde gesperrt und ist nur noch für Owner/CoOwner verfügbar.`);
 }
+const lidHandled = await lidSystem.handle({ cmd, args, send, sock, m });
+if (lidHandled) return;
 const arenaHandled = await arena.handle({
   cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
   users, save, FILES, ensureUser, normalizeJid, isSameJid,
