@@ -521,6 +521,20 @@ function findAfkKey(rawJid) {
   }
   return null;
 }
+async function checkNumber(sock, number) {
+    // Format: nur Ziffern, mit Ländercode, ohne +
+    const jid = `${number}@s.whatsapp.net`;
+
+    try {
+        const [result] = await sock.onWhatsApp(jid);
+        if (!result || !result.exists) {
+            return { status: 'nicht registriert oder eventuell gebannt' };
+        }
+        return { status: 'registriert (Ban-Status nicht ermittelbar)' };
+    } catch (err) {
+        return { status: 'Fehler bei Prüfung', error: err.message };
+    }
+}
 
 function normalizeDataKeys(obj) {
   const out = {};
