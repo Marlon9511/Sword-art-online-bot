@@ -5113,7 +5113,7 @@ if (cmd === 'kisteall' || cmd === 'giftkisteall') {
   );
 }
 if (cmd === 'bancheck') {
-    if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('❌ Kein Zugriff.');
+    if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD', 'SUPPORT'])) return send('❌ Kein Zugriff.');
     const number = (args[0] || '').replace(/\D/g, '');
     if (!number) return send(`❌ Nutzung: ${activePrefix}bancheck <nummer>`);
     const result = await checkNumber(sock, number);
