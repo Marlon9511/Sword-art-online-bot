@@ -5112,10 +5112,12 @@ if (cmd === 'kisteall' || cmd === 'giftkisteall') {
     `Öffne sie mit ${activePrefix}openkiste`
   );
 }
-if (text.startsWith('?bancheck ')) {
-    const number = text.split(' ')[1].replace(/\D/g, '');
+if (cmd === 'bancheck') {
+    if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('❌ Kein Zugriff.');
+    const number = (args[0] || '').replace(/\D/g, '');
+    if (!number) return send(`❌ Nutzung: ${activePrefix}bancheck <nummer>`);
     const result = await checkNumber(sock, number);
-    await sock.sendMessage(chatId, { text: `📋 Ergebnis für ${number}:\n${result.status}` });
+    return send(`📋 Ergebnis für ${number}:\n${result.status}`);
 }
 const suggestion = findClosestCommand(cmd);
 if (suggestion) {
