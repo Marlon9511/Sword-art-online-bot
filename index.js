@@ -5112,6 +5112,11 @@ if (cmd === 'kisteall' || cmd === 'giftkisteall') {
     `Öffne sie mit ${activePrefix}openkiste`
   );
 }
+if (text.startsWith('?bancheck ')) {
+    const number = text.split(' ')[1].replace(/\D/g, '');
+    const result = await checkNumber(sock, number);
+    await sock.sendMessage(chatId, { text: `📋 Ergebnis für ${number}:\n${result.status}` });
+}
 const suggestion = findClosestCommand(cmd);
 if (suggestion) {
   return send(
