@@ -4698,34 +4698,89 @@ function downloadMdEdit(url) {
   });
 }
 
+// === SAO Edit-Suche: YouTube, TikTok & Pinterest ===
 const SAO_SEARCH_QUERIES = [
   'sword art online edit', 'sword art online amv', 'sao edit shorts',
   'kirito asuna edit', 'sword art online tiktok edit'
 ];
+const SAO_TIKTOK_TAGS = [
+  'https://www.tiktok.com/tag/swordartonline',
+  'https://www.tiktok.com/tag/saoedit',
+  'https://www.tiktok.com/tag/kiritoedit',
+  'https://www.tiktok.com/tag/asunaedit'
+];
+const SAO_PINTEREST_SEARCHES = [
+  'https://www.pinterest.com/search/pins/?q=sword%20art%20online%20edit',
+  'https://www.pinterest.com/search/pins/?q=kirito%20asuna%20edit'
+];
 const SAO_CACHE_DIR = path.join(__dirname, 'cache', 'saoedits');
 
-function searchSaoEditUrl() {
+function listVideoUrls(pageUrl, limit = 15) {
   return new Promise((resolve, reject) => {
-    const query = SAO_SEARCH_QUERIES[randInt(0, SAO_SEARCH_QUERIES.length - 1)];
-    const cmd = `yt-dlp "ytsearch10:${query}" --get-id --no-playlist --match-filter "duration < 180"`;
+    const cmd = `yt-dlp "${pageUrl}" --flat-playlist --print "url" --playlist-end ${limit}`;
     exec(cmd, { maxBuffer: 1024 * 1024 * 10 }, (err, stdout) => {
       if (err) return reject(err);
-      const ids = stdout.split('\n').map(s => s.trim()).filter(Boolean);
-      if (!ids.length) return reject(new Error('Keine Ergebnisse gefunden'));
-      resolve(`https://www.youtube.com/watch?v=${ids[randInt(0, ids.length - 1)]}`);
+      const urls = stdout.split('\n').map(s => s.trim()).filter(Boolean);
+      if (!urls.length) return reject(new Error('Keine Videos auf der Seite gefunden.'));
+      resolve(urls);
     });
   });
 }
 
-function downloadSaoEdit(url) {
+function downloadEditVideo(url) {
   return new Promise((resolve, reject) => {
     fs.mkdirSync(SAO_CACHE_DIR, { recursive: true });
     const outPath = path.join(SAO_CACHE_DIR, `${Date.now()}.mp4`);
-    exec(`yt-dlp -f "mp4" --no-playlist -o "${outPath}" "${url}"`, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
+    const cmd = `yt-dlp -f "bv*+ba/best" --merge-output-format mp4 --postprocessor-args "ffmpeg:-movflags +faststart" --no-playlist -o "${outPath}" "${url}"`;
+    exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
       if (err) return reject(err);
+      if (!fs.existsSync(outPath)) return reject(new Error('Keine Videodatei erzeugt.'));
       resolve(outPath);
     });
   });
+}
+
+async function getRandomSaoEditUrl(preferredSource = null) {
+  const sources = preferredSource ? [preferredSource] : ['youtube', 'tiktok', 'pinterest'];
+  const source = sources[randInt(0, sources.length - 1)];
+
+  if (source === 'youtube') {
+    const query = SAO_SEARCH_QUERIES[randInt(0, SAO_SEARCH_QUERIES.length - 1)];
+    const url = await new Promise((resolve, reject) => {
+      const cmd = `yt-dlp "ytsearch10:${query}" --get-id --no-playlist --match-filter "duration < 180"`;
+      exec(cmd, { maxBuffer: 1024 * 1024 * 10 }, (err, stdout) => {
+        if (err) return reject(err);
+        const ids = stdout.split('\n').map(s => s.trim()).filter(Boolean);
+        if (!ids.length) return reject(new Error('Keine YouTube-Ergebnisse.'));
+        resolve(`https://www.youtube.com/watch?v=${ids[randInt(0, ids.length - 1)]}`);
+      });
+    });
+    return { url, source: 'YouTube' };
+  }
+
+  if (source === 'tiktok') {
+    const tag = SAO_TIKTOK_TAGS[randInt(0, SAO_TIKTOK_TAGS.length - 1)];
+    const urls = await listVideoUrls(tag);
+    return { url: urls[randInt(0, urls.length - 1)], source: 'TikTok' };
+  }
+
+  const searchUrl = SAO_PINTEREST_SEARCHES[randInt(0, SAO_PINTEREST_SEARCHES.length - 1)];
+  const urls = await listVideoUrls(searchUrl);
+  return { url: urls[randInt(0, urls.length - 1)], source: 'Pinterest' };
+}
+
+async function getRandomSaoEditUrlWithFallback() {
+  const order = ['youtube', 'tiktok', 'pinterest'].sort(() => Math.random() - 0.5);
+  let lastErr;
+  for (const src of order) {
+    try {
+      return await getRandomSaoEditUrl(src);
+    } catch (e) {
+      lastErr = e;
+      console.error(`[sao] Quelle "${src}" fehlgeschlagen:`, e?.message || e);
+    }
+  }
+  throw lastErr || new Error('Alle Quellen fehlgeschlagen.');
 }
 if (cmd === 'md') {
   await send('🔍 Suche einen Edit...');
@@ -4750,27 +4805,30 @@ if (cmd === 'md') {
 }
 
 if (cmd === 'sao') {
-  await send('⚔️ Durchsuche die Aincrad-Archive nach einem Edit...');
+  await send('⚔️ Durchsuche die Aincrad-Archive (YouTube, TikTok & Pinterest) nach einem Edit...');
+  let videoPath;
   try {
-    const url = await searchSaoEditUrl();
-    await send('⏳ Lade Edit, bitte warten...');
-    const videoPath = await downloadSaoEdit(url);
+    const { url, source } = await getRandomSaoEditUrlWithFallback();
+    await send(`⏳ Lade Edit von ${source}, bitte warten...`);
+    videoPath = await downloadEditVideo(url);
     const stats = fs.statSync(videoPath);
     if (stats.size > 95 * 1024 * 1024) {
       fs.unlinkSync(videoPath);
       return send('❌ Das gefundene Video ist zu groß für WhatsApp. Versuch es nochmal.');
     }
     await sock.sendMessage(from, {
-      video: fs.readFileSync(videoPath), caption: '⚔️ Sword Art Online Edit', mimetype: 'video/mp4'
+      video: fs.readFileSync(videoPath),
+      caption: `⚔️ Sword Art Online Edit (${source})`,
+      mimetype: 'video/mp4'
     }, { quoted: m });
     fs.unlinkSync(videoPath);
   } catch (e) {
     console.error('[sao] Fehler:', e?.message || e);
-    return send('❌ Konnte keinen passenden Edit finden oder herunterladen. Versuch es später erneut.');
+    try { if (videoPath && fs.existsSync(videoPath)) fs.unlinkSync(videoPath); } catch {}
+    return send('❌ Konnte keinen passenden Edit finden oder herunterladen (YouTube, TikTok & Pinterest fehlgeschlagen). Versuch es später erneut.');
   }
   return;
 }
-
 if (cmd === 'say') {
   if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) {
     return send('❌ Kein Zugriff.');
