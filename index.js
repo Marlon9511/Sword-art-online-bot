@@ -2645,48 +2645,65 @@ if (cmd === 'bewerbung' || cmd === 'bewerben' || cmd === 'apply') {
 
         return send(`✅ Session "${target}" wurde gestoppt und vollständig gelöscht (inkl. Login-Daten). Beim nächsten "${PREFIX}newsession ${target}" muss neu per QR-Code gescannt werden.`);
       }
+// Hilfsfunktionen: LID -> echte Nummer für die Anzeige auflösen
+async function resolveDisplayJid(jid) {
+  try {
+    if (jid.endsWith('@lid')) {
+      const pn = await sock.signalRepository.lidMapping.getPNForLID(jid);
+      if (pn) return pn; // z.B. 4915123456789@s.whatsapp.net
+    }
+  } catch (e) {}
+  return jid; // Fallback: Original-JID/LID
+}
+
+async function displayNum(jid) {
+  const real = await resolveDisplayJid(jid);
+  return real.split('@')[0];
+}
+
 if (cmd === 'marry') {
   const sub = (args[0] || '').toLowerCase();
 
   if (sub === 'accept') {
-  const proposal = pendingMarriageProposals.get(sender);
-  if (!proposal) return send('❌ Du hast keinen offenen Heiratsantrag.');
-  if (marriages[sender] || marriages[proposal.from]) {
+    const proposal = pendingMarriageProposals.get(sender);
+    if (!proposal) return send('❌ Du hast keinen offenen Heiratsantrag.');
+    if (marriages[sender] || marriages[proposal.from]) {
+      pendingMarriageProposals.delete(sender);
+      return send('❌ Einer von euch ist inzwischen bereits verheiratet.');
+    }
+    marriages[sender] = { partner: proposal.from, since: Date.now() };
+    marriages[proposal.from] = { partner: sender, since: Date.now() };
+    save(FILES.marriages, marriages);
     pendingMarriageProposals.delete(sender);
-    return send('❌ Einer von euch ist inzwischen bereits verheiratet.');
+
+    ensureUser(sender);
+    ensureUser(proposal.from);
+    users[sender].__isMarried = true;
+    users[proposal.from].__isMarried = true;
+    save(FILES.users, users);
+
+    await checkProgress({
+      users, save, FILES, send, activePrefix,
+      guilds, ownerJids: [OWNER_LID, OWNER_LID2, OWNER_PRIV, OWNER_PRIV2]
+    }, sender);
+    await checkProgress({
+      users, save, FILES, send: async (text, opts) => {
+        try { await sock.sendMessage(proposal.from, { text, ...opts }); } catch (e) {}
+      }, activePrefix,
+      guilds, ownerJids: [OWNER_LID, OWNER_LID2, OWNER_PRIV, OWNER_PRIV2]
+    }, proposal.from);
+
+    return send(
+      `💍 Herzlichen Glückwunsch! @${await displayNum(proposal.from)} und @${await displayNum(sender)} sind jetzt verheiratet! 🎉`,
+      { mentions: [sender, proposal.from] }
+    );
   }
-  marriages[sender] = { partner: proposal.from, since: Date.now() };
-  marriages[proposal.from] = { partner: sender, since: Date.now() };
-  save(FILES.marriages, marriages);
-  pendingMarriageProposals.delete(sender);
 
-  ensureUser(sender);
-  ensureUser(proposal.from);
-  users[sender].__isMarried = true;
-  users[proposal.from].__isMarried = true;
-  save(FILES.users, users);
-
-  await checkProgress({
-    users, save, FILES, send, activePrefix,
-    guilds, ownerJids: [OWNER_LID, OWNER_LID2, OWNER_PRIV, OWNER_PRIV2]
-  }, sender);
-  await checkProgress({
-    users, save, FILES, send: async (text, opts) => {
-      try { await sock.sendMessage(proposal.from, { text, ...opts }); } catch (e) {}
-    }, activePrefix,
-    guilds, ownerJids: [OWNER_LID, OWNER_LID2, OWNER_PRIV, OWNER_PRIV2]
-  }, proposal.from);
-
-  return send(
-    `💍 Herzlichen Glückwunsch! @${proposal.from.split('@')[0]} und @${sender.split('@')[0]} sind jetzt verheiratet! 🎉`,
-    { mentions: [sender, proposal.from] }
-  );
-}
   if (sub === 'deny' || sub === 'decline') {
     const proposal = pendingMarriageProposals.get(sender);
     if (!proposal) return send('❌ Du hast keinen offenen Heiratsantrag.');
-     pendingMarriageProposals.delete(sender);
-    return send(`💔 @${sender.split('@')[0]} hat den Heiratsantrag abgelehnt.`, { mentions: [sender] });
+    pendingMarriageProposals.delete(sender);
+    return send(`💔 @${await displayNum(sender)} hat den Heiratsantrag abgelehnt.`, { mentions: [sender] });
   }
 
   if (sub === 'cancel') {
@@ -2710,8 +2727,8 @@ if (cmd === 'marry') {
   ensureUser(targetJid);
 
   if (isSameJid(sender, targetJid)) return send('❌ Du kannst dich nicht selbst heiraten! 😅');
-  if (marriages[sender]) return send(`❌ Du bist bereits mit @${marriages[sender].partner.split('@')[0]} verheiratet. Nutze zuerst ${activePrefix}divorce.`, { mentions: [marriages[sender].partner] });
-  if (marriages[targetJid]) return send(`❌ @${targetJid.split('@')[0]} ist bereits verheiratet.`, { mentions: [targetJid] });
+  if (marriages[sender]) return send(`❌ Du bist bereits mit @${await displayNum(marriages[sender].partner)} verheiratet. Nutze zuerst ${activePrefix}divorce.`, { mentions: [marriages[sender].partner] });
+  if (marriages[targetJid]) return send(`❌ @${await displayNum(targetJid)} ist bereits verheiratet.`, { mentions: [targetJid] });
 
   const existing = pendingMarriageProposals.get(targetJid);
   if (existing && existing.from === sender) return send('❌ Du hast bereits einen offenen Antrag an diese Person.');
@@ -2719,7 +2736,7 @@ if (cmd === 'marry') {
   pendingMarriageProposals.set(targetJid, { from: sender, at: Date.now() });
 
   return send(
-    `💍 @${sender.split('@')[0]} möchte @${targetJid.split('@')[0]} heiraten!\n\n@${targetJid.split('@')[0]}, antworte mit:\n${activePrefix}marry accept — annehmen\n${activePrefix}marry deny — ablehnen`,
+    `💍 @${await displayNum(sender)} möchte @${await displayNum(targetJid)} heiraten!\n\n@${await displayNum(targetJid)}, antworte mit:\n${activePrefix}marry accept — annehmen\n${activePrefix}marry deny — ablehnen`,
     { mentions: [sender, targetJid] }
   );
 }
@@ -2736,12 +2753,12 @@ if (cmd === 'divorce') {
 
   try {
     await sock.sendMessage(partnerJid, {
-      text: `💔 @${sender.split('@')[0]} hat sich von dir scheiden lassen.`,
+      text: `💔 @${await displayNum(sender)} hat sich von dir scheiden lassen.`,
       mentions: [sender]
     });
   } catch (e) {}
 
-  return send(`💔 Du hast dich von @${partnerJid.split('@')[0]} scheiden lassen.`, { mentions: [partnerJid] });
+  return send(`💔 Du hast dich von @${await displayNum(partnerJid)} scheiden lassen.`, { mentions: [partnerJid] });
 }
       if (cmd === 'hidetag') {
         if (!isGroup) return send('❌ Nur in Gruppen.');
