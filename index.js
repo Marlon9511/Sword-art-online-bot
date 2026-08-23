@@ -4947,7 +4947,19 @@ const narutoHandled = await naruto.handle({
   getNumberMention, randInt, sleep, isPrimaryOwner
 });
 if (narutoHandled) return;
+const jujutsuHandled = await jujutsu.handle({
+  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
+  users, save, FILES, ensureUser, normalizeJid, isSameJid,
+  getNumberMention, randInt, sleep, isPrimaryOwner
+});
+if (jujutsuHandled) return;
 
+const hunterHandled = await hunterxhunter.handle({
+  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
+  users, save, FILES, ensureUser, normalizeJid, isSameJid,
+  getNumberMention, randInt, sleep, isPrimaryOwner
+});
+if (hunterHandled) return;
       if (cmd === 'ownermode' || cmd === 'om') {
         if (!isOwner) return send('❌ Nur der Inhaber/Co-Inhaber darf diesen Befehl nutzen.');
         const action = (args[0] || '').toLowerCase();
