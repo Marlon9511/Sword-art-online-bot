@@ -1884,7 +1884,9 @@ if (cmd === 'help' || cmd === 'menu') {
   GUILDWAR_HELP_TEXT,
   DS_HELP_TEXT: demonSlayer.DS_HELP_TEXT,
   SL_HELP_TEXT: soloLeveling.SL_HELP_TEXT,
-  NARUTO_HELP_TEXT: naruto.NARUTO_HELP_TEXT
+  NARUTO_HELP_TEXT: naruto.NARUTO_HELP_TEXT,
+  JJK_HELP_TEXT: jujutsu.JJK_HELP_TEXT,
+  HXH_HELP_TEXT: hunterxhunter.HXH_HELP_TEXT
 });
   try {
     const videoPath = await downloadShortIfNeeded();
