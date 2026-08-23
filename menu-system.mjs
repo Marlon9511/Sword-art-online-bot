@@ -30,6 +30,8 @@ function buildMainLayer(ctx) {
   t += `▸ ${PREFIX}menu demonslayer — Dämonentöter-System\n`;
   t += `▸ ${PREFIX}menu hunter — Solo-Leveling Hunter-System\n`;
   t += `▸ ${PREFIX}menu naruto — Naruto-Charaktersystem\n`;
+  t += `▸ ${PREFIX}menu jjk — Jujutsu-Kaisen-System\n`;
+  t += `▸ ${PREFIX}menu hxh — Hunter x Hunter Nen-System\n`;
   t += `▸ ${PREFIX}menu social — Interaktions-Skills (hug, kiss, pat, ...)\n`;
   t += `▸ ${PREFIX}menu fun — Fun & Action Skills (kill, yeet, nuke, ...)\n`;
   t += `▸ ${PREFIX}menu chat — Gilden-Chat & Gruppeneinstellungen\n`;
@@ -119,6 +121,30 @@ function buildNarutoLayer(ctx) {
     .map(l => l.replace(/\{P\}/g, PREFIX))
     .join('\n');
   t += `\n\n🍥 _"Das ist mein Weg des Ninja!" — Wähle deinen Charakter und werde zur Legende._`;
+  return t;
+}
+
+function buildJujutsuLayer(ctx) {
+  const { PREFIX, JJK_HELP_TEXT } = ctx;
+  let t = `🌀 *JUJUTSU-KAISEN-SYSTEM*\n${DIVIDER}\n`;
+  t += (JJK_HELP_TEXT || '(keine Daten verfügbar)')
+    .split('\n')
+    .filter(Boolean)
+    .map(l => l.replace(/\{P\}/g, PREFIX))
+    .join('\n');
+  t += `\n\n🌀 _"Ich, Ryomen Sukuna, verkünde hiermit..." — Meistere deine Fluchtechnik._`;
+  return t;
+}
+
+function buildHunterXHunterLayer(ctx) {
+  const { PREFIX, HXH_HELP_TEXT } = ctx;
+  let t = `🎯 *HUNTER X HUNTER: NEN-SYSTEM*\n${DIVIDER}\n`;
+  t += (HXH_HELP_TEXT || '(keine Daten verfügbar)')
+    .split('\n')
+    .filter(Boolean)
+    .map(l => l.replace(/\{P\}/g, PREFIX))
+    .join('\n');
+  t += `\n\n🎯 _"Ich sage nur einmal Danke." — Werde ein Hunter und entfessle dein Nen._`;
   return t;
 }
 
@@ -261,6 +287,8 @@ const LAYERS = {
   demonslayer: { build: buildDemonSlayerLayer, aliases: ['dämonentöter', 'daemonslayer', 'ds', 'atmung'] },
   hunter:      { build: buildSoloLevelingLayer, aliases: ['solo', 'sololeveling', 'jaeger', 'hunter-system'] },
   naruto:      { build: buildNarutoLayer,      aliases: ['nrt', 'shinobi', 'konoha'] },
+  jjk:         { build: buildJujutsuLayer,     aliases: ['jujutsu', 'jujutsukaisen', 'sukuna'] },
+  hxh:         { build: buildHunterXHunterLayer, aliases: ['hunterxhunter', 'nen', 'huntersystem2'] },
   social:      { build: buildSocialLayer,      aliases: ['interaktion', 'interaction'] },
   fun:         { build: buildFunLayer,         aliases: ['action', 'giphy'] },
   chat:        { build: buildChatLayer,        aliases: ['gruppe', 'group', 'gilden-chat'] },
@@ -292,6 +320,8 @@ function buildNavRows(ctx) {
     demonslayer: { title: '👹 Dämonentöter',   desc: 'Atemstile & Dämonen-Boss' },
     hunter:      { title: '⚡ Hunter',          desc: 'Solo-Leveling System' },
     naruto:      { title: '🍥 Naruto',         desc: 'Charaktere, Jutsu & Duelle' },
+    jjk:         { title: '🌀 Jujutsu Kaisen', desc: 'Fluchtechniken & Domain Expansion' },
+    hxh:         { title: '🎯 Hunter x Hunter', desc: 'Nen-Fähigkeiten & Duelle' },
     social:      { title: '💞 Social',         desc: 'Interaktions-Skills' },
     fun:         { title: '💀 Fun & Action',   desc: 'Giphy-Reactions' },
     chat:        { title: '💬 Gilden-Chat',    desc: 'Chat- & Gruppeneinstellungen' },
@@ -300,7 +330,7 @@ function buildNavRows(ctx) {
     owner:       { title: '👑 System-Admin',    desc: 'Kayaba-Rechte' }
   };
 
-  const order = ['main', 'arena', 'gilde', 'titel', 'pokemon', 'demonslayer', 'hunter', 'naruto', 'social', 'fun', 'chat', 'support', 'admin', 'owner'];
+  const order = ['main', 'arena', 'gilde', 'titel', 'pokemon', 'demonslayer', 'hunter', 'naruto', 'jjk', 'hxh', 'social', 'fun', 'chat', 'support', 'admin', 'owner'];
   const rows = [];
 
   for (const key of order) {
