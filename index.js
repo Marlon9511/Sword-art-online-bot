@@ -28,6 +28,8 @@ import { createDemonSlayerSystem } from './demonslayer-system.mjs';
 import { createSoloLevelingSystem } from './sololeveling-system.mjs';
 import { createNarutoSystem } from './naruto-system.mjs';
 import { createLidSystem } from './lid-system.mjs';
+import { createJujutsuSystem } from './jujutsu-system.mjs';
+import { createHunterSystem } from './hunterxhunter-system.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('⚠️ Unhandled Rejection:', reason?.message || reason);
@@ -259,6 +261,8 @@ const demonSlayer = createDemonSlayerSystem(DATA_PATH);
 const soloLeveling = createSoloLevelingSystem(DATA_PATH);
 const naruto = createNarutoSystem(DATA_PATH);
 const lidSystem = createLidSystem(DATA_PATH);
+const jujutsu = createJujutsuSystem(DATA_PATH);
+const hunterxhunter = createHunterSystem(DATA_PATH);
 
 async function createBackup() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
