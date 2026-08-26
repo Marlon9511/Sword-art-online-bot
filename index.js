@@ -4067,22 +4067,41 @@ function downloadYoutubeMp4(url) {
   return new Promise((resolve, reject) => {
     fs.mkdirSync(YTMP4_CACHE_DIR, { recursive: true });
 
-    const outTemplate = path.join(YTMP4_CACHE_DIR, `${Date.now()}-%(title).60s.%(ext)s`);
+    const rawTemplate = path.join(YTMP4_CACHE_DIR, `${Date.now()}-raw.%(ext)s`);
 
-    const cmd = `yt-dlp -f "bv*[height<=720]+ba/best[height<=720]" --merge-output-format mp4 ` +
-                `--postprocessor-args "ffmpeg:-movflags +faststart" --no-playlist ` +
-                `-o "${outTemplate}" "${url}"`;
+    
+    const dlCmd =
+      `yt-dlp -f "bv*[vcodec^=avc1][height<=720]+ba[acodec^=mp4a]/b[vcodec^=avc1][height<=720]/bv*[height<=720]+ba/best[height<=720]" ` +
+      `--merge-output-format mp4 --no-playlist -o "${rawTemplate}" "${url}"`;
 
-    exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
+    exec(dlCmd, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
       if (err) return reject(err);
 
-      const files = fs.readdirSync(YTMP4_CACHE_DIR)
-        .filter(f => f.endsWith('.mp4'))
+      const rawFiles = fs.readdirSync(YTMP4_CACHE_DIR)
+        .filter(f => f.includes('-raw.'))
         .map(f => ({ f, t: fs.statSync(path.join(YTMP4_CACHE_DIR, f)).mtimeMs }))
         .sort((a, b) => b.t - a.t);
 
-      if (!files.length) return reject(new Error('Keine MP4-Datei erzeugt.'));
-      resolve(path.join(YTMP4_CACHE_DIR, files[0].f));
+      if (!rawFiles.length) return reject(new Error('Keine Videodatei erzeugt.'));
+      const rawPath = path.join(YTMP4_CACHE_DIR, rawFiles[0].f);
+
+      const finalPath = path.join(YTMP4_CACHE_DIR, `${Date.now()}-final.mp4`);
+      const encodeCmd =
+        `ffmpeg -y -i "${rawPath}" -c:v libx264 -profile:v baseline -level 3.0 ` +
+        `-pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart "${finalPath}"`;
+
+      exec(encodeCmd, { maxBuffer: 1024 * 1024 * 50 }, (encErr) => {
+        try { fs.unlinkSync(rawPath); } catch (e) {}
+
+        if (encErr) {
+          console.error('[ytmp4] ffmpeg-Encode-Fehler:', encErr.message);
+          return reject(encErr);
+        }
+        if (!fs.existsSync(finalPath)) {
+          return reject(new Error('Encodierte Datei wurde nicht erzeugt.'));
+        }
+        resolve(finalPath);
+      });
     });
   });
 }
