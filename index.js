@@ -731,6 +731,41 @@ async function resolvePhoneJid(jid, sock) {
   return null;
 }
 
+// ── LID-Kanonisierung ──
+// Löst JEDE JID-Form (Telefonnummer ODER LID) zur ECHTEN LID auf,
+// via Baileys' interner signalRepository.lidMapping (kein String-Trick).
+// Ab jetzt ist die LID die einzige "Identität", mit der intern gearbeitet wird.
+const lidResolveCache = new Map();
+
+async function resolveLidJid(jid, sock) {
+  const n = normalizeJid(jid);
+  if (!n) return n;
+  if (n.endsWith('@lid')) return n; // schon LID
+  if (!n.endsWith('@s.whatsapp.net')) return n; // Gruppen-JIDs etc. unangetastet lassen
+
+  if (lidResolveCache.has(n)) return lidResolveCache.get(n);
+
+  try {
+    const lid = await sock?.signalRepository?.lidMapping?.getLIDForPN(n);
+    if (lid) {
+      const resolved = normalizeJid(lid);
+      lidResolveCache.set(n, resolved);
+      return resolved;
+    }
+  } catch (e) {
+    console.error('[resolveLidJid] Mapping-Fehler für', n, ':', e?.message || e);
+  }
+
+  // Kein Mapping verfügbar (z.B. Bot noch nicht verbunden, oder Nutzer hat
+  // noch nie mit LID interagiert) -> Original-Nummer als Fallback behalten.
+  return n;
+}
+
+function invalidateLidCache(jid) {
+  const n = normalizeJid(jid);
+  if (n) lidResolveCache.delete(n);
+}
+
 async function getNumberMention(jid, sock) {
   const resolved = await resolvePhoneJid(jid, sock);
   if (resolved) return `@${resolved.split('@')[0]}`;
@@ -1153,6 +1188,34 @@ async function updateBotProfile() {
 
     if (connection === 'open') {
       console.log(`✅ Session "${sessionName}" verbunden mit WhatsApp!`);
+
+      // ── LID-Kanonisierung der Owner-Konstanten ──
+      // OWNER_PRIV/OWNER_PRIV2 sind Telefonnummern-JIDs. Damit isPrimaryOwner()
+      // und isAuthorized() auch bei LID-basiertem "sender" greifen, wird hier
+      // einmalig die echte LID dieser Nummern aufgelöst und ergänzt.
+      if (sessionName === 'default') {
+        try {
+          const ownerLidResolved = await resolveLidJid(OWNER_PRIV, sock);
+          if (ownerLidResolved && ownerLidResolved.endsWith('@lid')) {
+            PRIMARY_OWNER_IDS.add(ownerLidResolved);
+            if (!ROLES.OWNER.some(id => isSameJid(id, ownerLidResolved))) ROLES.OWNER.push(ownerLidResolved);
+            ranks[ownerLidResolved] = 'OWNER';
+            console.log(`👑 Haupt-Owner-LID aufgelöst: ${ownerLidResolved}`);
+          }
+          if (OWNER_PRIV2) {
+            const owner2LidResolved = await resolveLidJid(OWNER_PRIV2, sock);
+            if (owner2LidResolved && owner2LidResolved.endsWith('@lid')) {
+              PRIMARY_OWNER_IDS.add(owner2LidResolved);
+              if (!ROLES.OWNER.some(id => isSameJid(id, owner2LidResolved))) ROLES.OWNER.push(owner2LidResolved);
+              ranks[owner2LidResolved] = 'OWNER';
+            }
+          }
+          save(FILES.ranks, ranks);
+        } catch (e) {
+          console.error('[LID-Owner-Resolve] Fehler:', e?.message || e);
+        }
+      }
+
       if (hooks.onOpen) {
         try { await hooks.onOpen(sock.user?.id, sessionName); } catch (e) {}
       }
@@ -1279,8 +1342,13 @@ const m = messages[0];
       const rawFrom = m.key.remoteJid;
       const rawParticipant = m.key.participant || m.key.remoteJid;
       const from = normalizeJid(rawFrom);
-      const sender = normalizeJid(rawParticipant);
       const isGroup = typeof from === 'string' && from.endsWith('@g.us');
+
+      // ── LID-Kanonisierung: sender ist ab hier IMMER die echte LID ──
+      // Alles Weitere (ensureUser, isAuthorized, ranks, users.json, ...)
+      // arbeitet nur noch mit dieser einen, konsistenten Identität.
+      const senderRaw = normalizeJid(rawParticipant);
+      const sender = await resolveLidJid(senderRaw, sock);
 
       if (OWNER_MODE && !isAuthorized(sender, ['OWNER', 'COOWNER']) && !m.key.fromMe) {
         return;
@@ -1374,7 +1442,7 @@ const ALL_COMMANDS = [
   'ban', 'unban', 'banlist', 'kick', 'warn', 'clearwarns', 'promote', 'demote',
   'setrole', 'setrank', 'listroles', 'applyroles', 'addxp', 'addcash', 'addvip', 'resetcoins',
   'bancmd', 'unbancmd', 'broadcast', 'restart', 'updateprofile',
-  'newsession', 'sessions', 'stopsession', 'deletesession', 'delsession',
+  'newsession', 'sessions', 'stopsession', 'deletesession', 'delsession', 'migratelid',
   'grouplist', 'gl', 'join', 'leave', 'getlid', 'groupid', 'gruppenid',
   'credits', 'addcredit', 'delcredit', 'partner', 'partners', 'buendnisse', 'addpartner', 'delpartner',
   'marry', 'divorce', 'bewerbung', 'bewerben', 'apply',
@@ -2227,7 +2295,7 @@ normalizedJids.forEach(jid => {
 
         if (!target) return send(`❌ Nutzung: ${PREFIX}resetcoins <@user|nummer>`);
 
-        const targetJid = normalizeJid(target);
+        const targetJid = await resolveLidJid(target, sock);
         ensureUser(targetJid);
         const oldCoins = users[targetJid].coins || 0;
         users[targetJid].coins = 0;
@@ -2361,6 +2429,64 @@ if (cmd === 'listroles') {
           await sock.sendMessage(normalizeJid(OWNER_PRIV), { text: `🔄 Bot-Neustart durch ${sender}` });
         } catch {}
         process.exit(0);
+      }
+
+      if (cmd === 'migratelid') {
+        if (!isOwner) return send('❌ Nur der Inhaber darf die LID-Migration ausführen.');
+
+        await send('🔄 Starte LID-Migration aller Datendateien. Dies kann einen Moment dauern...');
+
+        // Rekursiver Helfer: benennt alle Telefonnummer-JID-Keys eines Objekts
+        // auf ihre echte LID um (via Baileys-Mapping). Nicht auflösbare Nutzer
+        // (nie mit LID interagiert) behalten ihre alte Nummer als Key.
+        async function migrateKeys(obj, label) {
+          if (!obj || typeof obj !== 'object') return { migrated: 0, skipped: 0, total: 0 };
+          const entries = Object.entries(obj);
+          let migrated = 0, skipped = 0;
+          for (const [key, value] of entries) {
+            const nKey = normalizeJid(key);
+            if (!nKey || !nKey.endsWith('@s.whatsapp.net')) { skipped++; continue; }
+            const lid = await resolveLidJid(nKey, sock);
+            if (lid && lid.endsWith('@lid') && lid !== nKey) {
+              if (obj[lid] === undefined) {
+                obj[lid] = value;
+                delete obj[key];
+                migrated++;
+              } else {
+                skipped++; // Ziel-Key existiert bereits -> Konflikt, nicht automatisch mergen
+              }
+            } else {
+              skipped++;
+            }
+          }
+          return { migrated, skipped, total: entries.length };
+        }
+
+        const results = {};
+        results.users = await migrateKeys(users, 'users');
+        results.ranks = await migrateKeys(ranks, 'ranks');
+        results.bans = await migrateKeys(bans, 'bans');
+        results.pets = await migrateKeys(pets, 'pets');
+        results.marriages = await migrateKeys(marriages, 'marriages');
+        results.deletedUsers = await migrateKeys(deletedUsers, 'deletedUsers');
+
+        try {
+          save(FILES.users, users);
+          save(FILES.ranks, ranks);
+          save(FILES.bans, bans);
+          save(FILES.pets, pets);
+          save(FILES.marriages, marriages);
+          save(FILES.deleted, deletedUsers);
+        } catch (e) {
+          return send('❌ Migration teilweise durchgeführt, aber Speichern fehlgeschlagen: ' + e.message);
+        }
+
+        let report = '✅ *LID-Migration abgeschlossen*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n';
+        for (const [label, r] of Object.entries(results)) {
+          report += `${label}: ${r.migrated} migriert, ${r.skipped} übersprungen (von ${r.total})\n`;
+        }
+        report += '\nÜbersprungene Einträge waren entweder bereits LID, kein Mapping verfügbar (Nutzer noch nie über LID interagiert), oder ein Konflikt mit einem bereits existierenden LID-Key.';
+        return send(report);
       }
 
 if (cmd === 'whoami' || cmd === 'me') {
@@ -2728,7 +2854,7 @@ if (cmd === 'marry') {
   if (!target && ctx?.participant) target = ctx.participant;
   if (!target) return send(`❌ Nutzung: ${activePrefix}marry @user\n${activePrefix}marry accept / deny / cancel`);
 
-  const targetJid = normalizeJid(target);
+  const targetJid = await resolveLidJid(target, sock);
   ensureUser(sender);
   ensureUser(targetJid);
 
@@ -2775,9 +2901,10 @@ if (cmd === 'divorce') {
         if (!message) return send('❌ Beispiel: $hidetag Wichtige Ankündigung!');
         try {
           const groupMembers = await getGroupMetaSafe(from);
-          const mentions = (groupMembers?.participants || [])
-            .map(p => toLidJid(p.id))
-            .filter(jid => jid && jid.endsWith('@lid'));
+          const rawIds = (groupMembers?.participants || []).map(p => p.id).filter(Boolean);
+          // Echte LID je Teilnehmer auflösen (via Baileys-Mapping), statt sie zu erraten.
+          const resolved = await Promise.all(rawIds.map(id => resolveLidJid(id, sock)));
+          const mentions = resolved.filter(jid => jid && jid.endsWith('@lid'));
           if (!mentions.length) return send('❌ Keine Gruppenmitglieder gefunden.');
           return send(message, { mentions, quoted: m });
         } catch (err) {
@@ -2835,7 +2962,7 @@ if (cmd === 'divorce') {
         const target = args[0];
         const amount = parseInt(args[1]);
         if (!target || isNaN(amount) || amount < 0) return send('❌ Nutzung: $addxp <@nutzer> <menge>');
-        const targetJid = normalizeJid(target);
+        const targetJid = await resolveLidJid(target, sock);
         ensureUser(targetJid);
         users[targetJid].xp = (users[targetJid].xp || 0) + amount;
         save(FILES.users, users);
@@ -2846,7 +2973,7 @@ if (cmd === 'divorce') {
         const target = args[0];
         const amount = parseInt(args[1]);
         if (!target || isNaN(amount) || amount < 0) return send('❌ Nutzung: $addcash <@nutzer> <menge>');
-        const targetJid = normalizeJid(target);
+        const targetJid = await resolveLidJid(target, sock);
         ensureUser(targetJid);
         users[targetJid].coins = (users[targetJid].coins || 0) + amount;
         save(FILES.users, users);
@@ -2857,7 +2984,7 @@ if (cmd === 'divorce') {
         const target = args[0];
         const duration = args[1];
         if (!target || !duration) return send('❌ Nutzung: $addvip <@nutzer> <1d|12h|30m>');
-        const targetJid = normalizeJid(target);
+        const targetJid = await resolveLidJid(target, sock);
         if (!addVip(targetJid, duration)) return send('❌ Ungültiges Zeitformat.');
         ensureUser(targetJid);
         const expiry = new Date(vipExpiry.get(targetJid)).toLocaleString();
@@ -2928,7 +3055,7 @@ if (cmd === 'divorce') {
         const target = args[0];
         const amount = parseInt(args[1]);
         if (!target || isNaN(amount) || amount <= 0) return send('❌ Nutzung: $give <nummer|@mention> <betrag>');
-        const targetJid = normalizeJid(target);
+        const targetJid = await resolveLidJid(target, sock);
         if ((users[sender]?.coins || 0) < amount) return send('❌ Nicht genug Coins!');
         ensureUser(sender);
         ensureUser(targetJid);
@@ -3363,7 +3490,7 @@ if (cmd === 'ban') {
         if ((!t || t === 'kick' || t === 'remove') && ctx?.participant) t = ctx.participant;
 
         if (!t) return send('Usage: $ban <@user|num|jid> [kick]');
-        const jid = normalizeJid(t);
+        const jid = await resolveLidJid(t, sock);
         if (isPrimaryOwner(jid)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gebannt werden.');
         const reason = args.slice(1).filter(a => a !== 'kick' && a !== 'remove' && !a.startsWith('@')).join(' ') || 'Kein Grund';
         bans[jid] = { by: sender, at: new Date().toISOString(), reason };
@@ -3393,7 +3520,7 @@ if (cmd === 'ban') {
         if (!t && ctx?.participant) t = ctx.participant;
 
         if (!t) return send('Usage: $unban <@user|num|jid>');
-        const jid = normalizeJid(t);
+        const jid = await resolveLidJid(t, sock);
         delete bans[jid];
         save(FILES.bans, bans);
         return send(`✅ @${jid.split('@')[0]} entbannt.`, { mentions: [jid] });
@@ -3404,7 +3531,8 @@ if (cmd === 'ban') {
         let target = args[0];
         if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
         if (!target) return send('Usage: $kick <num|jid|@user>');
-        if (isPrimaryOwner(target)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gekickt werden.');
+        const kickTargetLid = await resolveLidJid(target, sock);
+        if (isPrimaryOwner(target) || isPrimaryOwner(kickTargetLid)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gekickt werden.');
 
        let permitted = isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD']);
         let groupMetadata;
@@ -3416,7 +3544,7 @@ if (cmd === 'ban') {
         if (!permitted) return send('❌ Du musst Admin/Mod/Gruppenadmin sein, um kicken zu können.');
 
         groupMetadata = groupMetadata || await getGroupMetaSafe(from);
-        const normalizedTarget = normalizeJid(target);
+        const normalizedTarget = kickTargetLid;
         const rawId = target.replace(/^@/, '').split('@')[0];
 
         const targetParticipant = groupMetadata?.participants?.find(p =>
@@ -3450,7 +3578,7 @@ if (cmd === 'ban') {
 
         const t = args[0]; const reason = args.slice(1).join(' ') || 'Kein Grund';
         if (!t) return send('Usage: $warn <num|jid> <grund>');
-        const jid = normalizeJid(t);
+        const jid = await resolveLidJid(t, sock);
         ensureUser(jid);
         users[jid].warns = users[jid].warns || [];
         users[jid].warns.push({ by: sender, reason, at: new Date().toISOString() });
@@ -3460,7 +3588,7 @@ if (cmd === 'ban') {
       if (cmd === 'clearwarns') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('Kein Zugriff.');
         const t = args[0]; if (!t) return send('Usage: $clearwarns <num|jid>');
-        const jid = normalizeJid(t);
+        const jid = await resolveLidJid(t, sock);
         if (users[jid]) users[jid].warns = [];
         save(FILES.users, users);
         return send(`✅ Warns entfernt für ${jid}`);
@@ -3475,7 +3603,7 @@ if (cmd === 'warns') {
 
         const t = args[0];
         if (!t) return send('Usage: $warns <num|jid>');
-        const jid = normalizeJid(t);
+        const jid = await resolveLidJid(t, sock);
         const warnList = users[jid]?.warns || [];
 
         if (!warnList.length) return send(`✅ @${jid.split('@')[0]} hat keine Verwarnungen.`, { mentions: [jid] });
@@ -3507,7 +3635,7 @@ if (cmd === 'promote') {
   if (!target && ctx?.participant) target = ctx.participant;
   if (!target) return send('Usage: $promote <num|jid|@user>');
 
-  const jid = normalizeJid(target);
+  const jid = await resolveLidJid(target, sock);
   const rawId = jid.split('@')[0];
   const targetParticipant = groupMetadata?.participants?.find(p =>
     isSameJid(p.id, jid) || (p.id || '').split('@')[0] === rawId
@@ -3540,7 +3668,7 @@ if (cmd === 'demote') {
   if (!target && ctx?.participant) target = ctx.participant;
   if (!target) return send('Usage: $demote <num|jid|@user>');
 
-  const jid = normalizeJid(target);
+  const jid = await resolveLidJid(target, sock);
   const rawId = jid.split('@')[0];
   const targetParticipant = groupMetadata?.participants?.find(p =>
     isSameJid(p.id, jid) || (p.id || '').split('@')[0] === rawId
@@ -3614,7 +3742,7 @@ if (cmd === 'demote') {
 if (cmd === 'datadelete') {
         if (!isOwner) return send('❌ Nur der Inhaber.');
         const t = args[0]; if (!t) return send('Usage: $datadelete <num|jid>');
-        const jid = normalizeJid(t);
+        const jid = await resolveLidJid(t, sock);
         if (isPrimaryOwner(jid)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gelöscht/gebannt werden.');
         delete users[jid]; delete pets[jid]; delete ranks[jid];
         for (const rid of Object.keys(joinreqs)) {
@@ -3934,7 +4062,7 @@ const titleMap = { xp: '⚔️ XP-Rangliste', level: '⚔️ Level-Rangliste', c
           if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
         } catch (e) {}
         if (!target) return send('Usage: $yeetban <num|jid>');
-        const jid = normalizeJid(target);
+        const jid = await resolveLidJid(target, sock);
         if (isPrimaryOwner(jid)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gebannt/entfernt werden.');
         const reason = args.slice(1).join(' ') || 'Kein Grund';
         bans[jid] = { by: sender, at: new Date().toISOString(), reason };
@@ -4280,7 +4408,7 @@ if (REACTION_COMMANDS[cmd]) {
     return send(`❓ Wen soll ich ${cmd}en? Erwähne jemanden mit @user oder antworte auf seine Nachricht mit ${activePrefix}${cmd}`);
   }
 
-  const targetJid = normalizeJid(target);
+  const targetJid = await resolveLidJid(target, sock);
   ensureUser(sender);
   ensureUser(targetJid);
 
@@ -4560,7 +4688,7 @@ if (cmd === 'showuser') {
   if (!target && ctx?.participant) target = ctx.participant;
   if (!target) target = sender;
 
-  const targetJid = normalizeJid(target);
+  const targetJid = await resolveLidJid(target, sock);
   ensureUser(targetJid);
   arena.ensureArenaFields(users, targetJid);
   const u = users[targetJid];
@@ -5067,7 +5195,7 @@ if (cmd === 'resetlevel') {
 
   if (!target) return send(`❌ Nutzung: ${PREFIX}resetlevel <@user|nummer>`);
 
-  const targetJid = normalizeJid(target);
+  const targetJid = await resolveLidJid(target, sock);
   ensureUser(targetJid);
   const oldLevel = users[targetJid].level || 1;
   const oldXp = users[targetJid].xp || 0;
@@ -5107,7 +5235,7 @@ if (cmd === 'resetcooldown' || cmd === 'resetcd') {
     return send(`❌ Nutzung: ${activePrefix}resetcooldown <@user|nummer> [befehl]\nBeispiel: ${activePrefix}resetcooldown @user\n${activePrefix}resetcooldown @user fish`);
   }
 
-  const targetJid = normalizeJid(target);
+  const targetJid = await resolveLidJid(target, sock);
   ensureUser(targetJid);
 
   const specificCmd = args.slice(1).join(' ').trim().toLowerCase().replace(new RegExp(`^\\${activePrefix}`), '');
