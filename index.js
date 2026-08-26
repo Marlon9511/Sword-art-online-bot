@@ -626,6 +626,31 @@ function isPrimaryOwner(jid) {
   return n ? PRIMARY_OWNER_IDS.has(n) : false;
 }
 
+// ── Robuste, bidirektionale Owner-Prüfung ──
+// Verlässt sich NICHT auf eine einmalig beim Start aufgelöste LID (die
+// stillschweigend fehlschlagen kann, wenn getLIDForPN in der jeweiligen
+// Baileys-Version nicht verfügbar ist). Prüft stattdessen live in beide
+// Richtungen: Telefonnummer -> LID und LID -> Telefonnummer.
+async function isPrimaryOwnerAsync(jid, sock) {
+  if (isPrimaryOwner(jid)) return true;
+  const n = normalizeJid(jid);
+  if (!n) return false;
+
+  try {
+    if (n.endsWith('@lid')) {
+      const phone = await resolvePhoneJid(n, sock);
+      if (phone && isPrimaryOwner(phone)) return true;
+    } else {
+      const lid = await resolveLidJid(n, sock);
+      if (lid && isPrimaryOwner(lid)) return true;
+    }
+  } catch (e) {
+    console.error('[isPrimaryOwnerAsync] Fehler:', e?.message || e);
+  }
+
+  return false;
+}
+
 function protectPrimaryOwner() {
   for (const jid of PRIMARY_OWNER_IDS) {
     ranks[jid] = 'OWNER';
@@ -1808,9 +1833,17 @@ mentions: [sender]
         if (ctx && Array.isArray(ctx.mentionedJid) && ctx.mentionedJid.length) {
           target = ctx.mentionedJid[0];
         }
-        const num = String(target).replace(/[^0-9]/g, '');
-        const lid = num ? `${num}@lid` : 'Unbekannt';
-        await sock.sendMessage(from, { text: `Die LID ist ${lid}` });
+        // Echte LID über Baileys-Mapping auflösen (keine Geratenes mehr).
+        const realLid = await resolveLidJid(target, sock);
+        const isPrimaryOwnerCheck = await isPrimaryOwnerAsync(target, sock);
+        let out = `📋 *LID-Auflösung für:* ${target}\n`;
+        if (realLid && realLid.endsWith('@lid')) {
+          out += `✅ Echte LID: ${realLid}`;
+        } else {
+          out += `⚠️ Keine LID-Zuordnung gefunden (Nutzer hat evtl. noch nie über LID interagiert, oder Baileys-Mapping nicht verfügbar).\nAufgelöster Wert: ${realLid || '(nichts)'}`;
+        }
+        out += `\n👑 Ist Haupt-Owner: ${isPrimaryOwnerCheck ? 'JA' : 'nein'}`;
+        await sock.sendMessage(from, { text: out });
         return;
       }
       if (cmd === 'groupid' || cmd === 'gruppenid') {
@@ -3491,7 +3524,7 @@ if (cmd === 'ban') {
 
         if (!t) return send('Usage: $ban <@user|num|jid> [kick]');
         const jid = await resolveLidJid(t, sock);
-        if (isPrimaryOwner(jid)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gebannt werden.');
+        if (await isPrimaryOwnerAsync(t, sock) || await isPrimaryOwnerAsync(jid, sock)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gebannt werden.');
         const reason = args.slice(1).filter(a => a !== 'kick' && a !== 'remove' && !a.startsWith('@')).join(' ') || 'Kein Grund';
         bans[jid] = { by: sender, at: new Date().toISOString(), reason };
         save(FILES.bans, bans);
@@ -3532,7 +3565,7 @@ if (cmd === 'ban') {
         if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
         if (!target) return send('Usage: $kick <num|jid|@user>');
         const kickTargetLid = await resolveLidJid(target, sock);
-        if (isPrimaryOwner(target) || isPrimaryOwner(kickTargetLid)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gekickt werden.');
+        if (await isPrimaryOwnerAsync(target, sock) || await isPrimaryOwnerAsync(kickTargetLid, sock)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gekickt werden.');
 
        let permitted = isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD']);
         let groupMetadata;
@@ -3743,7 +3776,7 @@ if (cmd === 'datadelete') {
         if (!isOwner) return send('❌ Nur der Inhaber.');
         const t = args[0]; if (!t) return send('Usage: $datadelete <num|jid>');
         const jid = await resolveLidJid(t, sock);
-        if (isPrimaryOwner(jid)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gelöscht/gebannt werden.');
+        if (await isPrimaryOwnerAsync(t, sock) || await isPrimaryOwnerAsync(jid, sock)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gelöscht/gebannt werden.');
         delete users[jid]; delete pets[jid]; delete ranks[jid];
         for (const rid of Object.keys(joinreqs)) {
           if (joinreqs[rid]?.sender && isSameJid(joinreqs[rid].sender, jid)) delete joinreqs[rid];
@@ -4063,7 +4096,7 @@ const titleMap = { xp: '⚔️ XP-Rangliste', level: '⚔️ Level-Rangliste', c
         } catch (e) {}
         if (!target) return send('Usage: $yeetban <num|jid>');
         const jid = await resolveLidJid(target, sock);
-        if (isPrimaryOwner(jid)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gebannt/entfernt werden.');
+        if (await isPrimaryOwnerAsync(target, sock) || await isPrimaryOwnerAsync(jid, sock)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gebannt/entfernt werden.');
         const reason = args.slice(1).join(' ') || 'Kein Grund';
         bans[jid] = { by: sender, at: new Date().toISOString(), reason };
         save(FILES.bans, bans);
