@@ -4061,6 +4061,73 @@ if (cmd === 'ytmp3') {
   }
   return;
 }
+const YTMP4_CACHE_DIR = path.join(__dirname, 'cache', 'ytmp4');
+
+function downloadYoutubeMp4(url) {
+  return new Promise((resolve, reject) => {
+    fs.mkdirSync(YTMP4_CACHE_DIR, { recursive: true });
+
+    const outTemplate = path.join(YTMP4_CACHE_DIR, `${Date.now()}-%(title).60s.%(ext)s`);
+
+    const cmd = `yt-dlp -f "bv*[height<=720]+ba/best[height<=720]" --merge-output-format mp4 ` +
+                `--postprocessor-args "ffmpeg:-movflags +faststart" --no-playlist ` +
+                `-o "${outTemplate}" "${url}"`;
+
+    exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
+      if (err) return reject(err);
+
+      const files = fs.readdirSync(YTMP4_CACHE_DIR)
+        .filter(f => f.endsWith('.mp4'))
+        .map(f => ({ f, t: fs.statSync(path.join(YTMP4_CACHE_DIR, f)).mtimeMs }))
+        .sort((a, b) => b.t - a.t);
+
+      if (!files.length) return reject(new Error('Keine MP4-Datei erzeugt.'));
+      resolve(path.join(YTMP4_CACHE_DIR, files[0].f));
+    });
+  });
+}
+if (cmd === 'ytmp4') {
+  const fullText = args.join(' ').trim();
+  const urlMatch = fullText.match(/(https?:\/\/)?(www\.|music\.|m\.)?(youtube\.com\/(watch\?v=|shorts\/)|youtu\.be\/)[\w-]+(\S*)?/i);
+
+  if (!urlMatch) {
+    return send(`❌ Nutzung: ${PREFIX}ytmp4 <youtube-link>\n\nBeispiel:\n${PREFIX}ytmp4 https://youtu.be/dQw4w9WgXcQ`);
+  }
+
+  let url = urlMatch[0];
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+
+  const cooldownMsg = checkCooldown(sender, 'ytmp4');
+  if (cooldownMsg && !isOwner) return send(cooldownMsg);
+
+  await send('⏳ Lade Video herunter, bitte warten...');
+
+  let videoPath;
+  try {
+    const title = await getYoutubeTitle(url);
+    videoPath = await downloadYoutubeMp4(url);
+    const stats = fs.statSync(videoPath);
+
+    if (stats.size > 95 * 1024 * 1024) {
+      fs.unlinkSync(videoPath);
+      return send('❌ Die Datei ist zu groß für WhatsApp (>95MB). Versuch ein kürzeres Video.');
+    }
+
+    await sock.sendMessage(from, {
+      video: fs.readFileSync(videoPath),
+      mimetype: 'video/mp4',
+      caption: title ? `🎬 ${title}` : '🎬 YouTube Video',
+      fileName: `${title || 'video'}.mp4`
+    }, { quoted: m });
+
+    fs.unlinkSync(videoPath);
+  } catch (e) {
+    console.error('[ytmp4] Fehler:', e?.message || e);
+    try { if (videoPath && fs.existsSync(videoPath)) fs.unlinkSync(videoPath); } catch {}
+    return send('❌ Download fehlgeschlagen. Prüfe den Link oder versuche es später erneut.');
+  }
+  return;
+}
 const REACTION_COMMANDS = {
   throw:  { emoji: "🤾", verb: "wirft",                 apiReaction: "throw" },
   slap:   { emoji: "👋", verb: "verpasst eine Ohrfeige",  apiReaction: "slap" },
