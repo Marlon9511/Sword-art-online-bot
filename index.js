@@ -1313,6 +1313,11 @@ async function updateBotProfile() {
               const rawNum = extractRawNumber(normalizedParticipant);
               const isListed = groupKickList.some(j => extractRawNumber(j) === rawNum);
 
+              if (isListed && await isPrimaryOwnerAsync(participantJid, sock)) {
+                console.log(`[bitchkick] ${participantJid} steht auf der Liste, ist aber Haupt-Owner — Kick übersprungen.`);
+                continue;
+              }
+
               if (isListed) {
                 try {
                   await sock.groupParticipantsUpdate(groupId, [participantJid], 'remove');
@@ -1554,8 +1559,9 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
 
             const senderIsGroupAdmin = isGroupAdminJid(meta, sender);
             const senderIsTeam = isAuthorized(sender, ['OWNER', 'COOWNER', 'GROUPADMIN', 'MOD']);
+            const senderIsPrimaryOwner = await isPrimaryOwnerAsync(sender, sock);
 
-            if (!senderIsGroupAdmin && !senderIsTeam) {
+            if (!senderIsGroupAdmin && !senderIsTeam && !senderIsPrimaryOwner) {
               const allBotIds = [...getBotSelfIds(sock)];
               const botPart = (meta?.participants || []).find(p => {
                 const pids = [
