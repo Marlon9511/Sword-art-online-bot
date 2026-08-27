@@ -1535,7 +1535,55 @@ export function createTitleSystem() {
       );
       return true;
     }
+if (cmd === 'addbeta') {
+      // Nur der Owner darf Beta-Tester-Titel vergeben
+      if (u.__isOwner !== true) {
+        await send('❌ Nur der Bot-Owner kann diesen Befehl nutzen.');
+        return true;
+      }
 
+      const mentioned = extractMentionedJids(ctx);
+      let targetRaw = null;
+
+      if (mentioned.length) {
+        targetRaw = extractRawNumberTitle(mentioned[0]);
+      } else if (args[0]) {
+        // Fallback: Nummer direkt als Argument, z.B. addbeta 4915123456789
+        targetRaw = extractRawNumberTitle(args[0]);
+      }
+
+      if (!targetRaw) {
+        await send(`❌ Nutzung: ${activePrefix}addbeta @user\n(Erkennt auch @lid-Mentions)`);
+        return true;
+      }
+
+      // Versuche zuerst einen bereits bekannten User zu finden (funktioniert auch bei @lid)
+      let targetJid = findUserJidByRawNumber(users, targetRaw);
+
+      // Falls noch kein Eintrag existiert, aber ein konkreter mentioned-JID vorliegt, diesen anlegen
+      if (!targetJid && mentioned.length) {
+        targetJid = mentioned[0];
+        ensureUser(targetJid);
+      }
+
+      if (!targetJid) {
+        await send('❌ Dieser User wurde noch nicht im System erfasst (noch keine Interaktion mit dem Bot).');
+        return true;
+      }
+
+      ensureUser(targetJid);
+      const targetUser = users[targetJid];
+      targetUser.__isBetaTester = true;
+      save(FILES.users, users);
+
+      const result = await checkProgress(ctx, targetJid);
+      const already = !result?.newTitles?.some(t => t.id === 'beta_tester');
+
+      await send(
+        `✅ Beta-Tester-Status wurde vergeben.\n🧪 Titel "Beta-Tester" ${already ? 'war bereits freigeschaltet oder wird beim nächsten Check aktiv' : 'wurde freigeschaltet'}.`
+      );
+      return true;
+    }
     if (cmd === 'achievements' || cmd === 'erfolge') {
       const total = ACHIEVEMENTS.length;
       const unlockedCount = Object.keys(u.unlockedAchievements).length;
