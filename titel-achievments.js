@@ -1417,29 +1417,55 @@ export function renderHpBar(current, max, length = 10) {
   return `${bar} ${safeCurrent}/${safeMax} HP (${pct}%)`;
 }
 
+// Extrahiert nur die reine Ziffernfolge aus einer JID, egal ob @lid,
+// @s.whatsapp.net oder mit :device-Suffix.
+function extractRawNumberTitle(jid) {
+  if (!jid) return null;
+  return String(jid).split(':')[0].split('@')[0].replace(/[^0-9]/g, '') || null;
+}
+
+// Sucht in den bekannten Usern nach dem Key, dessen reine Ziffernfolge übereinstimmt.
+// Dadurch ist es egal, ob der User als @lid oder @s.whatsapp.net gespeichert wurde.
 function findUserJidByRawNumber(users, rawNumber) {
   if (!rawNumber) return null;
-  // Direkter Treffer, falls der Key selbst schon die Nummer/JID ist
   for (const key of Object.keys(users)) {
     if (extractRawNumberTitle(key) === rawNumber) return key;
   }
   return null;
 }
 
+// Versucht, gemenionte JIDs (inkl. @lid) aus möglichst vielen gängigen
+// Bot-Framework-Strukturen zu ziehen. Deckt Baileys-typische Pfade ab.
 function extractMentionedJids(ctx) {
-  // Deckt gängige Varianten ab, wie Mentions im Bot-Framework ankommen können
-  const raw =
-    ctx.mentionedJid ||
-    ctx.mentions ||
-    ctx.message?.mentionedJid ||
-    ctx.message?.extendedTextMessage?.contextInfo?.mentionedJid ||
-    ctx.contextInfo?.mentionedJid ||
-    [];
-  return Array.isArray(raw) ? raw : [raw].filter(Boolean);
-}
-function extractRawNumberTitle(jid) {
-  if (!jid) return null;
-  return String(jid).split(':')[0].split('@')[0].replace(/[^0-9]/g, '') || null;
+  const candidates = [
+    ctx.mentionedJid,
+    ctx.mentions,
+    ctx.mentionedJids,
+    ctx.message?.mentionedJid,
+    ctx.message?.extendedTextMessage?.contextInfo?.mentionedJid,
+    ctx.contextInfo?.mentionedJid,
+    ctx.msg?.mentionedJid,
+    ctx.msg?.message?.extendedTextMessage?.contextInfo?.mentionedJid,
+    ctx.m?.mentionedJid,
+    ctx.m?.message?.extendedTextMessage?.contextInfo?.mentionedJid,
+    ctx.quoted?.mentionedJid,
+    ctx.raw?.message?.extendedTextMessage?.contextInfo?.mentionedJid
+  ];
+
+  for (const c of candidates) {
+    if (Array.isArray(c) && c.length) return c;
+    if (typeof c === 'string' && c) return [c];
+  }
+
+  // Fallback: Nummer direkt aus dem Rohtext ziehen, falls Mentions
+  // als Klartext (z.B. "@491701234567") ankommen statt strukturiert.
+  const rawText =
+    ctx.body || ctx.text || ctx.message?.conversation ||
+    ctx.message?.extendedTextMessage?.text || '';
+  const match = String(rawText).match(/@(\d{5,15})/);
+  if (match) return [match[1]];
+
+  return [];
 }
 
 export async function checkProgress(ctx, jid) {
@@ -1519,6 +1545,56 @@ export function createTitleSystem() {
 
     await checkProgress(ctx, sender);
 
+    if (cmd === 'addbeta') {
+      // Nur der Owner darf Beta-Tester-Titel vergeben
+      if (u.__isOwner !== true) {
+        await send('❌ Nur der Bot-Owner kann diesen Befehl nutzen.');
+        return true;
+      }
+
+      const mentioned = extractMentionedJids(ctx);
+      let targetRaw = null;
+
+      if (mentioned.length) {
+        targetRaw = extractRawNumberTitle(mentioned[0]);
+      } else if (args[0]) {
+        // Fallback: Nummer direkt als Argument, z.B. addbeta 4915123456789
+        targetRaw = extractRawNumberTitle(args[0]);
+      }
+
+      if (!targetRaw) {
+        await send(`❌ Nutzung: ${activePrefix}addbeta @user`);
+        return true;
+      }
+
+      // Versuche zuerst einen bereits bekannten User zu finden (funktioniert auch bei @lid)
+      let targetJid = findUserJidByRawNumber(users, targetRaw);
+
+      
+      if (!targetJid && mentioned.length && typeof mentioned[0] === 'string' && mentioned[0].includes('@')) {
+        targetJid = mentioned[0];
+        ensureUser(targetJid);
+      }
+
+      if (!targetJid) {
+        await send('❌ Dieser User wurde noch nicht im System erfasst (noch keine Interaktion mit dem Bot).');
+        return true;
+      }
+
+      ensureUser(targetJid);
+      const targetUser = users[targetJid];
+      targetUser.__isBetaTester = true;
+      save(FILES.users, users);
+
+      const result = await checkProgress(ctx, targetJid);
+      const already = !result?.newTitles?.some(t => t.id === 'beta_tester');
+
+      await send(
+        `✅ Beta-Tester-Status wurde vergeben.\n🧪 Titel "Beta-Tester" ${already ? 'war bereits freigeschaltet oder wird beim nächsten Check aktiv' : 'wurde freigeschaltet'}.`
+      );
+      return true;
+    }
+
     if (cmd === 'hpbar') {
       const sub = (args[0] || '').toLowerCase();
 
@@ -1554,55 +1630,7 @@ export function createTitleSystem() {
       );
       return true;
     }
-if (cmd === 'addbeta') {
-      // Nur der Owner darf Beta-Tester-Titel vergeben
-      if (u.__isOwner !== true) {
-        await send('❌ Nur der Bot-Owner kann diesen Befehl nutzen.');
-        return true;
-      }
 
-      const mentioned = extractMentionedJids(ctx);
-      let targetRaw = null;
-
-      if (mentioned.length) {
-        targetRaw = extractRawNumberTitle(mentioned[0]);
-      } else if (args[0]) {
-        // Fallback: Nummer direkt als Argument, z.B. addbeta 4915123456789
-        targetRaw = extractRawNumberTitle(args[0]);
-      }
-
-      if (!targetRaw) {
-        await send(`❌ Nutzung: ${activePrefix}addbeta @user\n(Erkennt auch @lid-Mentions)`);
-        return true;
-      }
-
-      // Versuche zuerst einen bereits bekannten User zu finden (funktioniert auch bei @lid)
-      let targetJid = findUserJidByRawNumber(users, targetRaw);
-
-      // Falls noch kein Eintrag existiert, aber ein konkreter mentioned-JID vorliegt, diesen anlegen
-      if (!targetJid && mentioned.length) {
-        targetJid = mentioned[0];
-        ensureUser(targetJid);
-      }
-
-      if (!targetJid) {
-        await send('❌ Dieser User wurde noch nicht im System erfasst (noch keine Interaktion mit dem Bot).');
-        return true;
-      }
-
-      ensureUser(targetJid);
-      const targetUser = users[targetJid];
-      targetUser.__isBetaTester = true;
-      save(FILES.users, users);
-
-      const result = await checkProgress(ctx, targetJid);
-      const already = !result?.newTitles?.some(t => t.id === 'beta_tester');
-
-      await send(
-        `✅ Beta-Tester-Status wurde vergeben.\n🧪 Titel "Beta-Tester" ${already ? 'war bereits freigeschaltet oder wird beim nächsten Check aktiv' : 'wurde freigeschaltet'}.`
-      );
-      return true;
-    }
     if (cmd === 'achievements' || cmd === 'erfolge') {
       const total = ACHIEVEMENTS.length;
       const unlockedCount = Object.keys(u.unlockedAchievements).length;
