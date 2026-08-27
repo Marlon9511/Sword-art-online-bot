@@ -207,8 +207,11 @@ export function createPokemonSystem() {
     const {
       cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
       users, save, FILES, ensureUser, normalizeJid, isSameJid,
-      getNumberMention, randInt, sleep, isPrimaryOwner
+      getNumberMention, randInt, sleep, isPrimaryOwner, resolveLidJid
     } = ctx;
+    // Fallback, falls resolveLidJid (noch) nicht von index.js durchgereicht wird
+    // (siehe Hinweis am Ende) — Verhalten bleibt dann wie vorher.
+    const resolveTargetJid = resolveLidJid || (async (jid) => normalizeJid(jid));
 
     if (!POKEMON_COMMANDS.includes(cmd)) return false;
 
@@ -529,15 +532,19 @@ export function createPokemonSystem() {
     }
 
     if (cmd === 'pokebattle') {
+      // ── @-Erwähnung / Reply hat jetzt IMMER Vorrang vor getipptem Text ──
+      // (bei LID-Mentions ist der angezeigte "@Zahl"-Text oft keine echte
+      // Telefonnummer mehr, daher darf getippter Text die Mention nie überstimmen)
       const ctxInfo = m.message?.extendedTextMessage?.contextInfo;
       let target = args[0];
-      if (!target && ctxInfo?.mentionedJid?.length) target = ctxInfo.mentionedJid[0];
-      if (!target && ctxInfo?.participant) target = ctxInfo.participant;
+      if (ctxInfo?.mentionedJid?.length) target = ctxInfo.mentionedJid[0];
+      else if (ctxInfo?.participant) target = ctxInfo.participant;
+
       if (!target) {
         await send(`❌ Nutzung: ${activePrefix}pokebattle @user`);
         return true;
       }
-      const targetJid = normalizeJid(target);
+      const targetJid = await resolveTargetJid(target, sock);
       if (isSameJid(sender, targetJid)) {
         await send('❌ Du kannst nicht gegen dich selbst kämpfen.');
         return true;
