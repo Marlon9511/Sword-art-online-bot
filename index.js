@@ -2329,8 +2329,8 @@ normalizedJids.forEach(jid => {
 
         const ctx = m.message?.extendedTextMessage?.contextInfo;
         let target = args[0];
-        if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
-        if (!target && ctx?.participant) target = ctx.participant;
+        if (ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+        else if (ctx?.participant) target = ctx.participant;
 
         if (!target) return send(`❌ Nutzung: ${PREFIX}resetcoins <@user|nummer>`);
 
@@ -2889,8 +2889,8 @@ if (cmd === 'marry') {
 
   const ctx = m.message?.extendedTextMessage?.contextInfo;
   let target = args[0];
-  if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
-  if (!target && ctx?.participant) target = ctx.participant;
+  if (ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+  else if (ctx?.participant) target = ctx.participant;
   if (!target) return send(`❌ Nutzung: ${activePrefix}marry @user\n${activePrefix}marry accept / deny / cancel`);
 
   const targetJid = await resolveLidJid(target, sock);
@@ -2998,7 +2998,10 @@ if (cmd === 'divorce') {
       }
 
       if (cmd === 'addxp' && hasAdminPerms(sender)) {
-        const target = args[0];
+        const mentionCtx1 = m.message?.extendedTextMessage?.contextInfo;
+        let target = args[0];
+        if (mentionCtx1?.mentionedJid?.length) target = mentionCtx1.mentionedJid[0];
+        else if (mentionCtx1?.participant) target = mentionCtx1.participant;
         const amount = parseInt(args[1]);
         if (!target || isNaN(amount) || amount < 0) return send('❌ Nutzung: $addxp <@nutzer> <menge>');
         const targetJid = await resolveLidJid(target, sock);
@@ -3009,7 +3012,10 @@ if (cmd === 'divorce') {
       }
 
       if (cmd === 'addcash' && hasAdminPerms(sender)) {
-        const target = args[0];
+        const mentionCtx2 = m.message?.extendedTextMessage?.contextInfo;
+        let target = args[0];
+        if (mentionCtx2?.mentionedJid?.length) target = mentionCtx2.mentionedJid[0];
+        else if (mentionCtx2?.participant) target = mentionCtx2.participant;
         const amount = parseInt(args[1]);
         if (!target || isNaN(amount) || amount < 0) return send('❌ Nutzung: $addcash <@nutzer> <menge>');
         const targetJid = await resolveLidJid(target, sock);
@@ -3020,7 +3026,10 @@ if (cmd === 'divorce') {
       }
 
       if (cmd === 'addvip' && hasAdminPerms(sender)) {
-        const target = args[0];
+        const mentionCtx3 = m.message?.extendedTextMessage?.contextInfo;
+        let target = args[0];
+        if (mentionCtx3?.mentionedJid?.length) target = mentionCtx3.mentionedJid[0];
+        else if (mentionCtx3?.participant) target = mentionCtx3.participant;
         const duration = args[1];
         if (!target || !duration) return send('❌ Nutzung: $addvip <@nutzer> <1d|12h|30m>');
         const targetJid = await resolveLidJid(target, sock);
@@ -3091,7 +3100,10 @@ if (cmd === 'divorce') {
         return send(`${header}${rarityTag ? rarityTag + ' ' : ''}${bodyText}${footer}`);
       }
       if (cmd === 'give') {
-        const target = args[0];
+        const giveCtx = m.message?.extendedTextMessage?.contextInfo;
+        let target = args[0];
+        if (giveCtx?.mentionedJid?.length) target = giveCtx.mentionedJid[0];
+        else if (giveCtx?.participant) target = giveCtx.participant;
         const amount = parseInt(args[1]);
         if (!target || isNaN(amount) || amount <= 0) return send('❌ Nutzung: $give <nummer|@mention> <betrag>');
         const targetJid = await resolveLidJid(target, sock);
@@ -3525,8 +3537,8 @@ if (cmd === 'ban') {
 
         const ctx = m.message?.extendedTextMessage?.contextInfo;
         let t = args[0];
-        if ((!t || t === 'kick' || t === 'remove') && ctx?.mentionedJid?.length) t = ctx.mentionedJid[0];
-        if ((!t || t === 'kick' || t === 'remove') && ctx?.participant) t = ctx.participant;
+        if (ctx?.mentionedJid?.length) t = ctx.mentionedJid[0];
+        else if (ctx?.participant) t = ctx.participant;
 
         if (!t) return send('Usage: $ban <@user|num|jid> [kick]');
         const jid = await resolveLidJid(t, sock);
@@ -3555,8 +3567,8 @@ if (cmd === 'ban') {
 
         const ctx = m.message?.extendedTextMessage?.contextInfo;
         let t = args[0];
-        if (!t && ctx?.mentionedJid?.length) t = ctx.mentionedJid[0];
-        if (!t && ctx?.participant) t = ctx.participant;
+        if (ctx?.mentionedJid?.length) t = ctx.mentionedJid[0];
+        else if (ctx?.participant) t = ctx.participant;
 
         if (!t) return send('Usage: $unban <@user|num|jid>');
         const jid = await resolveLidJid(t, sock);
@@ -3568,7 +3580,7 @@ if (cmd === 'ban') {
       if (cmd === 'kick') {
         const ctx = m.message?.extendedTextMessage?.contextInfo;
         let target = args[0];
-        if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+        if (ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
         if (!target) return send('Usage: $kick <num|jid|@user>');
         const kickTargetLid = await resolveLidJid(target, sock);
         if (await isPrimaryOwnerAsync(target, sock) || await isPrimaryOwnerAsync(kickTargetLid, sock)) return send('❌ Der Haupt-Owner ist geschützt und kann nicht gekickt werden.');
@@ -3670,8 +3682,8 @@ if (cmd === 'promote') {
 
   const ctx = m.message?.extendedTextMessage?.contextInfo;
   let target = args[0];
-  if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
-  if (!target && ctx?.participant) target = ctx.participant;
+  if (ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+  else if (ctx?.participant) target = ctx.participant;
   if (!target) return send('Usage: $promote <num|jid|@user>');
 
   const jid = await resolveLidJid(target, sock);
@@ -3703,8 +3715,8 @@ if (cmd === 'demote') {
 
   const ctx = m.message?.extendedTextMessage?.contextInfo;
   let target = args[0];
-  if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
-  if (!target && ctx?.participant) target = ctx.participant;
+  if (ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+  else if (ctx?.participant) target = ctx.participant;
   if (!target) return send('Usage: $demote <num|jid|@user>');
 
   const jid = await resolveLidJid(target, sock);
@@ -4097,8 +4109,8 @@ const titleMap = { xp: '⚔️ XP-Rangliste', level: '⚔️ Level-Rangliste', c
         let target = args[0];
         try {
           const ctx = m.message?.extendedTextMessage?.contextInfo;
-          if (!target && ctx?.participant) target = ctx.participant;
-          if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+          if (ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+          else if (ctx?.participant) target = ctx.participant;
         } catch (e) {}
         if (!target) return send('Usage: $yeetban <num|jid>');
         const jid = await resolveLidJid(target, sock);
@@ -4723,8 +4735,8 @@ if (cmd === 'showuser') {
 
   const ctx = m.message?.extendedTextMessage?.contextInfo;
   let target = args[0];
-  if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
-  if (!target && ctx?.participant) target = ctx.participant;
+  if (ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+  else if (ctx?.participant) target = ctx.participant;
   if (!target) target = sender;
 
   const targetJid = await resolveLidJid(target, sock);
@@ -5229,8 +5241,8 @@ if (cmd === 'resetlevel') {
 
   const ctx = m.message?.extendedTextMessage?.contextInfo;
   let target = args[0];
-  if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
-  if (!target && ctx?.participant) target = ctx.participant;
+  if (ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+  else if (ctx?.participant) target = ctx.participant;
 
   if (!target) return send(`❌ Nutzung: ${PREFIX}resetlevel <@user|nummer>`);
 
@@ -5267,8 +5279,8 @@ if (cmd === 'resetcooldown' || cmd === 'resetcd') {
 
   const ctx = m.message?.extendedTextMessage?.contextInfo;
   let target = args[0];
-  if (!target && ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
-  if (!target && ctx?.participant) target = ctx.participant;
+  if (ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+  else if (ctx?.participant) target = ctx.participant;
 
   if (!target) {
     return send(`❌ Nutzung: ${activePrefix}resetcooldown <@user|nummer> [befehl]\nBeispiel: ${activePrefix}resetcooldown @user\n${activePrefix}resetcooldown @user fish`);
