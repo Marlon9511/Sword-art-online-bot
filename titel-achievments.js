@@ -1417,8 +1417,26 @@ export function renderHpBar(current, max, length = 10) {
   return `${bar} ${safeCurrent}/${safeMax} HP (${pct}%)`;
 }
 
-// Extrahiert nur die reine Ziffernfolge aus einer JID, egal ob @lid,
-// @s.whatsapp.net oder mit :device-Suffix.
+function findUserJidByRawNumber(users, rawNumber) {
+  if (!rawNumber) return null;
+  // Direkter Treffer, falls der Key selbst schon die Nummer/JID ist
+  for (const key of Object.keys(users)) {
+    if (extractRawNumberTitle(key) === rawNumber) return key;
+  }
+  return null;
+}
+
+function extractMentionedJids(ctx) {
+  // Deckt gängige Varianten ab, wie Mentions im Bot-Framework ankommen können
+  const raw =
+    ctx.mentionedJid ||
+    ctx.mentions ||
+    ctx.message?.mentionedJid ||
+    ctx.message?.extendedTextMessage?.contextInfo?.mentionedJid ||
+    ctx.contextInfo?.mentionedJid ||
+    [];
+  return Array.isArray(raw) ? raw : [raw].filter(Boolean);
+}
 function extractRawNumberTitle(jid) {
   if (!jid) return null;
   return String(jid).split(':')[0].split('@')[0].replace(/[^0-9]/g, '') || null;
