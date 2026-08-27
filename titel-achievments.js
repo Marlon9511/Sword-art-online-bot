@@ -1468,6 +1468,31 @@ function extractMentionedJids(ctx) {
   return [];
 }
 
+// Versucht den JID des Absenders einer beantworteten (gequoteten) Nachricht
+// zu finden — deckt gängige Baileys/Bot-Wrapper-Pfade ab, inkl. @lid.
+function extractQuotedJid(ctx) {
+  const candidates = [
+    ctx.quotedJid,
+    ctx.quoted?.sender,
+    ctx.quoted?.participant,
+    ctx.quoted?.jid,
+    ctx.quoted?.key?.participant,
+    ctx.quoted?.key?.remoteJid,
+    ctx.message?.extendedTextMessage?.contextInfo?.participant,
+    ctx.contextInfo?.participant,
+    ctx.msg?.message?.extendedTextMessage?.contextInfo?.participant,
+    ctx.m?.message?.extendedTextMessage?.contextInfo?.participant,
+    ctx.m?.quoted?.sender,
+    ctx.m?.quoted?.participant,
+    ctx.raw?.message?.extendedTextMessage?.contextInfo?.participant
+  ];
+
+  for (const c of candidates) {
+    if (typeof c === 'string' && c) return c;
+  }
+  return null;
+}
+
 export async function checkProgress(ctx, jid) {
   const { users, save, FILES, send } = ctx;
   const u = users[jid];
@@ -1553,26 +1578,34 @@ export function createTitleSystem() {
       }
 
       const mentioned = extractMentionedJids(ctx);
+      const quotedJid = extractQuotedJid(ctx);
+
+      // Priorität: 1) @mention  2) beantwortete Nachricht (Reply)  3) Nummer als Argument
+      let sourceJid = null;
       let targetRaw = null;
 
       if (mentioned.length) {
+        sourceJid = typeof mentioned[0] === 'string' && mentioned[0].includes('@') ? mentioned[0] : null;
         targetRaw = extractRawNumberTitle(mentioned[0]);
+      } else if (quotedJid) {
+        sourceJid = quotedJid;
+        targetRaw = extractRawNumberTitle(quotedJid);
       } else if (args[0]) {
         // Fallback: Nummer direkt als Argument, z.B. addbeta 4915123456789
         targetRaw = extractRawNumberTitle(args[0]);
       }
 
       if (!targetRaw) {
-        await send(`❌ Nutzung: ${activePrefix}addbeta @user`);
+        await send(`❌ Nutzung: ${activePrefix}addbeta @user\noder: Nachricht des Users beantworten mit ${activePrefix}addbeta\n`);
         return true;
       }
 
       // Versuche zuerst einen bereits bekannten User zu finden (funktioniert auch bei @lid)
       let targetJid = findUserJidByRawNumber(users, targetRaw);
 
-      
-      if (!targetJid && mentioned.length && typeof mentioned[0] === 'string' && mentioned[0].includes('@')) {
-        targetJid = mentioned[0];
+      // Falls noch kein Eintrag existiert, aber ein konkreter JID (aus Mention oder Reply) vorliegt, diesen anlegen
+      if (!targetJid && sourceJid) {
+        targetJid = sourceJid;
         ensureUser(targetJid);
       }
 
