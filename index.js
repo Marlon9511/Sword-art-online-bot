@@ -5174,7 +5174,8 @@ if (titleHandled) return;
 const pokemonHandled = await pokemonSystem.handle({
   cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
   users, save, FILES, ensureUser, normalizeJid, isSameJid,
-  getNumberMention, randInt, sleep, isPrimaryOwner
+  getNumberMention, randInt, sleep, isPrimaryOwner,
+  resolveLidJid   
 });
 if (pokemonHandled) return;
 const bossEventHandled = await guildBoss.handle({
