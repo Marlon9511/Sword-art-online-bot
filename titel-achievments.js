@@ -1,7 +1,7 @@
 import { POKEMON_DB } from './pokemon-system.mjs'; // Pfad ggf. an euer Projekt anpassen
 
 export const TITLE_COMMANDS = [
-  'title', 'titel', 'achievements', 'erfolge', 'hpbar'
+  'title', 'titel', 'achievements', 'erfolge', 'hpbar', 'addbeta'
 ];
 
 export const TITLE_HELP_TEXT =
@@ -10,7 +10,8 @@ export const TITLE_HELP_TEXT =
   `▸ {P}title set <name> — Aktiven Titel setzen\n` +
   `▸ {P}title info <name> — Freischaltbedingung eines Titels anzeigen\n` +
   `▸ {P}achievements — Deine Erfolge & Fortschritt anzeigen\n` +
-  `▸ {P}hpbar — HP-Balken-Anzeige an/aus umschalten\n`;
+  `▸ {P}hpbar — HP-Balken-Anzeige an/aus umschalten\n` +
+  `▸ {P}addbeta @user — (Owner) Beta-Tester-Titel vergeben\n`;
 
 const dexCount = (u) => Object.keys(u.poke?.dex || {}).length;
 const teamCount = (u) => (u.poke?.team || []).length;
