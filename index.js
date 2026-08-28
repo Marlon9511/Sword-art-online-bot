@@ -1473,7 +1473,7 @@ const ALL_COMMANDS = [
   'setrole', 'setrank', 'listroles', 'applyroles', 'addxp', 'addcash', 'addvip', 'resetcoins',
   'bancmd', 'unbancmd', 'broadcast', 'restart', 'updateprofile',
   'newsession', 'sessions', 'stopsession', 'deletesession', 'delsession', 'migratelid',
-  'grouplist', 'gl', 'join', 'leave', 'getlid', 'groupid', 'gruppenid',
+  'grouplist', 'gl', 'join', 'leave', 'getlid', 'groupid', 'gruppenid', 'prefix',
   'credits', 'addcredit', 'delcredit', 'partner', 'partners', 'buendnisse', 'addpartner', 'delpartner',
   'marry', 'divorce', 'bewerbung', 'bewerben', 'apply',
   'dsgvo', 'ytmp3', 'sticker', 's', 'stiker', 'add', 'code', 'yeetban', 'datadelete',
@@ -1608,6 +1608,20 @@ mentions: [sender]
       }
 
       const activePrefix = isGroup ? getGroupPrefix(from) : PREFIX;
+
+      // ── @prefix — Sonderbefehl, funktioniert IMMER, unabhängig vom aktuell
+      // eingestellten Präfix (umgeht die normale Präfix-Prüfung bewusst). ──
+      if (body && body.trim().toLowerCase() === '@prefix') {
+        try {
+          await sock.sendMessage(from, {
+            text: isGroup
+              ? `🔧 Aktuelles Präfix dieser Gruppe: *${activePrefix}*`
+              : `🔧 Aktuelles Präfix: *${activePrefix}*`
+          });
+        } catch (e) {}
+        return;
+      }
+
       if (!body || !body.startsWith(activePrefix)) return;
 
       const afterPrefix = body.slice(activePrefix.length).trim();
@@ -1855,6 +1869,14 @@ mentions: [sender]
       if (cmd === 'groupid' || cmd === 'gruppenid') {
         if (!isGroup) return send('❌ Dieser Befehl funktioniert nur in Gruppen.');
         return send(`📋 Diese Gruppen-ID ist:\n${from}`);
+      }
+
+      if (cmd === 'prefix') {
+        return send(
+          isGroup
+            ? `🔧 Aktuelles Präfix dieser Gruppe: *${activePrefix}*`
+            : `🔧 Aktuelles Präfix: *${activePrefix}*`
+        );
       }
 
       if (cmd === 'bitchkick') {
@@ -5174,8 +5196,7 @@ if (titleHandled) return;
 const pokemonHandled = await pokemonSystem.handle({
   cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
   users, save, FILES, ensureUser, normalizeJid, isSameJid,
-  getNumberMention, randInt, sleep, isPrimaryOwner,
-  resolveLidJid   
+  getNumberMention, randInt, sleep, isPrimaryOwner
 });
 if (pokemonHandled) return;
 const bossEventHandled = await guildBoss.handle({
