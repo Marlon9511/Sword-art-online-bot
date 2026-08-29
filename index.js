@@ -1474,6 +1474,7 @@ const ALL_COMMANDS = [
   'bancmd', 'unbancmd', 'broadcast', 'restart', 'updateprofile',
   'newsession', 'sessions', 'stopsession', 'deletesession', 'delsession', 'migratelid',
   'grouplist', 'gl', 'join', 'leave', 'getlid', 'groupid', 'gruppenid', 'prefix',
+  'addcouncil', 'removecouncil', 'council', 'councilliste', 'ratsliste',
   'credits', 'addcredit', 'delcredit', 'partner', 'partners', 'buendnisse', 'addpartner', 'delpartner',
   'marry', 'divorce', 'bewerbung', 'bewerben', 'apply',
   'dsgvo', 'ytmp3', 'sticker', 's', 'stiker', 'add', 'code', 'yeetban', 'datadelete',
@@ -2582,6 +2583,17 @@ if (cmd === 'whoami' || cmd === 'me') {
     ? `🎖️ Titel: ${activeTitleObj.icon} "${activeTitleObj.name}"`
     : '🎖️ Titel: Keiner';
 
+  const isCouncilMember = user.council === true;
+  const councilSinceStr = user.councilSince
+    ? new Date(user.councilSince).toLocaleDateString('de-DE')
+    : null;
+  const councilBanner = isCouncilMember
+    ? `👑✨ ━━━━━━━━━━━━━━━━━━━━━ ✨👑\n` +
+      `      *MITGLIED DES CLAN-RATS*\n` +
+      (councilSinceStr ? `      _Rat seit ${councilSinceStr}_\n` : '') +
+      `👑✨ ━━━━━━━━━━━━━━━━━━━━━ ✨👑\n\n`
+    : '';
+
   arena.ensureArenaFields(users, normalizedSender);
   const weaponId = user.equipped?.weapon;
   const armorId = user.equipped?.armor;
@@ -2597,7 +2609,7 @@ if (cmd === 'whoami' || cmd === 'me') {
   const weaponLine = formatGearName(weaponId);
   const armorLine = formatGearName(armorId);
 
-  const caption = `User: ${username}\n${titleLine}\nCoins: ${coins}\nRank: ${r}\nLevel: ${level}\nXP: ${xp} / ${neededXp}\nNoch ${remainingXp} XP bis Level ${level + 1}\n🗡️ Waffe: ${weaponLine}\n🛡️ Rüstung: ${armorLine}\n${marriageLine}${infoBlock}`;
+  const caption = `${councilBanner}User: ${username}\n${titleLine}\nCoins: ${coins}\nRank: ${r}\nLevel: ${level}\nXP: ${xp} / ${neededXp}\nNoch ${remainingXp} XP bis Level ${level + 1}\n🗡️ Waffe: ${weaponLine}\n🛡️ Rüstung: ${armorLine}\n${marriageLine}${infoBlock}`;
 
   const FALLBACK_PP_URL = 'https://raw.githubusercontent.com/Marlon9511/Sword-art-online-bot/main/5d553cd8911378163e989839dff229f3.webp.jpg';
 
@@ -3059,6 +3071,71 @@ if (cmd === 'divorce') {
         ensureUser(targetJid);
         const expiry = new Date(vipExpiry.get(targetJid)).toLocaleString();
         return send(`✅ VIP für @${targetJid.split('@')[0]} bis ${expiry}.`, { mentions: [targetJid] });
+      }
+
+      if (cmd === 'addcouncil') {
+        if (!isOwner) return send('❌ Nur der Inhaber darf Mitglieder in den Clan-Rat aufnehmen.');
+        const councilCtx = m.message?.extendedTextMessage?.contextInfo;
+        let target = args[0];
+        if (councilCtx?.mentionedJid?.length) target = councilCtx.mentionedJid[0];
+        else if (councilCtx?.participant) target = councilCtx.participant;
+        if (!target) return send(`❌ Nutzung: ${activePrefix}addcouncil @user`);
+
+        const targetJid = await resolveLidJid(target, sock);
+        ensureUser(targetJid);
+
+        if (users[targetJid].council === true) {
+          return send(`ℹ️ @${targetJid.split('@')[0]} ist bereits Mitglied des Clan-Rats.`, { mentions: [targetJid] });
+        }
+
+        users[targetJid].council = true;
+        users[targetJid].councilSince = Date.now();
+        save(FILES.users, users);
+
+        return send(
+          `👑✨ *— NEUES CLAN-RATSMITGLIED —* ✨👑\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+          `@${targetJid.split('@')[0]} wurde offiziell in den *Clan-Rat* aufgenommen!\n\n` +
+          `Das Profil (${activePrefix}whoami) zeigt diese Ehre jetzt hervorgehoben an.`,
+          { mentions: [targetJid] }
+        );
+      }
+
+      if (cmd === 'removecouncil') {
+        if (!isOwner) return send('❌ Nur der Inhaber darf Mitglieder aus dem Clan-Rat entfernen.');
+        const councilCtx = m.message?.extendedTextMessage?.contextInfo;
+        let target = args[0];
+        if (councilCtx?.mentionedJid?.length) target = councilCtx.mentionedJid[0];
+        else if (councilCtx?.participant) target = councilCtx.participant;
+        if (!target) return send(`❌ Nutzung: ${activePrefix}removecouncil @user`);
+
+        const targetJid = await resolveLidJid(target, sock);
+        ensureUser(targetJid);
+
+        if (users[targetJid].council !== true) {
+          return send(`ℹ️ @${targetJid.split('@')[0]} ist kein Mitglied des Clan-Rats.`, { mentions: [targetJid] });
+        }
+
+        users[targetJid].council = false;
+        save(FILES.users, users);
+        return send(`✅ @${targetJid.split('@')[0]} wurde aus dem Clan-Rat entfernt.`, { mentions: [targetJid] });
+      }
+
+      if (cmd === 'council' || cmd === 'councilliste' || cmd === 'ratsliste') {
+        const members = Object.entries(users).filter(([, u]) => u.council === true);
+        if (!members.length) return send('👑 Der Clan-Rat hat aktuell keine Mitglieder.');
+
+        const sorted = members.sort((a, b) => (a[1].councilSince || 0) - (b[1].councilSince || 0));
+        const lines = sorted.map(([jid, u], i) => {
+          const name = u.name || u.registrationName || jid.split('@')[0];
+          const since = u.councilSince ? new Date(u.councilSince).toLocaleDateString('de-DE') : '?';
+          return `${i + 1}. 👑 ${name} — Mitglied seit ${since}`;
+        });
+        const mentions = sorted.map(([jid]) => jid);
+
+        return send(
+          `👑✨ *— DER CLAN-RAT VON AINCRAD —* ✨👑\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n${lines.join('\n')}`,
+          { mentions }
+        );
       }
 
       if (cmd === 'fish') {
@@ -4794,6 +4871,17 @@ if (cmd === 'showuser') {
 
   const viewerIsPrimaryOwner = isPrimaryOwner(sender);
 
+  const isCouncilMemberShow = u.council === true;
+  const councilSinceShowStr = u.councilSince
+    ? new Date(u.councilSince).toLocaleDateString('de-DE')
+    : null;
+  const councilBannerShow = isCouncilMemberShow
+    ? `👑✨ ━━━━━━━━━━━━━━━━━━━━━ ✨👑\n` +
+      `      *MITGLIED DES CLAN-RATS*\n` +
+      (councilSinceShowStr ? `      _Rat seit ${councilSinceShowStr}_\n` : '') +
+      `👑✨ ━━━━━━━━━━━━━━━━━━━━━ ✨👑\n\n`
+    : '';
+
   const formatGearLineForShowuser = (itemId) => {
     if (!itemId) return '— (keine Ausrüstung)';
     const it = ITEM_DB[itemId];
@@ -4811,7 +4899,7 @@ if (cmd === 'showuser') {
   const gearBlock = `\n⚔️ *Ausrüstung*\n🗡️ Waffe: ${weaponLine}\n🛡️ Rüstung: ${armorLine}`;
 
   const caption =
-    `👤 *Profil von ${displayName}*\n` +
+    `${councilBannerShow}👤 *Profil von ${displayName}*\n` +
     `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
     `🏅 Rang: ${prettyRank(rank)}\n` +
     `${titleLine}\n` +
