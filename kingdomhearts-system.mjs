@@ -1,3 +1,4 @@
+
 import fs from 'fs';
 import path from 'path';
 
@@ -313,19 +314,23 @@ ${' '}
     // ---------- khtravel ----------
     if (cmd === 'khtravel') {
       const query = args.join(' ').trim().toLowerCase();
-      if (!query) await send(`❌ Nutzung: ${activePrefix}khtravel <weltname>\nBeispiel: ${activePrefix}khtravel agrabah`);
-      return true;
+      if (!query) {
+        await send(`❌ Nutzung: ${activePrefix}khtravel <weltname>\nBeispiel: ${activePrefix}khtravel agrabah`);
+        return true;
+      }
 
       const target = WORLDS.find(w =>
         w.id.replace(/_/g, ' ') === query ||
         w.id === query.replace(/\s+/g, '_') ||
         w.name.toLowerCase().includes(query)
       );
-      if (!target) await send(`❌ Welt "${query}" nicht gefunden. Nutze ${activePrefix}khworlds für die Liste.`);
-      return true;
+      if (!target) {
+        await send(`❌ Welt "${query}" nicht gefunden. Nutze ${activePrefix}khworlds für die Liste.`);
+        return true;
+      }
       if (!profile.unlockedWorlds.includes(target.id)) {
         await send(`🔒 ${target.name} ist noch gesperrt. Besiege zuerst den Boss der vorherigen Welt.`);
-      return true;
+        return true;
       }
       profile.currentWorld = target.id;
       saveKh();
@@ -336,8 +341,10 @@ ${' '}
     // ---------- khexplore ----------
     if (cmd === 'khexplore') {
       const cd = cooldownLeft(profile.lastExplore, EXPLORE_COOLDOWN);
-      if (cd) await send(`⏰ Du musst noch ${cd} warten, bevor du wieder erkunden kannst.`);
-      return true;
+      if (cd) {
+        await send(`⏰ Du musst noch ${cd} warten, bevor du wieder erkunden kannst.`);
+        return true;
+      }
 
       const world = WORLDS.find(w => w.id === profile.currentWorld);
       const heartless = HEARTLESS[randInt(0, HEARTLESS.length - 1)];
@@ -357,32 +364,36 @@ ${' '}
           `+${xpGain} XP, +${munnyGain} Munny`;
         if (levelUps.length) text += `\n🎉 Level-Up! Du bist jetzt Level ${levelUps[levelUps.length - 1]}!`;
         await send(text);
-      return true;
+        return true;
       } else {
         const lostMunny = Math.min(profile.munny, randInt(5, 20));
         profile.munny -= lostMunny;
         saveKh();
         await send(`${heartless.emoji} *${heartless.name}* hat dich überwältigt! -${lostMunny} Munny.\nRüste eine stärkere Keyblade aus oder leve zuerst.`);
-      return true;
+        return true;
       }
     }
 
     // ---------- khboss ----------
     if (cmd === 'khboss') {
       const cd = cooldownLeft(profile.lastBoss, BOSS_COOLDOWN);
-      if (cd) await send(`⏰ Der Weltboss regeneriert sich noch. Warte ${cd}.`);
-      return true;
+      if (cd) {
+        await send(`⏰ Der Weltboss regeneriert sich noch. Warte ${cd}.`);
+        return true;
+      }
 
       const world = WORLDS.find(w => w.id === profile.currentWorld);
-      if (!world) await send('❌ Ungültige aktuelle Welt.');
-      return true;
+      if (!world) {
+        await send('❌ Ungültige aktuelle Welt.');
+        return true;
+      }
       if (profile.clearedWorlds.includes(world.id)) {
         await send(`✅ Du hast ${world.name} bereits abgeschlossen. Reise weiter mit ${activePrefix}khtravel.`);
-      return true;
+        return true;
       }
       if (profile.level < world.reqLevel) {
         await send(`⚠️ Du solltest mindestens Level ${world.reqLevel} sein, um gegen *${world.boss}* zu bestehen (aktuell: Lv.${profile.level}). Nutze ${activePrefix}khexplore zum Leveln.`);
-      return true;
+        return true;
       }
 
       profile.lastBoss = Date.now();
@@ -415,11 +426,11 @@ ${' '}
         else text += `\n\n✨ Du hast alle Welten abgeschlossen! Kingdom Hearts liegt in deiner Hand.`;
 
         await send(text);
-      return true;
+        return true;
       } else {
         saveKh();
         await send(`💔 *${world.boss}* war zu stark für dich! Werde stärker mit ${activePrefix}khexplore und versuche es erneut.`);
-      return true;
+        return true;
       }
     }
 
@@ -438,15 +449,19 @@ ${' '}
     if (cmd === 'khbuy') {
       const key = (args[0] || '').toLowerCase();
       const item = SHOP[key];
-      if (!item) await send(`❌ Unbekanntes Item. Nutze ${activePrefix}khshop für die Liste.`);
-      return true;
+      if (!item) {
+        await send(`❌ Unbekanntes Item. Nutze ${activePrefix}khshop für die Liste.`);
+        return true;
+      }
       if (item.reqWorld && !profile.unlockedWorlds.includes(item.reqWorld)) {
         const w = WORLDS.find(x => x.id === item.reqWorld);
         await send(`🔒 Du musst zuerst ${w?.name || item.reqWorld} freigeschaltet haben.`);
-      return true;
+        return true;
       }
-      if (profile.munny < item.price) await send(`💸 Nicht genug Munny (du hast ${profile.munny}, benötigt: ${item.price}).`);
-      return true;
+      if (profile.munny < item.price) {
+        await send(`💸 Nicht genug Munny (du hast ${profile.munny}, benötigt: ${item.price}).`);
+        return true;
+      }
 
       profile.munny -= item.price;
       if (item.keyblade) {
@@ -480,10 +495,14 @@ ${' '}
     if (cmd === 'khequip') {
       const key = (args.join('_') || args[0] || '').toLowerCase().replace(/\s+/g, '_');
       const matched = Object.keys(KEYBLADES).find(id => id === key || KEYBLADES[id].name.toLowerCase() === args.join(' ').toLowerCase());
-      if (!matched) await send(`❌ Nutzung: ${activePrefix}khequip <keyblade-id>\nSieh dein Inventar mit ${activePrefix}khinventory.`);
-      return true;
-      if (!profile.keyblades[matched]) await send(`❌ Du besitzt diese Keyblade nicht.`);
-      return true;
+      if (!matched) {
+        await send(`❌ Nutzung: ${activePrefix}khequip <keyblade-id>\nSieh dein Inventar mit ${activePrefix}khinventory.`);
+        return true;
+      }
+      if (!profile.keyblades[matched]) {
+        await send(`❌ Du besitzt diese Keyblade nicht.`);
+        return true;
+      }
       profile.equipped = matched;
       saveKh();
       await send(`✅ ${formatKeyblade(matched)} ausgerüstet!`);
@@ -493,23 +512,31 @@ ${' '}
     // ---------- khduel ----------
     if (cmd === 'khduel') {
       const cd = cooldownLeft(profile.lastDuel, DUEL_COOLDOWN);
-      if (cd) await send(`⏰ Du musst noch ${cd} warten, bevor du wieder duellieren kannst.`);
-      return true;
+      if (cd) {
+        await send(`⏰ Du musst noch ${cd} warten, bevor du wieder duellieren kannst.`);
+        return true;
+      }
 
       const ctxInfo = m?.message?.extendedTextMessage?.contextInfo;
       let targetRaw = args[0];
       if (ctxInfo?.mentionedJid?.length) targetRaw = ctxInfo.mentionedJid[0];
       else if (ctxInfo?.participant) targetRaw = ctxInfo.participant;
-      if (!targetRaw) await send(`❌ Nutzung: ${activePrefix}khduel @gegner`);
-      return true;
+      if (!targetRaw) {
+        await send(`❌ Nutzung: ${activePrefix}khduel @gegner`);
+        return true;
+      }
 
       const targetJid = normalizeJid(targetRaw);
-      if (targetJid === jid) await send('❌ Du kannst nicht gegen dich selbst duellieren!');
-      return true;
+      if (targetJid === jid) {
+        await send('❌ Du kannst nicht gegen dich selbst duellieren!');
+        return true;
+      }
 
       const opponent = khData[targetJid];
-      if (!opponent) await send('❌ Dieser Spieler hat noch keine Kingdom-Hearts-Reise begonnen.');
-      return true;
+      if (!opponent) {
+        await send('❌ Dieser Spieler hat noch keine Kingdom-Hearts-Reise begonnen.');
+        return true;
+      }
 
       profile.lastDuel = Date.now();
 
@@ -554,8 +581,10 @@ ${' '}
         return scoreB - scoreA;
       }).slice(0, 10);
 
-      if (!entries.length) await send('📊 Noch keine Schlüsselträger vorhanden.');
-      return true;
+      if (!entries.length) {
+        await send('📊 Noch keine Schlüsselträger vorhanden.');
+        return true;
+      }
 
       const medals = ['🥇', '🥈', '🥉'];
       const lines = await Promise.all(entries.map(async ([eJid, p], i) => {
