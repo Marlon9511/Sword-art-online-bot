@@ -794,7 +794,14 @@ function invalidateLidCache(jid) {
 async function getNumberMention(jid, sock) {
   const resolved = await resolvePhoneJid(jid, sock);
   if (resolved) return `@${resolved.split('@')[0]}`;
-  return '@Nutzer';
+  // Kein Telefonnummer-Mapping verfügbar (häufig bei reinen LID-Nutzern) —
+  // statt des generischen Platzhaltertexts "@Nutzer" die vorhandenen Ziffern
+  // (LID oder Telefonnummer, was auch immer vorliegt) verwenden. WhatsApp
+  // zeigt in der Mention trotzdem den echten Kontaktnamen an, solange die
+  // JID im "mentions"-Array der Nachricht steht — der Text hier ist nur Deko.
+  const n = normalizeJid(jid);
+  const raw = n ? n.split('@')[0] : null;
+  return raw ? `@${raw}` : '@Nutzer';
 }
 
 function findUserJidByName(name) {
@@ -4864,6 +4871,11 @@ if (cmd === 'showuser') {
     marriageLine = `💍 Verheiratet mit: ${partnerName}`;
   }
 
+  const banEntry = bans[targetJid];
+  const banLine = banEntry
+    ? `🚫 Gebannt: *JA* (Grund: ${banEntry.reason || 'Kein Grund'}${banEntry.at ? `, seit ${new Date(banEntry.at).toLocaleDateString('de-DE')}` : ''})`
+    : '✅ Gebannt: Nein';
+
   const activeTitleObj = TITLES.find(t => t.id === u.activeTitle);
   const titleLine = activeTitleObj
     ? `🎖️ Titel: ${activeTitleObj.icon} "${activeTitleObj.name}"`
@@ -4902,6 +4914,7 @@ if (cmd === 'showuser') {
     `${councilBannerShow}👤 *Profil von ${displayName}*\n` +
     `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
     `🏅 Rang: ${prettyRank(rank)}\n` +
+    `${banLine}\n` +
     `${titleLine}\n` +
     `⭐ Level: ${u.level || 1}\n` +
     `✨ XP: ${u.xp || 0}\n` +
