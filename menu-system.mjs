@@ -32,6 +32,7 @@ function buildMainLayer(ctx) {
   t += `▸ ${PREFIX}menu naruto — Naruto-Charaktersystem\n`;
   t += `▸ ${PREFIX}menu jjk — Jujutsu-Kaisen-System\n`;
   t += `▸ ${PREFIX}menu hxh — Hunter x Hunter Nen-System\n`;
+  t += `▸ ${PREFIX}menu kh — Kingdom-Hearts-System\n`;
   t += `▸ ${PREFIX}menu social — Interaktions-Skills (hug, kiss, pat, ...)\n`;
   t += `▸ ${PREFIX}menu fun — Fun & Action Skills (kill, yeet, nuke, ...)\n`;
   t += `▸ ${PREFIX}menu chat — Gilden-Chat & Gruppeneinstellungen\n`;
@@ -145,6 +146,18 @@ function buildHunterXHunterLayer(ctx) {
     .map(l => l.replace(/\{P\}/g, PREFIX))
     .join('\n');
   t += `\n\n🎯 _"Ich sage nur einmal Danke." — Werde ein Hunter und entfessle dein Nen._`;
+  return t;
+}
+
+function buildKingdomHeartsLayer(ctx) {
+  const { PREFIX, KH_HELP_TEXT } = ctx;
+  let t = `✨ *KINGDOM HEARTS SYSTEM*\n${DIVIDER}\n`;
+  t += (KH_HELP_TEXT || '(keine Daten verfügbar)')
+    .split('\n')
+    .filter(Boolean)
+    .map(l => l.replace(/\{P\}/g, PREFIX))
+    .join('\n');
+  t += `\n\n✨ _"Die Schlüssel zur Wahrheit liegen im Herzen." — Sammle Keyblades und bereise die Welten._`;
   return t;
 }
 
@@ -289,6 +302,7 @@ const LAYERS = {
   naruto:      { build: buildNarutoLayer,      aliases: ['nrt', 'shinobi', 'konoha'] },
   jjk:         { build: buildJujutsuLayer,     aliases: ['jujutsu', 'jujutsukaisen', 'sukuna'] },
   hxh:         { build: buildHunterXHunterLayer, aliases: ['hunterxhunter', 'nen', 'huntersystem2'] },
+  kh:          { build: buildKingdomHeartsLayer, aliases: ['kingdomhearts', 'kingdom-hearts', 'keyblade'] },
   social:      { build: buildSocialLayer,      aliases: ['interaktion', 'interaction'] },
   fun:         { build: buildFunLayer,         aliases: ['action', 'giphy'] },
   chat:        { build: buildChatLayer,        aliases: ['gruppe', 'group', 'gilden-chat'] },
@@ -322,6 +336,7 @@ function buildNavRows(ctx) {
     naruto:      { title: '🍥 Naruto',         desc: 'Charaktere, Jutsu & Duelle' },
     jjk:         { title: '🌀 Jujutsu Kaisen', desc: 'Fluchtechniken & Domain Expansion' },
     hxh:         { title: '🎯 Hunter x Hunter', desc: 'Nen-Fähigkeiten & Duelle' },
+    kh:          { title: '✨ Kingdom Hearts', desc: 'Keyblades, Welten & Duelle' },
     social:      { title: '💞 Social',         desc: 'Interaktions-Skills' },
     fun:         { title: '💀 Fun & Action',   desc: 'Giphy-Reactions' },
     chat:        { title: '💬 Gilden-Chat',    desc: 'Chat- & Gruppeneinstellungen' },
@@ -330,7 +345,7 @@ function buildNavRows(ctx) {
     owner:       { title: '👑 System-Admin',    desc: 'Kayaba-Rechte' }
   };
 
-  const order = ['main', 'arena', 'gilde', 'titel', 'pokemon', 'demonslayer', 'hunter', 'naruto', 'jjk', 'hxh', 'social', 'fun', 'chat', 'support', 'admin', 'owner'];
+  const order = ['main', 'arena', 'gilde', 'titel', 'pokemon', 'demonslayer', 'hunter', 'naruto', 'jjk', 'hxh', 'kh', 'social', 'fun', 'chat', 'support', 'admin', 'owner'];
   const rows = [];
 
   for (const key of order) {
