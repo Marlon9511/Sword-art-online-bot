@@ -5353,6 +5353,13 @@ const hunterHandled = await hunterxhunter.handle({
   getNumberMention, randInt, sleep, isPrimaryOwner
 });
 if (hunterHandled) return;
+
+const kingdomHeartsHandled = await kingdomHearts.handle({
+  cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
+  users, save, FILES, ensureUser, normalizeJid, isSameJid,
+  getNumberMention, randInt, sleep, isPrimaryOwner
+});
+if (kingdomHeartsHandled) return;
       if (cmd === 'ownermode' || cmd === 'om') {
         if (!isOwner) return send('❌ Nur der Inhaber/Co-Inhaber darf diesen Befehl nutzen.');
         const action = (args[0] || '').toLowerCase();
