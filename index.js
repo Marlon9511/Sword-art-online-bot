@@ -30,6 +30,7 @@ import { createNarutoSystem } from './naruto-system.mjs';
 import { createLidSystem } from './lid-system.mjs';
 import { createJujutsuSystem } from './jujutsu-system.mjs';
 import { createHunterSystem } from './hunterxhunter-system.mjs';
+import { createKingdomHeartsSystem } from './kingdomhearts-system.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('⚠️ Unhandled Rejection:', reason?.message || reason);
@@ -263,6 +264,7 @@ const naruto = createNarutoSystem(DATA_PATH);
 const lidSystem = createLidSystem(DATA_PATH);
 const jujutsu = createJujutsuSystem(DATA_PATH);
 const hunterxhunter = createHunterSystem(DATA_PATH);
+const kingdomHearts = createKingdomHeartsSystem(DATA_PATH);
 
 async function createBackup() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -2015,16 +2017,17 @@ function downloadShortIfNeeded() {
 
 if (cmd === 'help' || cmd === 'menu') {
   const helpText = menuSystem.buildMenuText({
-  args, sender, activePrefix, PREFIX,
-  isAuthorized, hasAdminPerms,
-  ARENA_HELP_TEXT, GUILD_HELP_TEXT, TITLE_HELP_TEXT, POKEMON_HELP_TEXT,
-  GUILDWAR_HELP_TEXT,
-  DS_HELP_TEXT: demonSlayer.DS_HELP_TEXT,
-  SL_HELP_TEXT: soloLeveling.SL_HELP_TEXT,
-  NARUTO_HELP_TEXT: naruto.NARUTO_HELP_TEXT,
-  JJK_HELP_TEXT: jujutsu.JJK_HELP_TEXT,
-  HXH_HELP_TEXT: hunterxhunter.HXH_HELP_TEXT
-});
+    args, sender, activePrefix, PREFIX,
+    isAuthorized, hasAdminPerms,
+    ARENA_HELP_TEXT, GUILD_HELP_TEXT, TITLE_HELP_TEXT, POKEMON_HELP_TEXT,
+    GUILDWAR_HELP_TEXT,
+    DS_HELP_TEXT: demonSlayer.DS_HELP_TEXT,
+    SL_HELP_TEXT: soloLeveling.SL_HELP_TEXT,
+    NARUTO_HELP_TEXT: naruto.NARUTO_HELP_TEXT,
+    JJK_HELP_TEXT: jujutsu.JJK_HELP_TEXT,
+    HXH_HELP_TEXT: hunterxhunter.HXH_HELP_TEXT,
+    KH_HELP_TEXT: kingdomHearts.KH_HELP_TEXT
+  });
   try {
     const videoPath = await downloadShortIfNeeded();
     await sock.sendMessage(from, {
