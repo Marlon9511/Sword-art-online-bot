@@ -1,34 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 
-/**
- * Kingdom Hearts System
- * ----------------------------------------------------------------
- * Komplett eigenständiges Spielsystem:
- *  - Keyblades sammeln & ausrüsten
- *  - Welten bereisen & Story-Fortschritt (Bosse besiegen -> nächste Welt)
- *  - PvP-Duelle zwischen Spielern
- *
- * Eigene Datenbank (kingdomhearts.json) und eigene Währung ("Munny"),
- * unabhängig von users.json / coins.
- *
- * Einbindung in index.js:
- *
- *   import { createKingdomHeartsSystem } from './kingdomhearts-system.mjs';
- *   const kingdomHearts = createKingdomHeartsSystem(DATA_PATH);
- *
- *   // im Command-Handler, z.B. neben den anderen "...Handled" Blöcken:
- *   const khHandled = await kingdomHearts.handle({
- *     cmd, args, sender, from, m, isGroup, activePrefix, send, sock,
- *     users, save, FILES, ensureUser, normalizeJid, isSameJid,
- *     getNumberMention, randInt, sleep, isPrimaryOwner
- *   });
- *   if (khHandled) return;
- *
- *   // im Menü (menuSystem.buildMenuText Aufruf):
- *   KH_HELP_TEXT: kingdomHearts.KH_HELP_TEXT
- * ----------------------------------------------------------------
- */
 
 export function createKingdomHeartsSystem(DATA_PATH) {
   const KH_FILE = path.join(DATA_PATH, 'kingdomhearts.json');
@@ -95,12 +67,12 @@ export function createKingdomHeartsSystem(DATA_PATH) {
   // ---------------------------------------------------------------
   const WORLDS = [
     {
-      id: 'destiny_islands', name: '🏝️ Zerstörinseln', reqLevel: 1,
+      id: 'destiny_islands', name: '🏝️ insel des Schicksals', reqLevel: 1,
       boss: 'Dunkler Nebel', bossPower: 20, xp: 40, munny: 60,
       unlockKeyblade: null
     },
     {
-      id: 'traverse_town', name: '🌆 Niemandsstadt', reqLevel: 2,
+      id: 'traverse_town', name: '🌆 traverse_town', reqLevel: 2,
       boss: 'Guard Armor', bossPower: 45, xp: 70, munny: 120,
       unlockKeyblade: null
     },
@@ -290,7 +262,7 @@ ${' '}
       return void send(
         `✨ Willkommen in *Kingdom Hearts*, Schlüsselträger!\n\n` +
         `Du beginnst mit der *Kingdom Key* ausgerüstet und ${profile.munny} Munny.\n` +
-        `Nutze ${activePrefix}khworlds um die Welten zu sehen, und ${activePrefix}khexplore um deine Reise auf den Zerstörinseln zu beginnen.`
+        `Nutze ${activePrefix}khworlds um die Welten zu sehen, und ${activePrefix}khexplore um deine Reise auf der Insel des Schicksals zu beginnen.`
       );
     }
 
