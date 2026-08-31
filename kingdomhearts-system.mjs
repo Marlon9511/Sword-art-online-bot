@@ -1,4 +1,3 @@
-
 import fs from 'fs';
 import path from 'path';
 
@@ -151,7 +150,7 @@ export function createKingdomHeartsSystem(DATA_PATH) {
   const KH_COMMANDS = [
     'khstart', 'khhelp', 'khprofile', 'khme',
     'khworld', 'khworlds', 'khtravel', 'khexplore', 'khboss',
-    'khshop', 'khbuy', 'khinventory', 'khinv', 'khequip',
+    'khshop', 'khbuy', 'khinventory', 'khinv', 'khequip', 'khuse',
     'khduel', 'khleaderboard', 'khrangliste'
   ];
 
@@ -168,6 +167,7 @@ ${' '}
 {P}khbuy <item> — Etwas kaufen
 {P}khinventory — Dein Inventar
 {P}khequip <keyblade> — Keyblade ausrüsten
+{P}khuse <item> — Item benutzen
 {P}khduel @user — Gegen einen anderen Spieler duellieren
 {P}khleaderboard — Bestenliste`;
 
@@ -509,6 +509,43 @@ ${' '}
       return true;
     }
 
+    // ---------- khuse ----------
+    if (cmd === 'khuse') {
+      const key = (args[0] || '').toLowerCase();
+      const owned = profile.items[key];
+
+      if (!owned) {
+        await send(`❌ Du besitzt "${key || '???'}" nicht. Nutze ${activePrefix}khinventory zum Nachsehen.`);
+        return true;
+      }
+
+      if (key === 'potion' || key === 'hi_potion') {
+        const xpGain = key === 'hi_potion' ? randInt(20, 40) : randInt(8, 18);
+        profile.items[key]--;
+        if (profile.items[key] <= 0) delete profile.items[key];
+        const levelUps = addXp(profile, xpGain);
+        saveKh();
+        let text = `🧪 ${SHOP[key].name} benutzt! +${xpGain} XP`;
+        if (levelUps.length) text += `\n🎉 Level-Up! Du bist jetzt Level ${levelUps[levelUps.length - 1]}!`;
+        await send(text);
+        return true;
+      }
+
+      if (key === 'ether') {
+        profile.items.ether--;
+        if (profile.items.ether <= 0) delete profile.items.ether;
+        profile.lastExplore = 0;
+        profile.lastBoss = 0;
+        profile.lastDuel = 0;
+        saveKh();
+        await send(`✨ Äther benutzt! Alle Cooldowns (Erkunden, Boss, Duell) wurden zurückgesetzt.`);
+        return true;
+      }
+
+      await send(`❌ "${key}" kann nicht benutzt werden.`);
+      return true;
+    }
+
     // ---------- khduel ----------
     if (cmd === 'khduel') {
       const cd = cooldownLeft(profile.lastDuel, DUEL_COOLDOWN);
@@ -572,41 +609,7 @@ ${' '}
       await send(text, { mentions });
       return true;
     }
-if (cmd === 'khuse') {
-      const key = (args[0] || '').toLowerCase();
-      const owned = profile.items[key];
 
-      if (!owned) {
-        await send(`❌ Du besitzt "${key || '???'}" nicht. Nutze ${activePrefix}khinventory zum Nachsehen.`);
-        return true;
-      }
-
-      if (key === 'potion' || key === 'hi_potion') {
-        const xpGain = key === 'hi_potion' ? randInt(20, 40) : randInt(8, 18);
-        profile.items[key]--;
-        if (profile.items[key] <= 0) delete profile.items[key];
-        const levelUps = addXp(profile, xpGain);
-        saveKh();
-        let text = `🧪 ${SHOP[key].name} benutzt! +${xpGain} XP`;
-        if (levelUps.length) text += `\n🎉 Level-Up! Du bist jetzt Level ${levelUps[levelUps.length - 1]}!`;
-        await send(text);
-        return true;
-      }
-
-      if (key === 'ether') {
-        profile.items.ether--;
-        if (profile.items.ether <= 0) delete profile.items.ether;
-        profile.lastExplore = 0;
-        profile.lastBoss = 0;
-        profile.lastDuel = 0;
-        saveKh();
-        await send(`✨ Äther benutzt! Alle Cooldowns (Erkunden, Boss, Duell) wurden zurückgesetzt.`);
-        return true;
-      }
-
-      await send(`❌ "${key}" kann nicht benutzt werden.`);
-      return true;
-    }
     // ---------- khleaderboard / khrangliste ----------
     if (cmd === 'khleaderboard' || cmd === 'khrangliste') {
       const entries = Object.entries(khData).sort((a, b) => {
