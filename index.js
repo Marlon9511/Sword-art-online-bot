@@ -31,6 +31,7 @@ import { createLidSystem } from './lid-system.mjs';
 import { createJujutsuSystem } from './jujutsu-system.mjs';
 import { createHunterSystem } from './hunterxhunter-system.mjs';
 import { createKingdomHeartsSystem } from './kingdomhearts-system.mjs';
+import { createAincradSystem } from './aincrad-system.mjs';
 
 process.on('unhandledRejection', (reason) => {
   console.error('⚠️ Unhandled Rejection:', reason?.message || reason);
@@ -265,6 +266,7 @@ const lidSystem = createLidSystem(DATA_PATH);
 const jujutsu = createJujutsuSystem(DATA_PATH);
 const hunterxhunter = createHunterSystem(DATA_PATH);
 const kingdomHearts = createKingdomHeartsSystem(DATA_PATH);
+const aincrad = createAincradSystem(DATA_PATH);
 
 async function createBackup() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -2039,7 +2041,8 @@ if (cmd === 'help' || cmd === 'menu') {
     NARUTO_HELP_TEXT: naruto.NARUTO_HELP_TEXT,
     JJK_HELP_TEXT: jujutsu.JJK_HELP_TEXT,
     HXH_HELP_TEXT: hunterxhunter.HXH_HELP_TEXT,
-    KH_HELP_TEXT: kingdomHearts.KH_HELP_TEXT
+    KH_HELP_TEXT: kingdomHearts.KH_HELP_TEXT, 
+AC_HELP_TEXT: aincrad.AC_HELP_TEXT
   });
   try {
     const videoPath = await downloadShortIfNeeded();
