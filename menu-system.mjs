@@ -24,6 +24,7 @@ function buildMainLayer(ctx) {
 
   t += `📚 *WEITERE MENÜ-EBENEN* — nutze ${PREFIX}menu <name>\n${DIVIDER}\n`;
   t += `▸ ${PREFIX}menu arena — Ausrüstung & PVP-Kämpfe\n`;
+  t += `▸ ${PREFIX}menu aincrad — Aincrad Floor-System (SAO)\n`;
   t += `▸ ${PREFIX}menu gilde — Gilden-/Verbunds-System\n`;
   t += `▸ ${PREFIX}menu titel — Titel & Erfolge\n`;
   t += `▸ ${PREFIX}menu pokemon — Pokémon-System\n`;
@@ -61,6 +62,18 @@ function buildArenaLayer(ctx) {
   t += `▸ ${PREFIX}feed — Begleiter füttern\n\n`;
   t += `⚔️ *ARENA-SYSTEM* (Ausrüstung & PVP)\n${DIVIDER}\n`;
   t += ARENA_HELP_TEXT.split('\n').filter(Boolean).map(l => l.replace(/\{P\}/g, PREFIX)).join('\n');
+  return t;
+}
+
+function buildAincradLayer(ctx) {
+  const { PREFIX, AC_HELP_TEXT } = ctx;
+  let t = `🏰 *AINCRAD-SYSTEM* (Sword Art Online)\n${DIVIDER}\n`;
+  t += (AC_HELP_TEXT || '(keine Daten verfügbar)')
+    .split('\n')
+    .filter(Boolean)
+    .map(l => l.replace(/\{P\}/g, PREFIX))
+    .join('\n');
+  t += `\n\n⚔️ _"Ich werde stärker als jeder andere." — Erklimme alle 100 Stockwerke und besiege Aincrad._`;
   return t;
 }
 
@@ -294,6 +307,7 @@ const LAYERS = {
   main:        { build: buildMainLayer,        aliases: [] },
   system:      { build: buildMainLayer,        aliases: ['start', 'basis'] },
   arena:       { build: buildArenaLayer,       aliases: ['wirtschaft', 'economy'] },
+  aincrad:     { build: buildAincradLayer,     aliases: ['sword-art-online', 'swordartonline', 'floors', 'stockwerke'] },
   gilde:       { build: buildGuildLayer,       aliases: ['guild', 'gilden'] },
   titel:       { build: buildTitleLayer,       aliases: ['titles', 'achievements', 'erfolge'] },
   pokemon:     { build: buildPokemonLayer,     aliases: ['poke', 'pokedex'] },
@@ -328,6 +342,7 @@ function buildNavRows(ctx) {
   const LABELS = {
     main:        { title: '🔷 Hauptmenü',     desc: 'Übersicht & Basis-Befehle' },
     arena:       { title: '⚔️ Arena',          desc: 'Ausrüstung, PVP & Wirtschaft' },
+    aincrad:     { title: '🏰 Aincrad',        desc: 'SAO Floor-System' },
     gilde:       { title: '🏰 Gilde',          desc: 'Verbünde & Gildensystem' },
     titel:       { title: '🎖️ Titel',          desc: 'Titel & Erfolge' },
     pokemon:     { title: '🐾 Pokémon',        desc: 'Fangen, Leveln, Kämpfen' },
@@ -345,7 +360,7 @@ function buildNavRows(ctx) {
     owner:       { title: '👑 System-Admin',    desc: 'Kayaba-Rechte' }
   };
 
-  const order = ['main', 'arena', 'gilde', 'titel', 'pokemon', 'demonslayer', 'hunter', 'naruto', 'jjk', 'hxh', 'kh', 'social', 'fun', 'chat', 'support', 'admin', 'owner'];
+  const order = ['main', 'arena', 'aincrad', 'gilde', 'titel', 'pokemon', 'demonslayer', 'hunter', 'naruto', 'jjk', 'hxh', 'kh', 'social', 'fun', 'chat', 'support', 'admin', 'owner'];
   const rows = [];
 
   for (const key of order) {
