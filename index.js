@@ -1999,22 +1999,35 @@ function getYoutubeTitle(url) {
     });
   });
 }
-
 function downloadShortIfNeeded() {
   return new Promise((resolve, reject) => {
     if (fs.existsSync(CACHE_PATH)) return resolve(CACHE_PATH);
 
     fs.mkdirSync(path.dirname(CACHE_PATH), { recursive: true });
 
-    const cmd = `yt-dlp -f "mp4" -o "${CACHE_PATH}" "${SHORT_URL}"`;
+    const rawPath = CACHE_PATH + '.raw.mp4';
 
-    exec(cmd, (err) => {
+    const dlCmd =
+      `yt-dlp -f "bv*[vcodec^=avc1][height<=720]+ba[acodec^=mp4a]/b[vcodec^=avc1][height<=720]/bv*[height<=720]+ba/best[height<=720]" ` +
+      `--merge-output-format mp4 --no-playlist -o "${rawPath}" "${SHORT_URL}"`;
+
+    exec(dlCmd, { maxBuffer: 1024 * 1024 * 50 }, (err) => {
       if (err) return reject(err);
-      resolve(CACHE_PATH);
+
+      const encodeCmd =
+        `ffmpeg -y -i "${rawPath}" -c:v libx264 -profile:v baseline -level 3.0 ` +
+        `-pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart "${CACHE_PATH}"`;
+
+      exec(encodeCmd, { maxBuffer: 1024 * 1024 * 50 }, (encErr) => {
+        try { fs.unlinkSync(rawPath); } catch (e) {}
+
+        if (encErr) return reject(encErr);
+        if (!fs.existsSync(CACHE_PATH)) return reject(new Error('Encodierte Datei wurde nicht erzeugt.'));
+        resolve(CACHE_PATH);
+      });
     });
   });
 }
-
 if (cmd === 'help' || cmd === 'menu') {
   const helpText = menuSystem.buildMenuText({
     args, sender, activePrefix, PREFIX,
