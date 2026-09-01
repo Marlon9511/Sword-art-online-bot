@@ -1966,7 +1966,7 @@ mentions: [sender]
         return send(`🔕 Du bist jetzt AFK: ${reason}`);
       }
 
-const SHORT_URL = 'https://youtube.com/shorts/FBMAN-SeeBQ?si=WfMtoSNb1ZD95Dk9';
+const SHORT_URL = 'https://youtube.com/shorts/FBMAN-SeeBQ?is=UcH8-OOtFdVyYz0-';
 const CACHE_PATH = path.join(__dirname, 'cache', 'menu-edit.mp4');
 const YTMP3_CACHE_DIR = path.join(__dirname, 'cache', 'ytmp3');
 
@@ -2040,6 +2040,28 @@ if (cmd === 'help' || cmd === 'menu') {
     await sock.sendMessage(from, { text: helpText }, { quoted: m });
   }
   return;
+}
+if (cmd === 'menucache' || cmd === 'clearmenucache') {
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
+
+  const sub = (args[0] || 'clear').toLowerCase();
+
+  if (sub === 'status') {
+    const exists = fs.existsSync(CACHE_PATH);
+    return send(exists ? `📦 Menu-Video-Cache vorhanden: ${CACHE_PATH}` : 'ℹ️ Kein Menu-Video-Cache vorhanden.');
+  }
+
+  if (!fs.existsSync(CACHE_PATH)) {
+    return send('ℹ️ Es gibt keinen Menu-Video-Cache zum Löschen.');
+  }
+
+  try {
+    fs.unlinkSync(CACHE_PATH);
+    return send('✅ Menu-Video-Cache gelöscht. Beim nächsten ' + activePrefix + 'menu wird das Video neu heruntergeladen.');
+  } catch (e) {
+    console.error('[menucache] Fehler beim Löschen:', e?.message || e);
+    return send('❌ Fehler beim Löschen des Caches: ' + (e?.message || 'Unbekannter Fehler'));
+  }
 }
  const GAME_COMMANDS = [
   'daily', 'work', 'blackjack', 'bj', 'bjstart', 'hit', 'stand',
