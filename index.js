@@ -1494,6 +1494,7 @@ const ALL_COMMANDS = [
   'slap', 'hug', 'kiss', 'pat', 'poke', 'cuddle', 'bite', 'punch', 'throw',
   'love', 'blush', 'handhold', 'lick', 'nervous',
   'bitchkick',
+  'autotranscribe-an', 'autotranscribe-aus', 'transcribe',
   ...ARENA_COMMANDS
 ];
 
@@ -1632,6 +1633,23 @@ mentions: [sender]
           });
         } catch (e) {}
         return;
+      }
+
+      // ── Sprachnachrichten-Transkription (automatisch) ──
+      // Läuft VOR dem Präfix-Gate, weil Sprachnachrichten normalerweise
+      // keinen Text-"body" haben und sonst nie hier ankommen würden.
+      const isVoiceNote = !!(m.message?.audioMessage);
+      if (isVoiceNote && !m.key.fromMe) {
+        const autoEnabled = isGroup
+          ? !!groupSettings[from]?.autotranscribe?.enabled
+          : !!groupSettings[from]?.autotranscribe?.enabled; // im PM wird "from" = Nutzer-JID genutzt, funktioniert genauso als Schlüssel
+        if (autoEnabled) {
+          await handleVoiceTranscription(sock, from, m, m);
+          // Automatische Transkription blockiert die restliche Verarbeitung
+          // dieser Nachricht nicht zwingend, aber da es sich um eine reine
+          // Sprachnachricht ohne Text-Befehl handelt, ist hier ohnehin Schluss.
+          return;
+        }
       }
 
       if (!body || !body.startsWith(activePrefix)) return;
@@ -1891,6 +1909,52 @@ mentions: [sender]
         );
       }
 
+      if ((cmd === 'autotranscribe-an' || cmd === 'autotranscribe-aus') ) {
+        if (isGroup) {
+          const groupMetadata = await getGroupMetaSafe(from);
+          const isGroupAdmin = isGroupAdminJid(groupMetadata, sender);
+          if (!isGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) {
+            return send('❌ Du musst Admin in dieser Gruppe sein, um die automatische Transkription umzuschalten.');
+          }
+        }
+
+        if (!groupSettings[from]) {
+          groupSettings[from] = { welcome: { enabled: false, message: 'Willkommen in der Gruppe {user}! 👋' } };
+        }
+        if (!groupSettings[from].autotranscribe) groupSettings[from].autotranscribe = { enabled: false };
+
+        if (cmd === 'autotranscribe-an') {
+          groupSettings[from].autotranscribe.enabled = true;
+          save(FILES.groupSettings, groupSettings);
+          return send('✅ Automatische Transkription von Sprachnachrichten ist jetzt AKTIV' + (isGroup ? ' für diese Gruppe' : '') + '.\nManuell geht das jederzeit auch mit ' + activePrefix + 'transcribe (als Antwort auf eine Sprachnachricht).');
+        }
+
+        groupSettings[from].autotranscribe.enabled = false;
+        save(FILES.groupSettings, groupSettings);
+        return send('🔕 Automatische Transkription von Sprachnachrichten ist jetzt DEAKTIVIERT' + (isGroup ? ' für diese Gruppe' : '') + '.');
+      }
+
+      if (cmd === 'transcribe') {
+        const ctx = m.message?.extendedTextMessage?.contextInfo;
+        const quoted = ctx?.quotedMessage;
+        if (!quoted || !quoted.audioMessage) {
+          return send(`❓ Bitte antworte mit ${activePrefix}transcribe direkt auf eine Sprachnachricht.`);
+        }
+
+        const fakeMsg = {
+          key: {
+            remoteJid: from,
+            id: ctx.stanzaId,
+            fromMe: false,
+            participant: ctx.participant
+          },
+          message: quoted
+        };
+
+        await handleVoiceTranscription(sock, from, fakeMsg, m);
+        return;
+      }
+
       if (cmd === 'bitchkick') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
         if (!isGroup) return send('❌ Dieser Befehl funktioniert nur innerhalb einer Gruppe.');
@@ -2134,7 +2198,7 @@ if (isGroup && GAME_COMMANDS.includes(cmd)) {
         const settings = groupSettings[from];
         const groupPrefix = settings.prefix || PREFIX;
         return send(
-          `📋 *Gruppeneinstellungen*\n\n*Welcome:* ${settings.welcome.enabled ? '✅ An' : '❌ Aus'}\n*Text:*\n${settings.welcome.message}\n*Prefix:* ${groupPrefix}\n\n*Befehle:*\n${groupPrefix}welcome-an / ${groupPrefix}welcome-aus / ${groupPrefix}welcome-set <text> / ${groupPrefix}setprefix <symbol> / ${groupPrefix}resetprefix`
+          `📋 *Gruppeneinstellungen*\n\n*Welcome:* ${settings.welcome.enabled ? '✅ An' : '❌ Aus'}\n*Text:*\n${settings.welcome.message}\n*Prefix:* ${groupPrefix}\n*Auto-Transkription:* ${settings.autotranscribe?.enabled ? '✅ An' : '❌ Aus'}\n\n*Befehle:*\n${groupPrefix}welcome-an / ${groupPrefix}welcome-aus / ${groupPrefix}welcome-set <text> / ${groupPrefix}setprefix <symbol> / ${groupPrefix}resetprefix / ${groupPrefix}autotranscribe-an / ${groupPrefix}autotranscribe-aus`
         );
       }
 
