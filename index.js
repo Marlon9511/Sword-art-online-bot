@@ -10,7 +10,7 @@ import QRCode from 'qrcode-terminal';
 import chalk from 'chalk';
 import readline from "readline";
 import gradient from "gradient-string";
-import { initTelegramConnect, setActiveSock, sendQrToTelegram } from './telegram-connect.js';
+import { initTelegramBot, setActiveSock, sendQrToTelegram } from './telegram-bot.js';
 import { fileURLToPath } from 'url';
 import webp from 'node-webpmux';
 import 'dotenv/config';
@@ -32,7 +32,6 @@ import { createJujutsuSystem } from './jujutsu-system.mjs';
 import { createHunterSystem } from './hunterxhunter-system.mjs';
 import { createKingdomHeartsSystem } from './kingdomhearts-system.mjs';
 import { createAincradSystem } from './aincrad-system.mjs';
-import { createTelegramModule } from './telegram-module.js';
 
 
 
