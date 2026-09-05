@@ -1,51 +1,4 @@
-// ============================================================================
-// telegram-module.js
-// ----------------------------------------------------------------------------
-// Eigenständiges Telegram-Modul für den Sword-Art-Online-Bot.
-//
-// ZIEL
-// Nutzer sollen den Bot auch über Telegram nutzen können, ohne dass ein
-// komplett getrenntes zweites Bot-System entsteht. Coins, XP, Level, Rang
-// etc. werden über dieselben Objekte (users, ranks, bans) verwaltet, die
-// auch der WhatsApp-Teil benutzt – dieses Modul bekommt sie einfach als
-// Referenz übergeben ("dependency injection"), verändert sie direkt und
-// ruft danach ganz normal save(FILES.xxx, xxx) auf, genau wie der
-// WhatsApp-Code das auch tut. Beide Plattformen lesen/schreiben also die
-// gleichen JSON-Dateien in /data.
-//
-// KONTOVERKNÜPFUNG (WhatsApp <-> Telegram)
-// Ein Telegram-Nutzer hat erstmal eine eigene, "native" Telegram-Identität:
-//   jid = "tg<telegramUserId>@telegram"
-// Hat er sich auf WhatsApp bereits per "?setpasswort <passwort>" eine
-// ID + Passwort gesetzt (siehe web-auth.js / users[jid].webId), kann er
-// sich in Telegram mit:
-//   /login <ID> <Passwort>
-// an genau diesen WhatsApp-Account anmelden. Ab dann zeigen/ändern alle
-// Telegram-Befehle die Daten DIESES verknüpften Accounts (gleiche Coins,
-// XP, Rang wie auf WhatsApp). /logout löst die Verknüpfung wieder (der
-// Telegram-Nutzer fällt zurück auf seinen eigenen "tg...@telegram"-Account).
-//
-// INSTALLATION
-//   npm install node-telegram-bot-api
-//
-// EINBINDUNG IN DEN HAUPT-BOT
-// Am Ende deiner index.js/bot.js, NACHDEM users/ranks/bans/save/FILES/
-// ensureUser/isAuthorized bereits geladen sind:
-//
-//   import { createTelegramModule } from './telegram-module.js';
-//
-//   const telegramModule = createTelegramModule({
-//     users, ranks, bans, save, FILES, ensureUser, isAuthorized,
-//     randInt, sleep, DATA_PATH
-//   });
-//   telegramModule.start();
-//
-// In deiner .env-Datei:
-//   TELEGRAM_BOT_TOKEN=123456:ABC-dein-bot-token-von-BotFather
-//
-// Fehlt TELEGRAM_BOT_TOKEN, startet das Modul einfach nicht (kein Crash) –
-// der WhatsApp-Teil läuft unabhängig davon normal weiter.
-// ============================================================================
+
 
 import TelegramBot from 'node-telegram-bot-api';
 import fs from 'fs';
@@ -87,7 +40,7 @@ export function createTelegramModule(deps) {
     DATA_PATH = path.resolve('./data')
   } = deps;
 
-  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const token = process.env.TELEGRAM_BOT_TOKEN;'8614468465:AAHP7693iiKX56Sp-9TRNa3q2gGMBXOQ-ms';
 
   if (!token) {
     console.log('⚠️  TELEGRAM_BOT_TOKEN nicht gesetzt — Telegram-Modul wird NICHT gestartet.');
