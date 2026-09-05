@@ -48,16 +48,19 @@ export function initTelegramConnect(manager) {
   });
 
   telegramBot.onText(/\/newsession\s+(\S+)/, async (msg, match) => {
-    if (!requireManager(msg.chat.id)) return;
+    // Owner darf auch dann durch, wenn der Session-Manager (noch) nicht angebunden ist —
+    // ein eventueller Fehler wird dann unten im try/catch abgefangen statt vorab zu blocken.
+    if (!isOwnerChat(msg) && !requireManager(msg.chat.id)) return;
 
     const name = match[1];
-    if (sessionManager.getSession(name)) {
-      return telegramBot.sendMessage(msg.chat.id, `⚠️ Session "${name}" läuft bereits. Nutze /status ${name}.`);
-    }
-
-    telegramBot.sendMessage(msg.chat.id, `⏳ Starte Session "${name}"...`);
 
     try {
+      if (sessionManager && sessionManager.getSession(name)) {
+        return telegramBot.sendMessage(msg.chat.id, `⚠️ Session "${name}" läuft bereits. Nutze /status ${name}.`);
+      }
+
+      telegramBot.sendMessage(msg.chat.id, `⏳ Starte Session "${name}"...`);
+
       const sock = await sessionManager.startSession(name, {
         onQr: async (qrBuffer) => {
           try {
@@ -177,7 +180,8 @@ export function initTelegramConnect(manager) {
 
   telegramBot.onText(/\/deletesession\s+(\S+)/, async (msg, match) => {
     if (!isOwnerChat(msg)) return telegramBot.sendMessage(msg.chat.id, '❌ Kein Zugriff. Nur der Owner darf Sessions löschen.');
-    if (!requireManager(msg.chat.id)) return;
+    // Kein requireManager-Check: der Owner darf es versuchen, auch wenn der
+    // Session-Manager (noch) nicht angebunden ist — ein Fehler landet dann im catch unten.
 
     const name = match[1];
     if (name === 'default') {
