@@ -3,9 +3,17 @@ import TelegramBot from 'node-telegram-bot-api';
 // Token fest eingebaut (kein .env nötig)
 const TELEGRAM_BOT_TOKEN = '8614468465:AAHP7693iiKX56Sp-9TRNa3q2gGMBXOQ-ms';
 
+// Nur dieser Telegram-Account darf /deletesession benutzen.
+// Eigene numerische Telegram-ID hier eintragen (z.B. via @userinfobot herausfinden).
+const OWNER_TELEGRAM_ID = 8598584607;
+
 let telegramBot = null;
 let sessionManager = null;
 let activeSock = null;
+
+function isOwnerChat(msg) {
+  return OWNER_TELEGRAM_ID && msg.from && msg.from.id === OWNER_TELEGRAM_ID;
+}
 
 function requireManager(chatId) {
   if (!sessionManager) {
@@ -168,6 +176,7 @@ export function initTelegramConnect(manager) {
   });
 
   telegramBot.onText(/\/deletesession\s+(\S+)/, async (msg, match) => {
+    if (!isOwnerChat(msg)) return telegramBot.sendMessage(msg.chat.id, '❌ Kein Zugriff. Nur der Owner darf Sessions löschen.');
     if (!requireManager(msg.chat.id)) return;
 
     const name = match[1];
