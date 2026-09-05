@@ -32,7 +32,7 @@ import { createJujutsuSystem } from './jujutsu-system.mjs';
 import { createHunterSystem } from './hunterxhunter-system.mjs';
 import { createKingdomHeartsSystem } from './kingdomhearts-system.mjs';
 import { createAincradSystem } from './aincrad-system.mjs';
-
+import { createYuGiOh } from './yugioh.mjs';
 
 
 process.on('unhandledRejection', (reason) => {
@@ -269,6 +269,8 @@ const jujutsu = createJujutsuSystem(DATA_PATH);
 const hunterxhunter = createHunterSystem(DATA_PATH);
 const kingdomHearts = createKingdomHeartsSystem(DATA_PATH);
 const aincrad = createAincradSystem(DATA_PATH);
+const yugioh = createYuGiOh(DATA_PATH);
+const pendingYugiohChallenges = new Map();
 
 async function createBackup() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
