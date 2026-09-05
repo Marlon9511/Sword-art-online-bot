@@ -1,5 +1,4 @@
 
-
 import TelegramBot from 'node-telegram-bot-api';
 import fs from 'fs';
 import path from 'path';
@@ -40,7 +39,8 @@ export function createTelegramModule(deps) {
     DATA_PATH = path.resolve('./data')
   } = deps;
 
-  const token = process.env.TELEGRAM_BOT_TOKEN;'8614468465:AAHP7693iiKX56Sp-9TRNa3q2gGMBXOQ-ms';
+  // Token fest eingebaut (kein .env nötig)
+  const token = '8614468465:AAHP7693iiKX56Sp-9TRNa3q2gGMBXOQ-ms';
 
   if (!token) {
     console.log('⚠️  TELEGRAM_BOT_TOKEN nicht gesetzt — Telegram-Modul wird NICHT gestartet.');
