@@ -34,11 +34,7 @@ import { createKingdomHeartsSystem } from './kingdomhearts-system.mjs';
 import { createAincradSystem } from './aincrad-system.mjs';
 import { createTelegramModule } from './telegram-module.js';
 
-const telegramModule = createTelegramModule({
-  users, ranks, bans, save, FILES, ensureUser, isAuthorized,
-  randInt, sleep, DATA_PATH
-});
-telegramModule.start();
+
 
 process.on('unhandledRejection', (reason) => {
   console.error('⚠️ Unhandled Rejection:', reason?.message || reason);
@@ -5635,7 +5631,11 @@ return send(
       log('ERROR: ' + (err?.message || String(err)));
     }
   });
-
+const telegramModule = createTelegramModule({
+  users, ranks, bans, save, FILES, ensureUser, isAuthorized,
+  randInt, sleep, DATA_PATH
+});
+telegramModule.start();
   console.log('✅ Sword-art-online-bot Session "' + sessionName + '" gestartet.');
   return sock;
 }
