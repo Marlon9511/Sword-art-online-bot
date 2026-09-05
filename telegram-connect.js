@@ -1,15 +1,11 @@
 import TelegramBot from 'node-telegram-bot-api';
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8614468465:AAHP7693iiKX56Sp-9TRNa3q2gGMBXOQ-ms';
-const OWNER_TELEGRAM_ID = process.env.OWNER_TELEGRAM_ID ? Number(process.env.OWNER_TELEGRAM_ID) : 8598584607;
+// Token fest eingebaut (kein .env nötig)
+const TELEGRAM_BOT_TOKEN = '8614468465:AAHP7693iiKX56Sp-9TRNa3q2gGMBXOQ-ms';
 
 let telegramBot = null;
 let sessionManager = null;
 let activeSock = null;
-
-function isOwnerChat(msg) {
-  return OWNER_TELEGRAM_ID && msg.from && msg.from.id === OWNER_TELEGRAM_ID;
-}
 
 function requireManager(chatId) {
   if (!sessionManager) {
@@ -26,16 +22,11 @@ export function initTelegramConnect(manager) {
     console.log('ℹ️ TELEGRAM_BOT_TOKEN nicht gesetzt — Telegram-Verbindung deaktiviert.');
     return null;
   }
-  if (!OWNER_TELEGRAM_ID) {
-    console.log('⚠️ OWNER_TELEGRAM_ID nicht gesetzt — Telegram-Bot startet nicht, damit niemand sonst deine WhatsApp-Sessions pairen kann.');
-    return null;
-  }
 
   telegramBot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
   telegramBot.on('polling_error', (e) => console.error('[telegram polling_error]', e.message));
 
   telegramBot.onText(/\/start|\/help/, (msg) => {
-    if (!isOwnerChat(msg)) return;
     telegramBot.sendMessage(msg.chat.id,
       '🤖 *WhatsApp-Session-Verwaltung*\n\n' +
       '/newsession <name> - neue Session starten (QR-Code kommt automatisch)\n' +
@@ -49,7 +40,6 @@ export function initTelegramConnect(manager) {
   });
 
   telegramBot.onText(/\/newsession\s+(\S+)/, async (msg, match) => {
-    if (!isOwnerChat(msg)) return telegramBot.sendMessage(msg.chat.id, '❌ Kein Zugriff.');
     if (!requireManager(msg.chat.id)) return;
 
     const name = match[1];
@@ -63,7 +53,7 @@ export function initTelegramConnect(manager) {
       const sock = await sessionManager.startSession(name, {
         onQr: async (qrBuffer) => {
           try {
-            await telegramBot.sendPhoto(OWNER_TELEGRAM_ID, qrBuffer, {
+            await telegramBot.sendPhoto(msg.chat.id, qrBuffer, {
               caption: `📱 QR-Code für Session "${name}"\nScanne mit WhatsApp: Verknüpfte Geräte → Gerät verknüpfen`
             });
           } catch (e) {
@@ -72,7 +62,7 @@ export function initTelegramConnect(manager) {
         },
         onOpen: async (jid) => {
           try {
-            await telegramBot.sendMessage(OWNER_TELEGRAM_ID, `✅ Session "${name}" verbunden!\nJID: ${jid || '(unbekannt)'}`);
+            await telegramBot.sendMessage(msg.chat.id, `✅ Session "${name}" verbunden!\nJID: ${jid || '(unbekannt)'}`);
           } catch (e) {}
         }
       });
@@ -84,7 +74,6 @@ export function initTelegramConnect(manager) {
   });
 
   telegramBot.onText(/\/pair\s+(\S+)\s+(\d+)/, async (msg, match) => {
-    if (!isOwnerChat(msg)) return telegramBot.sendMessage(msg.chat.id, '❌ Kein Zugriff.');
     if (!requireManager(msg.chat.id)) return;
 
     const [, name, number] = match;
@@ -96,7 +85,7 @@ export function initTelegramConnect(manager) {
       try {
         sock = await sessionManager.startSession(name, {
           onOpen: async (jid) => {
-            try { await telegramBot.sendMessage(OWNER_TELEGRAM_ID, `✅ Session "${name}" verbunden!\nJID: ${jid || '(unbekannt)'}`); } catch (e) {}
+            try { await telegramBot.sendMessage(msg.chat.id, `✅ Session "${name}" verbunden!\nJID: ${jid || '(unbekannt)'}`); } catch (e) {}
           }
         });
         setActiveSock(sock);
@@ -135,7 +124,6 @@ export function initTelegramConnect(manager) {
   });
 
   telegramBot.onText(/\/sessions/, (msg) => {
-    if (!isOwnerChat(msg)) return;
     if (!requireManager(msg.chat.id)) return;
 
     const list = sessionManager.listSessions();
@@ -147,7 +135,6 @@ export function initTelegramConnect(manager) {
   });
 
   telegramBot.onText(/\/status(?:\s+(\S+))?/, (msg, match) => {
-    if (!isOwnerChat(msg)) return;
     if (!requireManager(msg.chat.id)) return;
 
     const name = match[1];
@@ -166,7 +153,6 @@ export function initTelegramConnect(manager) {
   });
 
   telegramBot.onText(/\/unpair\s+(\S+)/, async (msg, match) => {
-    if (!isOwnerChat(msg)) return telegramBot.sendMessage(msg.chat.id, '❌ Kein Zugriff.');
     if (!requireManager(msg.chat.id)) return;
 
     const name = match[1];
@@ -182,7 +168,6 @@ export function initTelegramConnect(manager) {
   });
 
   telegramBot.onText(/\/deletesession\s+(\S+)/, async (msg, match) => {
-    if (!isOwnerChat(msg)) return telegramBot.sendMessage(msg.chat.id, '❌ Kein Zugriff.');
     if (!requireManager(msg.chat.id)) return;
 
     const name = match[1];
@@ -198,7 +183,7 @@ export function initTelegramConnect(manager) {
     }
   });
 
-  console.log('✅ Telegram-Verbindungs-Bot gestartet (Multi-Session). Schreib /start an deinen Bot.');
+  console.log('✅ Telegram-Verbindungs-Bot gestartet (Multi-Session, für alle Nutzer offen). Schreib /start an deinen Bot.');
   return telegramBot;
 }
 
@@ -211,10 +196,6 @@ export function getActiveSock() {
 }
 
 export async function sendQrToTelegram(qrBuffer, caption = '📱 WhatsApp QR-Code zum Scannen') {
-  if (!telegramBot || !OWNER_TELEGRAM_ID) return;
-  try {
-    await telegramBot.sendPhoto(OWNER_TELEGRAM_ID, qrBuffer, { caption });
-  } catch (e) {
-    console.error('Telegram QR send failed:', e.message);
-  }
+  if (!telegramBot) return;
+  console.warn('[telegram] sendQrToTelegram ohne festen Owner: es gibt keinen Ziel-Chat mehr, da OWNER_TELEGRAM_ID entfernt wurde.');
 }
