@@ -32,6 +32,13 @@ import { createJujutsuSystem } from './jujutsu-system.mjs';
 import { createHunterSystem } from './hunterxhunter-system.mjs';
 import { createKingdomHeartsSystem } from './kingdomhearts-system.mjs';
 import { createAincradSystem } from './aincrad-system.mjs';
+import { createTelegramModule } from './telegram-module.js';
+
+const telegramModule = createTelegramModule({
+  users, ranks, bans, save, FILES, ensureUser, isAuthorized,
+  randInt, sleep, DATA_PATH
+});
+telegramModule.start();
 
 process.on('unhandledRejection', (reason) => {
   console.error('⚠️ Unhandled Rejection:', reason?.message || reason);
