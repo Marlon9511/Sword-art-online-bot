@@ -2,6 +2,7 @@ import TelegramBot from 'node-telegram-bot-api';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { createSoloLevelingSystem } from './sololeveling-system.mjs';
 
 // ============================================================================
 // EIN Bot, EIN Token für ALLES (Session-Manager + Aincrad-Game).
@@ -222,6 +223,12 @@ export function initTelegramBot(manager, aincradDeps = {}) {
         '/credits — Mitwirkende anzeigen\n' +
         '/partner — Gilden-Bündnisse anzeigen\n' +
         '/rangliste [xp|level|coins]\n\n' +
+        '⚡ *Hunter-System (Solo Leveling)*\n' +
+        '/awaken — als Hunter erwachen\n' +
+        '/hunterinfo · /gate · /extract · /shadows\n' +
+        '/huntershop · /buyweapon <code> · /hunterequip <code>\n' +
+        '/dailyquest · /hunterrank\n' +
+        '/sololevelinghelp — vollständige Hunter-Befehlsliste\n\n' +
         '🛡️ *Admin* (jeweils als Reply auf eine Nachricht)\n' +
         '/addcash <betrag> · /addxp <betrag> · /addvip <1d|12h|30m>\n' +
         '/ban [grund] · /unban · /warn <grund> · /warns · /clearwarns\n' +
@@ -448,6 +455,14 @@ export function initTelegramBot(manager, aincradDeps = {}) {
 
     // Ausstehende Heiratsanträge: targetJid -> { from: jid, at }
     const pendingMarriageProposals = new Map();
+
+    // ── Solo-Leveling / Hunter-System ────────────────────────────────────────
+    // Wiederverwendung desselben Moduls wie auf WhatsApp: identische Logik,
+    // identische Datei (sololeveling.json) im DATA_PATH → Hunter-Fortschritt
+    // ist zwischen WhatsApp und Telegram geteilt, sofern der Account über
+    // /login verknüpft ist (gleiche JID). Nicht verknüpfte Telegram-Nutzer
+    // bekommen automatisch ihre eigene "tg<id>@telegram"-Hunter-Akte.
+    const soloLeveling = createSoloLevelingSystem(DATA_PATH);
 
     function resolveSender(msg) {
       const jid = jidForTelegramUser(msg.from.id);
@@ -1259,6 +1274,63 @@ export function initTelegramBot(manager, aincradDeps = {}) {
         `⛔ /${cmdName} — gesperrt von ${displayName(users[info.by] || {})} am ${info.at ? new Date(info.at).toLocaleString('de-DE') : '(unbekannt)'}`
       );
       reply(msg.chat.id, `📋 *Gesperrte Befehle* (${entries.length}):\n\n${lines.join('\n')}`);
+    });
+
+    // ---- Hunter-System (Solo Leveling) -------------------------------------------
+    // Ein generischer Router: fängt jede Nachricht ab, die wie ein Befehl aussieht,
+    // und leitet sie nur dann an das Hunter-System weiter, wenn der Befehlsname
+    // zu SL_COMMANDS gehört. Alle anderen Befehle laufen unangetastet weiter
+    // durch ihre eigenen, spezifischen onText-Handler oben.
+    const slCmdRegex = new RegExp(`\\?(${soloLeveling.SL_COMMANDS.join('|')})\\b`, 'g');
+
+    telegramBot.onText(/^\/(\S+)(?:\s+([\s\S]+))?$/, async (msg, match) => {
+      const cmdName = match[1].toLowerCase();
+      if (!soloLeveling.SL_COMMANDS.includes(cmdName)) return;
+
+      const jid = resolveSender(msg);
+      const chatId = msg.chat.id;
+      const isGroupChat = msg.chat.type !== 'private';
+      const argsStr = (match[2] || '').trim();
+      const args = argsStr ? argsStr.split(/\s+/) : [];
+
+      // Die Hilfetexte des Moduls nutzen "?befehl" (WhatsApp-Präfix) —
+      // für Telegram hier auf "/befehl" umschreiben, ohne das Modul selbst
+      // anzufassen.
+      const sendAdapted = (text, opts) => reply(chatId, String(text).replace(slCmdRegex, '/$1'), opts);
+
+      // Schlanker Ersatz für das Baileys-`sock`-Objekt: das Modul nutzt es nur,
+      // um bei einer erfolgreichen Schatten-Extraktion eine Sprachnachricht
+      // ("Arise") zu senden — das funktioniert per sendVoice 1:1 genauso.
+      const slSock = {
+        sendMessage: async (targetChatId, opts) => {
+          if (opts?.audio) {
+            try { await telegramBot.sendVoice(targetChatId, opts.audio); }
+            catch (e) { console.error('[sololeveling] Telegram-Voice-Fehler:', e?.message || e); }
+          }
+        }
+      };
+
+      try {
+        const handled = await soloLeveling.handle({
+          cmd: cmdName,
+          args,
+          sender: jid,
+          from: chatId,
+          isGroup: isGroupChat,
+          send: sendAdapted,
+          sock: slSock,
+          users,
+          ensureUser,
+          normalizeJid: (j) => j, // JIDs sind hier bereits kanonisch (tg<id>@telegram oder verknüpfte WA-JID)
+          getNumberMention: async (j) => displayName(users[j] || {}),
+          randInt,
+          isPrimaryOwner: (j) => isAuthorized(j, ['OWNER'])
+        });
+        if (!handled) return; // sollte wegen des SL_COMMANDS-Filters oben nicht vorkommen
+      } catch (e) {
+        console.error('[sololeveling] Fehler:', e?.message || e);
+        reply(chatId, '❌ Ein Fehler ist im Hunter-System aufgetreten.');
+      }
     });
 
     // ---- Ban-Sperre & AFK-Auflösung ----------------------------------------------
