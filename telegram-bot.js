@@ -10,7 +10,7 @@ import { createSoloLevelingSystem } from './sololeveling-system.mjs';
 // zwei separate Bot-Instanzen mit demselben Token haben sich bisher
 // gegenseitig mit "409 Conflict" rausgeworfen.
 // ============================================================================
-const TELEGRAM_BOT_TOKEN = '8614468465:AAHP7693iiKX56Sp-9TRNa3q2gGMBXOQ-ms';
+const TELEGRAM_BOT_TOKEN = '8614468465:AAE783LlHvU1yBjcjw3qZZ05EOuTmF4A5UU';
 
 // Nur dieser Telegram-Account darf /deletesession benutzen.
 const OWNER_TELEGRAM_ID = 8598584607;
