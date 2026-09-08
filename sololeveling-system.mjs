@@ -1,8 +1,6 @@
 import TelegramBot from 'node-telegram-bot-api';
 import fs from 'fs';
 import path from 'path';
-import crypto from 'crypto';
-import { createSoloLevelingSystem } from './sololeveling-system.mjs';
 
 // ============================================================================
 // EIN Bot, EIN Token für ALLES (Session-Manager + Aincrad-Game).
