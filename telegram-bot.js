@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { createSoloLevelingSystem } from './sololeveling-system.mjs';
+import { createArenaSystem, ARENA_COMMANDS, ARENA_HELP_TEXT, ARENA_SHOP_ITEM } from './arena-system.mjs';
 
 // ============================================================================
 // EIN Bot, EIN Token für ALLES (Session-Manager + Aincrad-Game).
@@ -219,6 +220,17 @@ export function initTelegramBot(manager, aincradDeps = {}) {
         '/todo add|list|done|remove <text/id>\n' +
         '/usertodo add <text> — Vorschlag einreichen\n' +
         '/usertodo list|done|remove <id> — nur Owner\n\n' +
+        '⚔️ *Arena & Ausrüstung*\n' +
+        '/buy kiste — Ausrüstungskiste kaufen\n' +
+        '/openkiste — Kiste öffnen\n' +
+        '/gear — Ausrüstung & Inventar\n' +
+        '/equip <id> · /unequip weapon|armor\n' +
+        '/sell <id> [anzahl|all]\n' +
+        '/duell @user <einsatz> · /duell accept|deny|cancel\n' +
+        '/arena — Arena-Rangliste\n' +
+        '/arenaitems — alle Waffen & Rüstungen\n' +
+        '/floor — Floor-Fortschritt\n' +
+        '/arenahelp — vollständige Arena-Befehlsliste\n\n' +
         '✨ *Sonstiges*\n' +
         '/credits — Mitwirkende anzeigen\n' +
         '/partner — Gilden-Bündnisse anzeigen\n' +
@@ -464,6 +476,13 @@ export function initTelegramBot(manager, aincradDeps = {}) {
     // bekommen automatisch ihre eigene "tg<id>@telegram"-Hunter-Akte.
     const soloLeveling = createSoloLevelingSystem(DATA_PATH);
 
+    // ── Arena- / Ausrüstungssystem ───────────────────────────────────────────
+    // Wiederverwendung desselben Moduls wie auf WhatsApp: identische Logik,
+    // dieselbe users.json (über save/FILES/users-Referenzen geteilt) → Waffen,
+    // Rüstungen und Duell-Statistiken sind zwischen WhatsApp und Telegram
+    // synchron, sofern der Account über /login verknüpft ist.
+    const arenaSystem = createArenaSystem();
+
     function resolveSender(msg) {
       const jid = jidForTelegramUser(msg.from.id);
       ensureUser(jid);
@@ -669,6 +688,7 @@ export function initTelegramBot(manager, aincradDeps = {}) {
       for (const [k, v] of Object.entries(SHOP)) {
         out += `• \`${k}\` — ${v.price} 💰 | ${v.desc}\n`;
       }
+      out += `• \`${ARENA_SHOP_ITEM.id}\` — ${ARENA_SHOP_ITEM.price} 💰 | ${ARENA_SHOP_ITEM.desc}\n`;
       out += '\nKaufen mit: `/buy <item>`';
       reply(msg.chat.id, out);
     });
@@ -677,6 +697,16 @@ export function initTelegramBot(manager, aincradDeps = {}) {
       const jid = resolveSender(msg);
       const u = users[jid];
       const item = match[1].toLowerCase();
+
+      if (item === ARENA_SHOP_ITEM.id) {
+        arenaSystem.ensureArenaFields(users, jid);
+        if ((u.coins || 0) < ARENA_SHOP_ITEM.price) return reply(msg.chat.id, '💸 Zu wenig Coins.');
+        u.coins -= ARENA_SHOP_ITEM.price;
+        u.items[item] = (u.items[item] || 0) + 1;
+        saveUsers();
+        return reply(msg.chat.id, `✅ ${ARENA_SHOP_ITEM.desc} gekauft! Öffne sie mit /openkiste.`);
+      }
+
       if (!SHOP[item]) return reply(msg.chat.id, '❌ Unbekanntes Item. Siehe `/shop`.');
       if ((u.coins || 0) < SHOP[item].price) return reply(msg.chat.id, '💸 Zu wenig Coins.');
       u.coins -= SHOP[item].price;
@@ -1276,6 +1306,12 @@ export function initTelegramBot(manager, aincradDeps = {}) {
       reply(msg.chat.id, `📋 *Gesperrte Befehle* (${entries.length}):\n\n${lines.join('\n')}`);
     });
 
+    // ---- Arena-Hilfe --------------------------------------------------------------
+
+    telegramBot.onText(/^\/arenahelp$/, (msg) => {
+      reply(msg.chat.id, ARENA_HELP_TEXT.replace(/\{P\}/g, '/'));
+    });
+
     // ---- Hunter-System (Solo Leveling) -------------------------------------------
     // Ein generischer Router: fängt jede Nachricht ab, die wie ein Befehl aussieht,
     // und leitet sie nur dann an das Hunter-System weiter, wenn der Befehlsname
@@ -1330,6 +1366,71 @@ export function initTelegramBot(manager, aincradDeps = {}) {
       } catch (e) {
         console.error('[sololeveling] Fehler:', e?.message || e);
         reply(chatId, '❌ Ein Fehler ist im Hunter-System aufgetreten.');
+      }
+    });
+
+    // ---- Arena- / Ausrüstungssystem -----------------------------------------------
+    // Gleiches Prinzip wie beim Hunter-System oben: generischer Router,
+    // der nur ARENA_COMMANDS abfängt und den Rest unangetastet lässt.
+    // /duell funktioniert per Reply auf die Zielperson statt @mention.
+    const arenaDuelSubcommands = ['accept', 'annehmen', 'deny', 'decline', 'ablehnen', 'cancel', 'abbrechen'];
+
+    telegramBot.onText(/^\/(\S+)(?:\s+([\s\S]+))?$/, async (msg, match) => {
+      const cmdName = match[1].toLowerCase();
+      if (!ARENA_COMMANDS.includes(cmdName)) return;
+
+      const jid = resolveSender(msg);
+      const chatId = msg.chat.id;
+      const typedArgs = (match[2] || '').trim() ? match[2].trim().split(/\s+/) : [];
+      const replyTargetJid = resolveReplyTarget(msg);
+
+      // /duell <einsatz> als Reply auf die Zielperson: Ziel wie eine "@mention"
+      // simulieren, sonst würde args[0] (der Einsatz) fälschlich als
+      // Zielspieler interpretiert werden.
+      const isDuelCmd = cmdName === 'duell' || cmdName === 'duel';
+      const isSubcommand = isDuelCmd && arenaDuelSubcommands.includes((typedArgs[0] || '').toLowerCase());
+      const arenaArgs = (isDuelCmd && !isSubcommand)
+        ? [replyTargetJid || '', ...typedArgs]
+        : typedArgs;
+
+      const fakeM = {
+        message: {
+          extendedTextMessage: {
+            contextInfo: {
+              mentionedJid: replyTargetJid ? [replyTargetJid] : [],
+              participant: replyTargetJid || undefined
+            }
+          }
+        }
+      };
+
+      const sendAdapted = (text, opts) => reply(chatId, String(text).replace(/\{P\}/g, '/'), opts);
+
+      try {
+        const handled = await arenaSystem.handle({
+          cmd: cmdName,
+          args: arenaArgs,
+          sender: jid,
+          from: chatId,
+          m: fakeM,
+          send: sendAdapted,
+          sock: null, // wird nur für "@lid"-JIDs gebraucht, kommen bei Telegram nicht vor
+          users,
+          save,
+          FILES,
+          ensureUser,
+          normalizeJid: (j) => j,
+          isSameJid: (a, b) => a === b,
+          getNumberMention: async (j) => displayName(users[j] || {}),
+          randInt,
+          sleep: (ms) => new Promise((res) => setTimeout(res, ms)),
+          activePrefix: '/',
+          isPrimaryOwner: (j) => isAuthorized(j, ['OWNER'])
+        });
+        if (!handled) return;
+      } catch (e) {
+        console.error('[arena] Fehler:', e?.message || e);
+        reply(chatId, '❌ Ein Fehler ist im Arena-System aufgetreten.');
       }
     });
 
