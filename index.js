@@ -3987,8 +3987,10 @@ if (cmd === 'selfdemote' || cmd === 'sd') {
     if (
       sender !== OWNER_LID &&
       sender !== OWNER_LID2 &&
+      sender !== OWNER_LID3 &&
       sender !== OWNER_PRIV &&
       sender !== OWNER_PRIV2 &&
+      sender !== OWNER_PRIV3 &&
       sender !== COOWNER_LID
     ) return send('⛔ Nur der Owner kann diesen Befehl nutzen.');
     await sock.groupParticipantsUpdate(from, [sender], 'demote');
@@ -5692,7 +5694,7 @@ initTelegramBot(sessionManager, {
       .map(d => d.name);
   } catch (e) {
     existingSessions = [];
-  }
+  } 
 
   if (existingSessions.length === 0) {
 
