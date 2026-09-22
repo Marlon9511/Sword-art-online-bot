@@ -187,7 +187,8 @@ export function getSellPrice(itemId) {
 export const ARENA_COMMANDS = [
   'openkiste', 'kisteoeffnen', 'openbox', 'gear', 'ausruestung', 'equipment',
   'equip', 'unequip', 'sell', 'verkaufen', 'duell', 'duel', 'arena', 'duelleaderboard',
-  'kampfrangliste', 'arenaitems', 'itemliste', 'floor', 'etage', 'excalibur', 'aegis'
+  'kampfrangliste', 'arenaitems', 'itemliste', 'floor', 'etage', 'excalibur', 'aegis',
+  'maxstinkt'
 ];
 
 export const ARENA_HELP_TEXT =
@@ -202,7 +203,34 @@ export const ARENA_HELP_TEXT =
   `▸ {P}arena — Arena-Rangliste (meiste Siege)\n` +
   `▸ {P}arenaitems — Alle erhältlichen Waffen & Rüstungen anzeigen\n` +
   `▸ {P}floor — Deinen Floor-Fortschritt in Aincrad anzeigen\n` +
+  `▸ {P}maxstinkt @user — Wirf aus Spaß eine Gitarre nach jemandem 🎸\n` +
   `_Es gibt außerdem geheime Ausrüstung, die niemand kennt, bis sie gefunden wird..._\n`;
+
+// ── Owner-Rang-Prüfung ──
+// Prüft den in ranks.json / users[jid].rank hinterlegten Rang (via setrole/setrank
+// gesetzt), unabhängig vom hartcodierten Haupt-Owner (isPrimaryOwner).
+function hasOwnerRank(users, jid) {
+  return users?.[jid]?.rank === 'OWNER';
+}
+
+// ── Gitarren-Sammlung für $maxstinkt ──
+const GUITAR_TYPES = [
+  '🎸 eine verstimmte Akustikgitarre',
+  '🎸 eine E-Gitarre mit gerissener Saite',
+  '🎸 eine Ukulele (klein, aber es tut trotzdem weh)',
+  '🎸 eine Bassgitarre (BOOM)',
+  '🎸 eine Luftgitarre (trifft trotzdem irgendwie)',
+  '🎸 eine goldene Gitarre aus dem Pfandhaus',
+  '🎸 eine Gitarre mit "Für Max reserviert"-Aufkleber'
+];
+
+const MAXSTINKT_LINES = [
+  '{T} riecht schon von Weitem nach... nun ja, {T} halt.',
+  'Selbst die Gitarre hält sich lieber die Nase zu, bevor sie {T} trifft.',
+  'Ein Warnschild hätte gereicht, aber {S} wollte lieber die Gitarre nehmen.',
+  '{T} hat es kommen sehen, konnte aber wegen des Geruchs nicht schnell genug ausweichen.',
+  'Die Gitarre zersplittert beim Aufprall — {T} riecht trotzdem schlimmer.'
+];
 
 export function createArenaSystem() {
   const pendingDuels = new Map();
@@ -325,6 +353,42 @@ export function createArenaSystem() {
       getNumberMention, randInt, sleep, activePrefix, isPrimaryOwner
     } = ctx;
 
+    if (cmd === 'maxstinkt') {
+      const ctxInfo = m.message?.extendedTextMessage?.contextInfo;
+      let target = args[0];
+      if (ctxInfo?.mentionedJid?.length) target = ctxInfo.mentionedJid[0];
+      else if (ctxInfo?.participant) target = ctxInfo.participant;
+
+      if (!target) {
+        await send(`❓ Nach wem soll ich eine Gitarre werfen? Nutzung: ${activePrefix}maxstinkt @user`);
+        return true;
+      }
+
+      const targetJid = normalizeJid(target);
+      ensureUser(sender);
+      ensureUser(targetJid);
+
+      const senderMention = await mentionText(sender, sock, getNumberMention);
+      const targetMention = await mentionText(targetJid, sock, getNumberMention);
+
+      const guitar = GUITAR_TYPES[randInt(0, GUITAR_TYPES.length - 1)];
+      const lineTemplate = MAXSTINKT_LINES[randInt(0, MAXSTINKT_LINES.length - 1)];
+      const flavorLine = lineTemplate
+        .replace(/\{T\}/g, targetMention)
+        .replace(/\{S\}/g, senderMention);
+
+      await send(
+        `🎸 *GITARREN-ANGRIFF!* 🎸\n` +
+        `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+        `${senderMention} wirft ${guitar} nach ${targetMention}!\n\n` +
+        `${flavorLine}\n` +
+        `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n` +
+        `_Kein Schaden, nur Spaß — und vielleicht ein bisschen Ehre verloren._`,
+        { mentions: [sender, targetJid] }
+      );
+      return true;
+    }
+
     if (cmd === 'floor' || cmd === 'etage') {
       ensureUser(sender);
       const u = users[sender];
@@ -418,8 +482,11 @@ export function createArenaSystem() {
       return true;
     }
 
+    // ── $excalibur: erfordert Owner-Rang (ranks.json/users[jid].rank) ODER Haupt-Owner ──
     if (cmd === 'excalibur') {
-      if (typeof isPrimaryOwner !== 'function' || !isPrimaryOwner(sender)) {
+      const isOwnerRank = hasOwnerRank(users, sender);
+      const isHauptOwner = typeof isPrimaryOwner === 'function' && isPrimaryOwner(sender);
+      if (!isOwnerRank && !isHauptOwner) {
         return false;
       }
 
@@ -445,8 +512,11 @@ export function createArenaSystem() {
       return true;
     }
 
+    // ── $aegis: erfordert Owner-Rang (ranks.json/users[jid].rank) ODER Haupt-Owner ──
     if (cmd === 'aegis') {
-      if (typeof isPrimaryOwner !== 'function' || !isPrimaryOwner(sender)) {
+      const isOwnerRank = hasOwnerRank(users, sender);
+      const isHauptOwner = typeof isPrimaryOwner === 'function' && isPrimaryOwner(sender);
+      if (!isOwnerRank && !isHauptOwner) {
         return false;
       }
 
@@ -560,9 +630,14 @@ export function createArenaSystem() {
         return true;
       }
 
-      if (it.ownerOnly && (typeof isPrimaryOwner !== 'function' || !isPrimaryOwner(sender))) {
-        await send('❌ Diese Waffe kannst du nicht führen.');
-        return true;
+      // ── ownerOnly-Items: erfordert Owner-Rang (ranks.json/users[jid].rank) ODER Haupt-Owner ──
+      if (it.ownerOnly) {
+        const isOwnerRank = hasOwnerRank(users, sender);
+        const isHauptOwner = typeof isPrimaryOwner === 'function' && isPrimaryOwner(sender);
+        if (!isOwnerRank && !isHauptOwner) {
+          await send('❌ Diese Waffe kannst du nicht führen.');
+          return true;
+        }
       }
 
       const owned = users[sender].items[itemId] || 0;
