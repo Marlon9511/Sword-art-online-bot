@@ -79,6 +79,9 @@ let restartCount = 0;
 let lastRestartTime = 0;
 let manualStop = false;
 let currentDelay = config.restart.retryDelay;
+// Verhindert, dass Exit-Handler UND der periodische Watchdog-Tick
+// (weiter unten) gleichzeitig/doppelt einen Neustart einplanen.
+let restartScheduled = false;
 
 function startProcess() {
   const scriptPath = path.join(__dirname, config.process.script);
@@ -101,9 +104,22 @@ function startProcess() {
 
     if (!config.restart.enabled) return;
 
-    // "on-failure": nur bei Fehlercode neu starten; bei code 0 nicht.
-    if (config.restart.strategy === 'on-failure' && code === 0) {
-      log('info', 'Sauberer Exit (Code 0) — kein Neustart laut Strategie "on-failure".');
+    // Sauberer Exit (Code 0) = GEWOLLTER Neustart, z.B. durch den
+    // WhatsApp-Befehl "?restart" (der macht intern process.exit(0)).
+    // Das ist KEIN Absturz — deshalb sofort neu starten, OHNE den
+    // Backoff-/maxRetries-Zähler zu erhöhen. Sonst würde jeder
+    // "?restart"-Aufruf den Absturz-Zähler hochzählen und nach ein
+    // paar Neustarts hintereinander bliebe der Bot wegen maxRetries
+    // irgendwann einfach aus.
+    if (code === 0) {
+      log('info', 'Sauberer Exit (Code 0, z.B. via ?restart) — sofortiger Neustart ohne Backoff-Strafe.');
+      restartCount = 0;
+      currentDelay = 0;
+      restartScheduled = true;
+      setTimeout(() => {
+        restartScheduled = false;
+        startProcess();
+      }, 1000); // kurze Pause, damit z.B. die WhatsApp-Verbindung sauber schließt
       return;
     }
 
@@ -116,6 +132,11 @@ function startProcess() {
 }
 
 function handleRestart() {
+  if (restartScheduled) {
+    log('info', 'Neustart bereits eingeplant — überspringe doppelten Trigger.');
+    return;
+  }
+
   if (restartCount >= config.restart.maxRetries) {
     log('error', `Maximale Anzahl an Neustarts (${config.restart.maxRetries}) erreicht. Gebe auf.`);
     if (config.notifications.onMaxRetriesReached) {
@@ -151,7 +172,9 @@ function handleRestart() {
     notifyTermux('Bot-Watchdog', `Neustart ${restartCount}/${config.restart.maxRetries} in ${Math.round(delay / 1000)}s`);
   }
 
+  restartScheduled = true;
   setTimeout(() => {
+    restartScheduled = false;
     startProcess();
   }, delay);
 }
@@ -184,7 +207,10 @@ function isChildAlive() {
 // Periodischer Watchdog-Tick: prüft ob der Kindprozess noch lebt.
 if (config.watchdog.enabled) {
   setInterval(() => {
-    if (!child && !manualStop) {
+    // restartScheduled verhindert, dass dieser Tick einen Neustart
+    // auslöst, während der Exit-Handler bereits einen eingeplant hat
+    // (z.B. den 1-Sekunden-Sofort-Neustart nach "?restart").
+    if (!child && !manualStop && !restartScheduled) {
       log('warn', 'Watchdog-Tick: Kein aktiver Prozess gefunden, versuche Neustart...');
       handleRestart();
     }
