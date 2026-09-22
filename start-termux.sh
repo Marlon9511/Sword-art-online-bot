@@ -2,7 +2,6 @@
 # ─────────────────────────────────────────────────────────
 # Startskript für Termux: Bot + Watchdog + Tunnel (Port 5000)
 # ─────────────────────────────────────────────────────────
-
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,9 +23,9 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! command -v lt >/dev/null 2>&1; then
-  echo "📥 Installiere localtunnel global via npm..."
-  npm install -g localtunnel
+if [ ! -d "$SCRIPT_DIR/node_modules/localtunnel" ]; then
+  echo "📥 Installiere localtunnel lokal via npm..."
+  npm install localtunnel
 fi
 
 # ── Alte Prozesse auf Port 5000 beenden (falls vorhanden) ──
@@ -39,7 +38,7 @@ fi
 
 # ── Tunnel starten (localtunnel, Port 5000) ──
 echo "🌐 Starte Tunnel auf Port $PORT..."
-nohup lt --port $PORT > "$TUNNEL_LOG" 2>&1 &
+nohup node "$SCRIPT_DIR/tunnel.cjs" > "$TUNNEL_LOG" 2>&1 &
 TUNNEL_PID=$!
 echo "$TUNNEL_PID" > "$SCRIPT_DIR/.tunnel.pid"
 
@@ -61,7 +60,7 @@ fi
 
 # ── Watchdog starten (übernimmt Start/Restart von index.js) ──
 echo "🐕 Starte Watchdog..."
-nohup node "$SCRIPT_DIR/watchdog.js" > "$WATCHDOG_LOG" 2>&1 &
+nohup node "$SCRIPT_DIR/watchdog.cjs" > "$WATCHDOG_LOG" 2>&1 &
 WATCHDOG_PID=$!
 echo "$WATCHDOG_PID" > "$SCRIPT_DIR/.watchdog.pid"
 
