@@ -5612,6 +5612,56 @@ if (cmd === 'bancheck') {
     const result = await checkNumber(sock, number);
     return send(`📋 Ergebnis für ${number}:\n${result.status}`);
 }
+if (cmd === 'errors' || cmd === 'fehler') {
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) return send('❌ Kein Zugriff.');
+
+  const linesPerFile = parseInt(args[0]) || 15;
+
+  const logTargets = [
+    { label: 'logs.txt (Bot)', path: LOG_FILE },
+    { label: 'watchdog-stdout.log', path: path.join(BASE_DIR, 'logs', 'watchdog-stdout.log') },
+    { label: 'tunnel.log', path: path.join(BASE_DIR, 'logs', 'tunnel.log') }
+  ];
+
+  let out = `🐛 *— FEHLER-BERICHT —* 🐛\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n`;
+  let foundAny = false;
+
+  for (const target of logTargets) {
+    if (!fs.existsSync(target.path)) continue;
+
+    let content;
+    try {
+      content = fs.readFileSync(target.path, 'utf8');
+    } catch (e) {
+      continue;
+    }
+
+    const errorLines = content
+      .split('\n')
+      .filter(line => /error|fehler|exception|throw|uncaught/i.test(line))
+      .slice(-linesPerFile);
+
+    if (errorLines.length > 0) {
+      foundAny = true;
+      out += `\n*${target.label}:*\n\`\`\`${errorLines.join('\n')}\`\`\`\n`;
+    }
+  }
+
+  if (!foundAny) {
+    out += '\n✅ Keine Fehler in den letzten Log-Einträgen gefunden.';
+  }
+
+  out += `\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n_Nutzung: ${activePrefix}errors [anzahl-zeilen]_`;
+
+  // WhatsApp-Textlimit — bei Bedarf als Datei senden statt als Text
+  if (out.length > 4000) {
+    const buf = Buffer.from(out, 'utf8');
+    await sock.sendMessage(from, { document: buf, mimetype: 'text/plain', fileName: 'errors.txt' });
+    return send('📄 Fehlerbericht war zu lang für eine Nachricht — als Datei gesendet.');
+  }
+
+  return send(out);
+}
 const suggestion = findClosestCommand(cmd);
 if (suggestion) {
   return send(
