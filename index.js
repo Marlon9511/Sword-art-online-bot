@@ -112,7 +112,8 @@ commandAllow: { file: 'command-allow.json', default: {} },
   officialGroup: { file: 'official-group.json', default: { link: 'https://chat.whatsapp.com/DBiDcF2s16FEWiGKyZA7Nl' } },
 partners: { file: 'partners.json', default: { list: [] } },
 groupLockSchedule: { file: 'group-lock-schedule.json', default: {} },
-bitchkick: { file: 'bitchkick.json', default: {} }
+bitchkick: { file: 'bitchkick.json', default: {} },
+giveCommand: { file: 'give-command.json', default: { enabled: false, jids: [] } }
 };
 
 Object.values(FILES).forEach(({ file, default: def }) => {
@@ -590,6 +591,8 @@ let officialGroup = load(FILES.officialGroup.file) || { link: 'https://chat.what
 if (!officialGroup.link) officialGroup.link = 'https://chat.whatsapp.com/DBiDcF2s16FEWiGKyZA7Nl';
 
 let bitchkickData = load(FILES.bitchkick.file) || {};
+let giveCommandData = load(FILES.giveCommand.file) || { enabled: false, jids: [] };
+if (!Array.isArray(giveCommandData.jids)) giveCommandData.jids = [];
 
 console.log('Loaded ranks:', ranks);
 
@@ -848,6 +851,7 @@ save(FILES.marriages, marriages);
   save(FILES.groupLockSchedule, groupLockSchedules);
 save(FILES.officialGroup, officialGroup);
 save(FILES.bitchkick, bitchkickData);
+save(FILES.giveCommand, giveCommandData);
   try {
     save(FILES.owner, { ownerLid: OWNER_LID, ownerPriv: OWNER_PRIV, coownerLid: COOWNER_LID });
   } catch (e) { console.error('Failed to save owner config:', e); }
@@ -1400,6 +1404,18 @@ const m = messages[0];
         return;
       }
 
+      // ── Givecommand-Zugriffsbeschränkung ──
+      // Wenn aktiv, reagiert der Bot NUR noch auf den Haupt-Owner und die
+      // Nutzer in giveCommandData.jids — alle anderen werden komplett ignoriert.
+      if (
+        giveCommandData.enabled &&
+        !isPrimaryOwner(sender) &&
+        !giveCommandData.jids.some(j => isSameJid(j, sender)) &&
+        !m.key.fromMe
+      ) {
+        return;
+      }
+
  const body = (m.message.conversation)
         || (m.message.extendedTextMessage && m.message.extendedTextMessage.text)
         || (m.message.imageMessage && m.message.imageMessage.caption)
@@ -1498,7 +1514,7 @@ const ALL_COMMANDS = [
   'selfpromote', 'sp', 'selfdemote', 'sd',
   'slap', 'hug', 'kiss', 'pat', 'poke', 'cuddle', 'bite', 'punch', 'throw',
   'love', 'blush', 'handhold', 'lick', 'nervous',
-  'bitchkick',
+  'bitchkick', 'givecommand',
   ...ARENA_COMMANDS
 ];
 
@@ -1858,6 +1874,53 @@ mentions: [sender]
             } catch (e) {}
           }
         }
+      }
+
+      if (cmd === 'givecommand') {
+        if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Nur Owner/CoOwner.');
+        const sub = (args[0] || '').toLowerCase();
+
+        if (sub === 'an' || sub === 'on') {
+          giveCommandData.enabled = true;
+          save(FILES.giveCommand, giveCommandData);
+          return send('✅ Zugriffsbeschränkung aktiviert. Nur erlaubte Nutzer + Owner können den Bot jetzt nutzen.');
+        }
+        if (sub === 'aus' || sub === 'off') {
+          giveCommandData.enabled = false;
+          save(FILES.giveCommand, giveCommandData);
+          return send('✅ Zugriffsbeschränkung deaktiviert. Der Bot reagiert wieder auf alle.');
+        }
+        if (sub === 'add') {
+          const ctx = m.message?.extendedTextMessage?.contextInfo;
+          let target = args[1];
+          if (ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+          else if (ctx?.participant) target = ctx.participant;
+          if (!target) return send(`❌ Nutzung: ${activePrefix}givecommand add <nummer|@user>`);
+          const jid = await resolveLidJid(target, sock);
+          if (!giveCommandData.jids.some(j => isSameJid(j, jid))) giveCommandData.jids.push(jid);
+          save(FILES.giveCommand, giveCommandData);
+          return send(`✅ @${jid.split('@')[0]} darf den Bot jetzt nutzen.`, { mentions: [jid] });
+        }
+        if (sub === 'remove' || sub === 'del') {
+          const ctx = m.message?.extendedTextMessage?.contextInfo;
+          let target = args[1];
+          if (ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+          else if (ctx?.participant) target = ctx.participant;
+          if (!target) return send(`❌ Nutzung: ${activePrefix}givecommand remove <nummer|@user>`);
+          const jid = await resolveLidJid(target, sock);
+          giveCommandData.jids = giveCommandData.jids.filter(j => !isSameJid(j, jid));
+          save(FILES.giveCommand, giveCommandData);
+          return send(`✅ @${jid.split('@')[0]} entfernt.`, { mentions: [jid] });
+        }
+        if (sub === 'list') {
+          if (!giveCommandData.jids.length) return send(`ℹ️ Liste ist leer (Status: ${giveCommandData.enabled ? 'AKTIV' : 'inaktiv'}).`);
+          const lines = giveCommandData.jids.map((j, i) => `${i + 1}. @${j.split('@')[0]}`).join('\n');
+          return send(`📋 Erlaubte Nutzer (Status: ${giveCommandData.enabled ? 'AKTIV' : 'inaktiv'}):\n${lines}`, { mentions: giveCommandData.jids });
+        }
+
+        return send(
+          `❌ Nutzung:\n${activePrefix}givecommand an\n${activePrefix}givecommand aus\n${activePrefix}givecommand add <nummer|@user>\n${activePrefix}givecommand remove <nummer|@user>\n${activePrefix}givecommand list`
+        );
       }
 
       if (cmd === 'getlid') {
