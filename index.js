@@ -113,7 +113,7 @@ commandAllow: { file: 'command-allow.json', default: {} },
 partners: { file: 'partners.json', default: { list: [] } },
 groupLockSchedule: { file: 'group-lock-schedule.json', default: {} },
 bitchkick: { file: 'bitchkick.json', default: {} },
-giveCommand: { file: 'give-command.json', default: { enabled: false, jids: [] } }
+giveCommand: { file: 'give-command.json', default: { grants: {} } }
 };
 
 Object.values(FILES).forEach(({ file, default: def }) => {
@@ -567,11 +567,15 @@ function hasAdminPerms(jid) {
   return isAuthorized(jid, ['OWNER', 'COOWNER', 'ADMIN']);
 }
 
+let CURRENT_PROCESSING_CMD = null;
+
 function isAuthorized(jid, allowedRoles) {
   const normalizedJid = normalizeJid(jid);
   const role = ranks[normalizedJid] || users[normalizedJid]?.rank || 'USER';
   if (Array.isArray(allowedRoles) && allowedRoles.includes(role)) return true;
-  return allowedRoles.some(role => ROLES[role]?.some(roleJid => isSameJid(normalizedJid, roleJid)));
+  if (allowedRoles.some(r => ROLES[r]?.some(roleJid => isSameJid(normalizedJid, roleJid)))) return true;
+  if (CURRENT_PROCESSING_CMD && giveCommandData.grants?.[normalizedJid]?.includes(CURRENT_PROCESSING_CMD)) return true;
+  return false;
 }
 
 let users = normalizeDataKeys(load(FILES.users.file));
@@ -591,8 +595,8 @@ let officialGroup = load(FILES.officialGroup.file) || { link: 'https://chat.what
 if (!officialGroup.link) officialGroup.link = 'https://chat.whatsapp.com/DBiDcF2s16FEWiGKyZA7Nl';
 
 let bitchkickData = load(FILES.bitchkick.file) || {};
-let giveCommandData = load(FILES.giveCommand.file) || { enabled: false, jids: [] };
-if (!Array.isArray(giveCommandData.jids)) giveCommandData.jids = [];
+let giveCommandData = load(FILES.giveCommand.file) || { grants: {} };
+if (!giveCommandData.grants || typeof giveCommandData.grants !== 'object') giveCommandData.grants = {};
 
 console.log('Loaded ranks:', ranks);
 
@@ -639,10 +643,6 @@ function isPrimaryOwner(jid) {
 }
 
 // ── Robuste, bidirektionale Owner-Prüfung ──
-// Verlässt sich NICHT auf eine einmalig beim Start aufgelöste LID (die
-// stillschweigend fehlschlagen kann, wenn getLIDForPN in der jeweiligen
-// Baileys-Version nicht verfügbar ist). Prüft stattdessen live in beide
-// Richtungen: Telefonnummer -> LID und LID -> Telefonnummer.
 async function isPrimaryOwnerAsync(jid, sock) {
   if (isPrimaryOwner(jid)) return true;
   const n = normalizeJid(jid);
@@ -768,10 +768,6 @@ async function resolvePhoneJid(jid, sock) {
   return null;
 }
 
-// ── LID-Kanonisierung ──
-// Löst JEDE JID-Form (Telefonnummer ODER LID) zur ECHTEN LID auf,
-// via Baileys' interner signalRepository.lidMapping (kein String-Trick).
-// Ab jetzt ist die LID die einzige "Identität", mit der intern gearbeitet wird.
 const lidResolveCache = new Map();
 
 async function resolveLidJid(jid, sock) {
@@ -793,8 +789,6 @@ async function resolveLidJid(jid, sock) {
     console.error('[resolveLidJid] Mapping-Fehler für', n, ':', e?.message || e);
   }
 
-  // Kein Mapping verfügbar (z.B. Bot noch nicht verbunden, oder Nutzer hat
-  // noch nie mit LID interagiert) -> Original-Nummer als Fallback behalten.
   return n;
 }
 
@@ -806,11 +800,6 @@ function invalidateLidCache(jid) {
 async function getNumberMention(jid, sock) {
   const resolved = await resolvePhoneJid(jid, sock);
   if (resolved) return `@${resolved.split('@')[0]}`;
-  // Kein Telefonnummer-Mapping verfügbar (häufig bei reinen LID-Nutzern) —
-  // statt des generischen Platzhaltertexts "@Nutzer" die vorhandenen Ziffern
-  // (LID oder Telefonnummer, was auch immer vorliegt) verwenden. WhatsApp
-  // zeigt in der Mention trotzdem den echten Kontaktnamen an, solange die
-  // JID im "mentions"-Array der Nachricht steht — der Text hier ist nur Deko.
   const n = normalizeJid(jid);
   const raw = n ? n.split('@')[0] : null;
   return raw ? `@${raw}` : '@Nutzer';
@@ -1234,10 +1223,6 @@ async function updateBotProfile() {
     if (connection === 'open') {
       console.log(`✅ Session "${sessionName}" verbunden mit WhatsApp!`);
 
-      // ── LID-Kanonisierung der Owner-Konstanten ──
-      // OWNER_PRIV/OWNER_PRIV2 sind Telefonnummern-JIDs. Damit isPrimaryOwner()
-      // und isAuthorized() auch bei LID-basiertem "sender" greifen, wird hier
-      // einmalig die echte LID dieser Nummern aufgelöst und ergänzt.
       if (sessionName === 'default') {
         try {
           const ownerLidResolved = await resolveLidJid(OWNER_PRIV, sock);
@@ -1394,25 +1379,10 @@ const m = messages[0];
       const from = normalizeJid(rawFrom);
       const isGroup = typeof from === 'string' && from.endsWith('@g.us');
 
-      // ── LID-Kanonisierung: sender ist ab hier IMMER die echte LID ──
-      // Alles Weitere (ensureUser, isAuthorized, ranks, users.json, ...)
-      // arbeitet nur noch mit dieser einen, konsistenten Identität.
       const senderRaw = normalizeJid(rawParticipant);
       const sender = await resolveLidJid(senderRaw, sock);
 
       if (OWNER_MODE && !isAuthorized(sender, ['OWNER', 'COOWNER']) && !m.key.fromMe) {
-        return;
-      }
-
-      // ── Givecommand-Zugriffsbeschränkung ──
-      // Wenn aktiv, reagiert der Bot NUR noch auf den Haupt-Owner und die
-      // Nutzer in giveCommandData.jids — alle anderen werden komplett ignoriert.
-      if (
-        giveCommandData.enabled &&
-        !isPrimaryOwner(sender) &&
-        !giveCommandData.jids.some(j => isSameJid(j, sender)) &&
-        !m.key.fromMe
-      ) {
         return;
       }
 
@@ -1642,8 +1612,6 @@ mentions: [sender]
 
       const activePrefix = isGroup ? getGroupPrefix(from) : PREFIX;
 
-      // ── @prefix — Sonderbefehl, funktioniert IMMER, unabhängig vom aktuell
-      // eingestellten Präfix (umgeht die normale Präfix-Prüfung bewusst). ──
       if (body && body.trim().toLowerCase() === '@prefix') {
         try {
           await sock.sendMessage(from, {
@@ -1827,6 +1795,7 @@ mentions: [sender]
       const [cmdRaw, ...args] = body.trim().split(/\s+/);
       const rawCmd = cmdRaw.toLowerCase();
       const cmd = rawCmd.startsWith(activePrefix) ? rawCmd.slice(activePrefix.length) : rawCmd;
+      CURRENT_PROCESSING_CMD = cmd;
 
       const userRank = ranks[sender] || users[sender]?.rank || 'USER';
       const isOwner = isAuthorized(sender, ['OWNER', 'COOWNER']);
@@ -1862,6 +1831,19 @@ mentions: [sender]
         return;
       }
 
+      // ── Exklusiv-Vergabe: Wenn ein Befehl per givecommand an bestimmte
+      // Nutzer vergeben wurde, dürfen NUR diese (+ Owner/CoOwner) ihn nutzen.
+      const exclusiveHolders = Object.keys(giveCommandData.grants || {})
+        .filter(jid => (giveCommandData.grants[jid] || []).includes(cmd));
+
+      if (exclusiveHolders.length && !isAuthorized(sender, ['OWNER', 'COOWNER'])) {
+        const isHolder = exclusiveHolders.some(jid => isSameJid(jid, sender));
+        if (!isHolder) {
+          try { await sock.sendMessage(from, { text: `⛔ Der Befehl "${activePrefix}${cmd}" ist aktuell exklusiv vergeben und nur für bestimmte Nutzer verfügbar.` }); } catch (e) {}
+          return;
+        }
+      }
+
       const mentionCtx = m.message?.extendedTextMessage?.contextInfo;
       if (mentionCtx && Array.isArray(mentionCtx.mentionedJid) && mentionCtx.mentionedJid.length) {
         for (const mid of mentionCtx.mentionedJid) {
@@ -1878,49 +1860,73 @@ mentions: [sender]
 
       if (cmd === 'givecommand') {
         if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Nur Owner/CoOwner.');
+
         const sub = (args[0] || '').toLowerCase();
+        const ctx = m.message?.extendedTextMessage?.contextInfo;
 
-        if (sub === 'an' || sub === 'on') {
-          giveCommandData.enabled = true;
-          save(FILES.giveCommand, giveCommandData);
-          return send('✅ Zugriffsbeschränkung aktiviert. Nur erlaubte Nutzer + Owner können den Bot jetzt nutzen.');
-        }
-        if (sub === 'aus' || sub === 'off') {
-          giveCommandData.enabled = false;
-          save(FILES.giveCommand, giveCommandData);
-          return send('✅ Zugriffsbeschränkung deaktiviert. Der Bot reagiert wieder auf alle.');
-        }
-        if (sub === 'add') {
-          const ctx = m.message?.extendedTextMessage?.contextInfo;
-          let target = args[1];
-          if (ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
-          else if (ctx?.participant) target = ctx.participant;
-          if (!target) return send(`❌ Nutzung: ${activePrefix}givecommand add <nummer|@user>`);
-          const jid = await resolveLidJid(target, sock);
-          if (!giveCommandData.jids.some(j => isSameJid(j, jid))) giveCommandData.jids.push(jid);
-          save(FILES.giveCommand, giveCommandData);
-          return send(`✅ @${jid.split('@')[0]} darf den Bot jetzt nutzen.`, { mentions: [jid] });
-        }
-        if (sub === 'remove' || sub === 'del') {
-          const ctx = m.message?.extendedTextMessage?.contextInfo;
-          let target = args[1];
-          if (ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
-          else if (ctx?.participant) target = ctx.participant;
-          if (!target) return send(`❌ Nutzung: ${activePrefix}givecommand remove <nummer|@user>`);
-          const jid = await resolveLidJid(target, sock);
-          giveCommandData.jids = giveCommandData.jids.filter(j => !isSameJid(j, jid));
-          save(FILES.giveCommand, giveCommandData);
-          return send(`✅ @${jid.split('@')[0]} entfernt.`, { mentions: [jid] });
-        }
         if (sub === 'list') {
-          if (!giveCommandData.jids.length) return send(`ℹ️ Liste ist leer (Status: ${giveCommandData.enabled ? 'AKTIV' : 'inaktiv'}).`);
-          const lines = giveCommandData.jids.map((j, i) => `${i + 1}. @${j.split('@')[0]}`).join('\n');
-          return send(`📋 Erlaubte Nutzer (Status: ${giveCommandData.enabled ? 'AKTIV' : 'inaktiv'}):\n${lines}`, { mentions: giveCommandData.jids });
+          let target = args[1];
+          if (ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+          else if (ctx?.participant) target = ctx.participant;
+
+          if (target) {
+            const jid = await resolveLidJid(target, sock);
+            const cmds = giveCommandData.grants[jid] || [];
+            if (!cmds.length) return send(`ℹ️ @${jid.split('@')[0]} hat keine exklusiven Befehle.`, { mentions: [jid] });
+            return send(`📋 Exklusive Befehle für @${jid.split('@')[0]}:\n${cmds.map(c => `• ${activePrefix}${c}`).join('\n')}`, { mentions: [jid] });
+          }
+
+          const entries = Object.entries(giveCommandData.grants).filter(([, cmds]) => cmds.length);
+          if (!entries.length) return send('ℹ️ Es sind aktuell keine Befehle exklusiv vergeben.');
+          const lines = entries.map(([jid, cmds]) => `@${jid.split('@')[0]}: ${cmds.map(c => activePrefix + c).join(', ')}`);
+          return send(`📋 Exklusiv vergebene Befehle:\n${lines.join('\n')}`, { mentions: entries.map(([jid]) => jid) });
         }
 
-        return send(
-          `❌ Nutzung:\n${activePrefix}givecommand an\n${activePrefix}givecommand aus\n${activePrefix}givecommand add <nummer|@user>\n${activePrefix}givecommand remove <nummer|@user>\n${activePrefix}givecommand list`
-        );
+        const isRemove = sub === 'remove' || sub === 'del';
+
+        let target = isRemove ? args[1] : args[0];
+        if (ctx?.mentionedJid?.length) target = ctx.mentionedJid[0];
+        else if (ctx?.participant) target = ctx.participant;
+
+        const cmdArgIndex = isRemove ? 2 : 1;
+        const targetCmd = (args[cmdArgIndex] || '').toLowerCase().replace(new RegExp(`^\\${activePrefix}`), '').trim();
+
+        if (!target) {
+          return send(
+            `❌ Nutzung:\n${activePrefix}givecommand @user <befehl>\n${activePrefix}givecommand remove @user <befehl>\n${activePrefix}givecommand remove @user\n${activePrefix}givecommand list [@user]`
+          );
+        }
+
+        const jid = await resolveLidJid(target, sock);
+
+        if (isRemove) {
+          if (!giveCommandData.grants[jid]) return send(`ℹ️ @${jid.split('@')[0]} hat keine exklusiven Befehle.`, { mentions: [jid] });
+
+          if (!targetCmd) {
+            delete giveCommandData.grants[jid];
+            save(FILES.giveCommand, giveCommandData);
+            return send(`✅ Alle exklusiven Befehle von @${jid.split('@')[0]} wurden entfernt.`, { mentions: [jid] });
+          }
+
+          giveCommandData.grants[jid] = (giveCommandData.grants[jid] || []).filter(c => c !== targetCmd);
+          if (!giveCommandData.grants[jid].length) delete giveCommandData.grants[jid];
+          save(FILES.giveCommand, giveCommandData);
+          return send(`✅ Befehl "${targetCmd}" wurde @${jid.split('@')[0]} entzogen.`, { mentions: [jid] });
+        }
+
+        if (!targetCmd) {
+          return send(`❌ Nutzung: ${activePrefix}givecommand @user <befehl>\nBeispiel: ${activePrefix}givecommand @zakk fish`);
+        }
+
+        if (targetCmd === 'givecommand') {
+          return send('❌ Der Befehl "givecommand" selbst kann nicht exklusiv vergeben werden.');
+        }
+
+        if (!giveCommandData.grants[jid]) giveCommandData.grants[jid] = [];
+        if (!giveCommandData.grants[jid].includes(targetCmd)) giveCommandData.grants[jid].push(targetCmd);
+        save(FILES.giveCommand, giveCommandData);
+
+        return send(`✅ Der Befehl "${targetCmd}" wurde exklusiv an @${jid.split('@')[0]} vergeben. Nur er/sie (+ Owner) kann ihn jetzt noch nutzen.`, { mentions: [jid] });
       }
 
       if (cmd === 'getlid') {
@@ -1933,7 +1939,6 @@ mentions: [sender]
         if (ctx && Array.isArray(ctx.mentionedJid) && ctx.mentionedJid.length) {
           target = ctx.mentionedJid[0];
         }
-        // Echte LID über Baileys-Mapping auflösen (keine Geratenes mehr).
         const realLid = await resolveLidJid(target, sock);
         const isPrimaryOwnerCheck = await isPrimaryOwnerAsync(target, sock);
         let out = `📋 *LID-Auflösung für:* ${target}\n`;
@@ -2614,9 +2619,6 @@ if (cmd === 'listroles') {
 
         await send('🔄 Starte LID-Migration aller Datendateien. Dies kann einen Moment dauern...');
 
-        // Rekursiver Helfer: benennt alle Telefonnummer-JID-Keys eines Objekts
-        // auf ihre echte LID um (via Baileys-Mapping). Nicht auflösbare Nutzer
-        // (nie mit LID interagiert) behalten ihre alte Nummer als Key.
         async function migrateKeys(obj, label) {
           if (!obj || typeof obj !== 'object') return { migrated: 0, skipped: 0, total: 0 };
           const entries = Object.entries(obj);
@@ -2631,7 +2633,7 @@ if (cmd === 'listroles') {
                 delete obj[key];
                 migrated++;
               } else {
-                skipped++; // Ziel-Key existiert bereits -> Konflikt, nicht automatisch mergen
+                skipped++;
               }
             } else {
               skipped++;
@@ -2966,15 +2968,14 @@ if (cmd === 'bewerbung' || cmd === 'bewerben' || cmd === 'apply') {
 
         return send(`✅ Session "${target}" wurde gestoppt und vollständig gelöscht (inkl. Login-Daten). Beim nächsten "${PREFIX}newsession ${target}" muss neu per QR-Code gescannt werden.`);
       }
-// Hilfsfunktionen: LID -> echte Nummer für die Anzeige auflösen
 async function resolveDisplayJid(jid) {
   try {
     if (jid.endsWith('@lid')) {
       const pn = await sock.signalRepository.lidMapping.getPNForLID(jid);
-      if (pn) return pn; // z.B. 4915123456789@s.whatsapp.net
+      if (pn) return pn;
     }
   } catch (e) {}
-  return jid; // Fallback: Original-JID/LID
+  return jid;
 }
 
 async function displayNum(jid) {
@@ -3091,7 +3092,6 @@ if (cmd === 'divorce') {
         try {
           const groupMembers = await getGroupMetaSafe(from);
           const rawIds = (groupMembers?.participants || []).map(p => p.id).filter(Boolean);
-          // Echte LID je Teilnehmer auflösen (via Baileys-Mapping), statt sie zu erraten.
           const resolved = await Promise.all(rawIds.map(id => resolveLidJid(id, sock)));
           const mentions = resolved.filter(jid => jid && jid.endsWith('@lid'));
           if (!mentions.length) return send('❌ Keine Gruppenmitglieder gefunden.');
@@ -5222,7 +5222,6 @@ function downloadMdEdit(url) {
   });
 }
 
-// === SAO Edit-Suche (YouTube) ===
 const SAO_SEARCH_QUERIES = [
   'sword art online edit', 'sword art online amv', 'sao edit shorts',
   'kirito asuna edit', 'sword art online tiktok edit',
@@ -5716,7 +5715,6 @@ if (cmd === 'errors' || cmd === 'fehler') {
 
   out += `\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n_Nutzung: ${activePrefix}errors [anzahl-zeilen]_`;
 
-  // WhatsApp-Textlimit — bei Bedarf als Datei senden statt als Text
   if (out.length > 4000) {
     const buf = Buffer.from(out, 'utf8');
     await sock.sendMessage(from, { document: buf, mimetype: 'text/plain', fileName: 'errors.txt' });
