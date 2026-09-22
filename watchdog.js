@@ -1,6 +1,6 @@
 'use strict';
 
-const { spawn } = require('child_process');
+import { spawn } from "child_process";
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
