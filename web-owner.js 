@@ -38,7 +38,7 @@ export function createOwnerRoutes({ users, ranks, bans, save, FILES, normalizeJi
     next();
   });
 
-  // ---- Übersicht ----
+  
   router.get('/overview', (req, res) => {
     const all = Object.values(users);
     return res.json({
@@ -51,7 +51,7 @@ export function createOwnerRoutes({ users, ranks, bans, save, FILES, normalizeJi
     });
   });
 
-  // ---- Nutzerliste ----
+  
   router.get('/users', (req, res) => {
     const list = Object.entries(users).map(([jid, u]) => ({
       jid,
@@ -66,7 +66,7 @@ export function createOwnerRoutes({ users, ranks, bans, save, FILES, normalizeJi
     return res.json({ success: true, users: list });
   });
 
-  // ---- Rang setzen ----
+  
   router.post('/rank', (req, res) => {
     const { jid, rank } = req.body || {};
     if (!jid || !rank) return res.status(400).json({ success: false, error: 'jid und rank erforderlich.' });
@@ -84,7 +84,7 @@ export function createOwnerRoutes({ users, ranks, bans, save, FILES, normalizeJi
     return res.json({ success: true, jid: target, rank: rankUpper });
   });
 
-  // ---- Bannen ----
+  
   router.post('/ban', (req, res) => {
     const { jid, reason } = req.body || {};
     if (!jid) return res.status(400).json({ success: false, error: 'jid erforderlich.' });
@@ -94,7 +94,7 @@ export function createOwnerRoutes({ users, ranks, bans, save, FILES, normalizeJi
     return res.json({ success: true, jid: target, banned: true });
   });
 
-  // ---- Entbannen ----
+  
   router.post('/unban', (req, res) => {
     const { jid } = req.body || {};
     if (!jid) return res.status(400).json({ success: false, error: 'jid erforderlich.' });
@@ -104,7 +104,7 @@ export function createOwnerRoutes({ users, ranks, bans, save, FILES, normalizeJi
     return res.json({ success: true, jid: target, banned: false });
   });
 
-  // ---- Coins vergeben (+/-) ----
+  
   router.post('/coins', (req, res) => {
     const { jid, amount } = req.body || {};
     const amt = parseInt(amount);
@@ -116,7 +116,7 @@ export function createOwnerRoutes({ users, ranks, bans, save, FILES, normalizeJi
     return res.json({ success: true, jid: target, coins: users[target].coins });
   });
 
-  // ---- XP vergeben (+/-) ----
+  
   router.post('/xp', (req, res) => {
     const { jid, amount } = req.body || {};
     const amt = parseInt(amount);
