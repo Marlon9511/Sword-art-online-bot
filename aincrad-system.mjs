@@ -27,9 +27,7 @@ export function createAincradSystem(DATA_PATH) {
     }
   };
 
-  // ---------------------------------------------------------------
-  // Waffen-Datenbank
-  // ---------------------------------------------------------------
+  
   const RARITY_INFO = {
     common:    { label: 'Gewöhnlich', emoji: '⚪' },
     rare:      { label: 'Selten',     emoji: '🔵' },
@@ -70,9 +68,7 @@ export function createAincradSystem(DATA_PATH) {
     }
   };
 
-  // ---------------------------------------------------------------
-  // Stockwerke (Story-Reihenfolge)
-  // ---------------------------------------------------------------
+  
   const FLOORS = [
     {
       id: 'floor_1', name: '🏰 Stockwerk 1 — Stadt der Anfänge', reqLevel: 1,
@@ -183,9 +179,7 @@ ${' '}
 {P}aincradduel @user — Gegen einen anderen Spieler duellieren
 {P}aincradleaderboard — Bestenliste`;
 
-  // ---------------------------------------------------------------
-  // Hilfsfunktionen
-  // ---------------------------------------------------------------
+  
   function ensureProfile(jid) {
     if (!acData[jid]) {
       acData[jid] = {
@@ -252,13 +246,11 @@ ${' '}
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   }
 
-  const EXPLORE_COOLDOWN = 5 * 60 * 1000;   // 5 Min
-  const BOSS_COOLDOWN = 30 * 60 * 1000;     // 30 Min
-  const DUEL_COOLDOWN = 10 * 60 * 1000;     // 10 Min
+  const EXPLORE_COOLDOWN = 5 * 60 * 1000;   
+  const BOSS_COOLDOWN = 30 * 60 * 1000;     
+  const DUEL_COOLDOWN = 10 * 60 * 1000;     
 
-  // ---------------------------------------------------------------
-  // Command-Handler
-  // ---------------------------------------------------------------
+  
   async function handle(ctx) {
     const {
       cmd, args, sender, from, isGroup, activePrefix, send, sock,
@@ -270,7 +262,7 @@ ${' '}
     const jid = normalizeJid(sender);
     const profile = ensureProfile(jid);
 
-    // ---------- aincradstart ----------
+    
     if (cmd === 'aincradstart') {
       await send(
         `⚔️ Willkommen in *Aincrad*, Schwertkämpfer!\n\n` +
@@ -280,13 +272,13 @@ ${' '}
       return true;
     }
 
-    // ---------- aincradhelp ----------
+    
     if (cmd === 'aincradhelp') {
       await send(AC_HELP_TEXT.replace(/\{P\}/g, activePrefix));
       return true;
     }
 
-    // ---------- aincradprofile / aincradme ----------
+    
     if (cmd === 'aincradprofile' || cmd === 'aincradme') {
       const floor = FLOORS.find(f => f.id === profile.currentFloor);
       const needed = xpNeeded(profile.level);
@@ -305,7 +297,7 @@ ${' '}
       return true;
     }
 
-    // ---------- aincradfloor / aincradfloors ----------
+     
     if (cmd === 'aincradfloor' || cmd === 'aincradfloors') {
       const lines = FLOORS.map((f, i) => {
         const unlocked = profile.unlockedFloors.includes(f.id);
@@ -323,7 +315,7 @@ ${' '}
       return true;
     }
 
-    // ---------- aincradtravel ----------
+    
     if (cmd === 'aincradtravel') {
       const query = args.join(' ').trim().toLowerCase();
       if (!query) {
@@ -350,7 +342,7 @@ ${' '}
       return true;
     }
 
-    // ---------- aincradexplore ----------
+    
     if (cmd === 'aincradexplore') {
       const cd = cooldownLeft(profile.lastExplore, EXPLORE_COOLDOWN);
       if (cd) {
@@ -386,7 +378,7 @@ ${' '}
       }
     }
 
-    // ---------- aincradboss ----------
+    
     if (cmd === 'aincradboss') {
       const cd = cooldownLeft(profile.lastBoss, BOSS_COOLDOWN);
       if (cd) {
@@ -446,7 +438,7 @@ ${' '}
       }
     }
 
-    // ---------- aincradshop ----------
+    
     if (cmd === 'aincradshop') {
       let out = '🛒 *— WAFFEN- & ITEM-SHOP —* 🛒\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n';
       for (const [key, item] of Object.entries(SHOP)) {
@@ -457,7 +449,7 @@ ${' '}
       return true;
     }
 
-    // ---------- aincradbuy ----------
+    
     if (cmd === 'aincradbuy') {
       const key = (args[0] || '').toLowerCase();
       const item = SHOP[key];
@@ -486,7 +478,7 @@ ${' '}
       return true;
     }
 
-    // ---------- aincradinventory / aincradinv ----------
+    
     if (cmd === 'aincradinventory' || cmd === 'aincradinv') {
       const viewerIsOwner = isPrimaryOwner ? isPrimaryOwner(jid) : false;
       const wLines = Object.entries(profile.weapons)
@@ -503,7 +495,7 @@ ${' '}
       return true;
     }
 
-    // ---------- aincradequip ----------
+    
     if (cmd === 'aincradequip') {
       const key = (args.join('_') || args[0] || '').toLowerCase().replace(/\s+/g, '_');
       const matched = Object.keys(WEAPONS).find(id => id === key || WEAPONS[id].name.toLowerCase() === args.join(' ').toLowerCase());
@@ -521,7 +513,7 @@ ${' '}
       return true;
     }
 
-    // ---------- aincraduse ----------
+    
     if (cmd === 'aincraduse') {
       const key = (args[0] || '').toLowerCase();
       const owned = profile.items[key];
@@ -558,7 +550,7 @@ ${' '}
       return true;
     }
 
-    // ---------- aincradduel ----------
+    
     if (cmd === 'aincradduel') {
       const cd = cooldownLeft(profile.lastDuel, DUEL_COOLDOWN);
       if (cd) {
@@ -622,7 +614,7 @@ ${' '}
       return true;
     }
 
-    // ---------- aincradleaderboard / aincradrangliste ----------
+    
     if (cmd === 'aincradleaderboard' || cmd === 'aincradrangliste') {
       const entries = Object.entries(acData).sort((a, b) => {
         const scoreA = a[1].level * 1000 + a[1].xp;
