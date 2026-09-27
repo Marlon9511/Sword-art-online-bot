@@ -1,9 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-// ─────────────────────────────────────────────────────────────
-// CHARAKTERE
-// ─────────────────────────────────────────────────────────────
+
 
 const CHARACTERS = {
   gon: {
@@ -137,9 +135,7 @@ const CHAR_ALIASES = {
   netero: 'netero', isaac: 'netero'
 };
 
-// ─────────────────────────────────────────────────────────────
-// GEGNER-POOL (PvE — Chimera-Ameisen & Wilde Tiere)
-// ─────────────────────────────────────────────────────────────
+
 
 const ENEMY_POOL = [
   { name: 'Wildes Vieh im Greed Island', icon: '🐗', tier: 1, hp: 60, atk: 10, def: 5, spd: 8, xp: 15, coins: [20, 40] },
@@ -152,9 +148,6 @@ const ENEMY_POOL = [
   { name: 'Chimera-Ameisen-König (Fragment)', icon: '👁️‍🗨️', tier: 5, hp: 260, atk: 32, def: 18, spd: 16, xp: 100, coins: [120, 200], boss: true }
 ];
 
-// ─────────────────────────────────────────────────────────────
-// PERSISTENZ
-// ─────────────────────────────────────────────────────────────
 
 export function createHunterSystem(DATA_PATH) {
   const FILE_PATH = path.join(DATA_PATH, 'hunterxhunter.json');
@@ -239,9 +232,7 @@ export function createHunterSystem(DATA_PATH) {
     };
   }
 
-  // ─────────────────────────────────────────────────────────
-  // KAMPF-ENGINE
-  // ─────────────────────────────────────────────────────────
+  
 
   function hpBar(cur, max, len = 12) {
     const ratio = Math.max(0, Math.min(1, cur / max));
@@ -447,9 +438,7 @@ export function createHunterSystem(DATA_PATH) {
     return false;
   }
 
-  // ─────────────────────────────────────────────────────────
-  // TEXTBAUSTEINE
-  // ─────────────────────────────────────────────────────────
+  
 
   function characterListText(prefix) {
     let out = `🎯 *— HUNTER X HUNTER CHARAKTERE —* 🎯\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n`;
@@ -493,9 +482,7 @@ export function createHunterSystem(DATA_PATH) {
 
   const HXH_COMMANDS = ['hxh', 'hunter'];
 
-  // ─────────────────────────────────────────────────────────
-  // HAUPT-HANDLER
-  // ─────────────────────────────────────────────────────────
+
 
   async function handle(ctx) {
     const {
