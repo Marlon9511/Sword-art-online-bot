@@ -3,7 +3,7 @@ const path = require('path');
 
 const DATA_PATH = path.join(__dirname, 'data', 'bitchkick.json');
 
-// ---------- Storage ----------
+
 function loadData() {
   try {
     if (!fs.existsSync(DATA_PATH)) {
@@ -25,7 +25,7 @@ function saveData(data) {
   }
 }
 
-// ---------- Helpers ----------
+
 function normalizeNumber(input) {
   const num = String(input).replace(/[^0-9]/g, '');
   if (!num) return null;
@@ -76,7 +76,7 @@ async function isBotAdmin(sock, groupJid) {
   }
 }
 
-// ---------- Command Handler ----------
+
 async function handleBitchkickCommand({ cmd, args, sender, send, activePrefix, isAuthorized, m, sock }) {
   if (cmd !== 'bitchkick') return false;
 
@@ -167,7 +167,7 @@ async function handleBitchkickCommand({ cmd, args, sender, send, activePrefix, i
   return true;
 }
 
-// ---------- Join-Event Handler ----------
+
 function registerBitchkickListener(sock) {
   sock.ev.on('group-participants-update', async (update) => {
     const { id: groupJid, participants, action } = update;
