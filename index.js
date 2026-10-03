@@ -32,7 +32,7 @@ import { createJujutsuSystem } from './jujutsu-system.mjs';
 import { createHunterSystem } from './hunterxhunter-system.mjs';
 import { createKingdomHeartsSystem } from './kingdomhearts-system.mjs';
 import { createAincradSystem } from './aincrad-system.mjs';
-import { createYuGiOh } from './yugioh.mjs';
+
 
 
 process.on('unhandledRejection', (reason) => {
