@@ -271,8 +271,6 @@ const jujutsu = createJujutsuSystem(DATA_PATH);
 const hunterxhunter = createHunterSystem(DATA_PATH);
 const kingdomHearts = createKingdomHeartsSystem(DATA_PATH);
 const aincrad = createAincradSystem(DATA_PATH);
-const yugioh = createYuGiOh(DATA_PATH);
-const pendingYugiohChallenges = new Map();
 
 async function createBackup() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
