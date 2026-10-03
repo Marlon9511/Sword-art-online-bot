@@ -5668,12 +5668,7 @@ if (cmd === 'kisteall' || cmd === 'giftkisteall') {
     `Öffne sie mit ${activePrefix}openkiste`
   );
 }
-if (cmd === 'bancheck') {
-    const number = (args[0] || '').replace(/\D/g, '');
-    if (!number) return send(`❌ Nutzung: ${activePrefix}bancheck <nummer>`);
-    const result = await checkNumber(sock, number);
-    return send(`📋 Ergebnis für ${number}:\n${result.status}`);
-}
+
 if (cmd === 'errors' || cmd === 'fehler') {
   if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN'])) return send('❌ Kein Zugriff.');
 
