@@ -1,11 +1,26 @@
-// apply-bancheck.mjs — baut den ?bancheck-Befehl in deine Bot-Datei ein.
+// apply-bancheck.mjs — baut den ?bancheck-Befehl (mit Ban-Art) in deine Bot-Datei ein.
 // Nutzung:  node apply-bancheck.mjs ./index.js
+// Funktioniert für frische Dateien UND für Dateien, in die schon die erste Version eingebaut wurde.
 // Legt vorher ein Backup (<datei>.bak) an und trägt den API-Key in die .env ein.
 
 import fs from 'fs';
 import path from 'path';
 
 const API_KEY = 'bk_v1_Nrr2NnM3cs0vMBl3rVabq4dx1fl6wDpzPTSJX1WNJQkrK-sK1clk9GK8ZACgU2tYenHT8ByfZsPR2wGPaqNHpLMlk5op1T0ohql28veCD4BeSZ5l214TII9TWC7ZrX8tOK8K3BEl68b3K0RUaWyilOmYmkN_WMHukwoAHBiEJKi6D5i8jUHI12SoolfDNLcKH_1Uzh0IKrt49r7HRWr3CgPUfjl0zRrZFJnRt68zaYdntriZ6tCYECQM9wa0sFKID25f1L0LsoRsEwQjJhGRkvVWty8_jG_QJBAjdfl8tDgPu1bX0UYsv7zPilHy5hPI6nJqOGS88kVJEMbVK2sih9toLoEoHgyKmJ4VwhbPDx67C-pOLGdn8K96KgagWOMBwoln89PVcRK2jt2M25N54hVG_eCycz0pGhXEqtWNi1bEnWGYqYgGMiH-p_SoV4vxJsiAAgTPIBrvX9ZWp1CT_VrgMFSJ9BnFIiVmiJrKf_oiJnT28DM-u6pOBQdzVEntBL9dVGTn-rNj5D0igYkIGU9kBq7Q8Lr8rvK8BxCvw6Q7HZuB0wg';
+
+const DESCRIBE = String.raw`
+function describeBan(r) {
+  if (!r.banned) return '✅ Nicht gebannt';
+  const reason = String(r.reason || '');
+  const t = reason.toLowerCase();
+  let type = '🚫 Gebannt (Art unbekannt)';
+  if (/perm|dauer|forever|lifetime/.test(t)) type = '⛔ Perma-Ban';
+  else if (/spam/.test(t)) type = '📛 Spam-Ban';
+  else if (/mod|moderat|review|violation|tos|terms/.test(t)) type = '🛡️ Mod-Ban';
+  else if (/temp|tempor|vor.?übergehend/.test(t)) type = '⏳ Temporärer Ban';
+  return type + (reason ? '\n📝 Grund: ' + reason : '');
+}
+`;
 
 const FUNCS = String.raw`const BANCHECK_API_BASE = 'https://baron0.com';
 
@@ -19,6 +34,7 @@ async function bancheckRequest(endpoint, payload) {
   });
   const body = await res.json();
   if (!res.ok) throw new Error(body.detail || body.title || ('HTTP ' + res.status));
+  console.log('[bancheck] API-Antwort:', JSON.stringify(body));
   return body;
 }
 
@@ -35,8 +51,7 @@ const toApiNumber = (raw) => {
   const digits = String(raw || '').replace(/[^0-9]/g, '');
   return digits.length >= 6 ? '+' + digits : null;
 };
-
-`;
+`+ DESCRIBE + '\n';
 
 const COMMAND = String.raw`if (cmd === 'bancheck' || cmd === 'checkban') {
   if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD'])) return send('❌ Kein Zugriff.');
@@ -54,13 +69,13 @@ const COMMAND = String.raw`if (cmd === 'bancheck' || cmd === 'checkban') {
       return send(
         '📋 *Ban-Check*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n' +
         '📞 ' + numbers[0] + '\n' +
-        (r.banned ? '🚫 Gebannt' + (r.reason ? ': ' + r.reason : '') : '✅ Nicht gebannt')
+        describeBan(r)
       );
     }
 
     const results = await apiBulkCheck(numbers);
     const lines = results.map(r =>
-      (r.banned ? '🚫 ' : '✅ ') + r.number + (r.banned && r.reason ? ' — ' + r.reason : '')
+      r.number + ' — ' + describeBan(r).replace('\n📝 Grund: ', ' | ')
     );
     return send('📋 *Ban-Check (' + results.length + ')*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n' + lines.join('\n'));
   } catch (e) {
@@ -70,6 +85,20 @@ const COMMAND = String.raw`if (cmd === 'bancheck' || cmd === 'checkban') {
 }
 `;
 
+// Alte (erste) Version → neue Version
+const OLD_SINGLE = String.raw`(r.banned ? '🚫 Gebannt' + (r.reason ? ': ' + r.reason : '') : '✅ Nicht gebannt')`;
+const NEW_SINGLE = String.raw`describeBan(r)`;
+const OLD_BULK = String.raw`(r.banned ? '🚫 ' : '✅ ') + r.number + (r.banned && r.reason ? ' — ' + r.reason : '')`;
+const NEW_BULK = String.raw`r.number + ' — ' + describeBan(r).replace('\n📝 Grund: ', ' | ')`;
+const OLD_TONUM_END = String.raw`  return digits.length >= 6 ? '+' + digits : null;
+};
+`;
+const OLD_RETURN = String.raw`  if (!res.ok) throw new Error(body.detail || body.title || ('HTTP ' + res.status));
+  return body;`;
+const NEW_RETURN = String.raw`  if (!res.ok) throw new Error(body.detail || body.title || ('HTTP ' + res.status));
+  console.log('[bancheck] API-Antwort:', JSON.stringify(body));
+  return body;`;
+
 const target = process.argv[2];
 if (!target || !fs.existsSync(target)) {
   console.error('Nutzung: node apply-bancheck.mjs <pfad-zur-bot-datei>');
@@ -78,29 +107,44 @@ if (!target || !fs.existsSync(target)) {
 
 let src = fs.readFileSync(target, 'utf8');
 
-if (src.includes('apiCheckNumber')) {
-  console.error('Abbruch: Der Ban-Check ist in dieser Datei bereits eingebaut.');
+if (src.includes('function describeBan')) {
+  console.error('Abbruch: Diese Datei hat schon die neue Version (mit Ban-Art).');
   process.exit(1);
 }
 
-const anchors = {
-  funcs: 'const randInt = (min, max)',
-  command: 'const lidHandled = await lidSystem.handle(',
-  list: "'bitchkick', 'givecommand',"
-};
-for (const [name, a] of Object.entries(anchors)) {
-  if (!src.includes(a)) {
-    console.error('Abbruch: Einfüge-Stelle "' + name + '" nicht gefunden (' + a + ').');
+if (src.includes('apiCheckNumber')) {
+  // ── Upgrade der ersten Version ──
+  if (!src.includes(OLD_SINGLE) || !src.includes(OLD_BULK) || !src.includes(OLD_TONUM_END)) {
+    console.error('Abbruch: Die bestehende Ban-Check-Version wurde verändert — Upgrade nicht automatisch möglich.');
     process.exit(1);
   }
+  fs.copyFileSync(target, target + '.bak');
+  src = src.replace(OLD_TONUM_END, OLD_TONUM_END + DESCRIBE);
+  src = src.replace(OLD_SINGLE, NEW_SINGLE);
+  src = src.replace(OLD_BULK, NEW_BULK);
+  if (src.includes(OLD_RETURN)) src = src.replace(OLD_RETURN, NEW_RETURN);
+  fs.writeFileSync(target, src);
+  console.log('Bestehender Ban-Check auf die Version mit Ban-Art aktualisiert.');
+} else {
+  // ── Frische Installation ──
+  const anchors = {
+    funcs: 'const randInt = (min, max)',
+    command: 'const lidHandled = await lidSystem.handle(',
+    list: "'bitchkick', 'givecommand',"
+  };
+  for (const [name, a] of Object.entries(anchors)) {
+    if (!src.includes(a)) {
+      console.error('Abbruch: Einfüge-Stelle "' + name + '" nicht gefunden (' + a + ').');
+      process.exit(1);
+    }
+  }
+  fs.copyFileSync(target, target + '.bak');
+  src = src.replace(anchors.funcs, FUNCS + anchors.funcs);
+  src = src.replace(anchors.command, COMMAND + anchors.command);
+  src = src.replace(anchors.list, anchors.list + " 'bancheck', 'checkban',");
+  fs.writeFileSync(target, src);
+  console.log('Ban-Check frisch eingebaut.');
 }
-
-fs.copyFileSync(target, target + '.bak');
-
-src = src.replace(anchors.funcs, FUNCS + anchors.funcs);
-src = src.replace(anchors.command, COMMAND + anchors.command);
-src = src.replace(anchors.list, anchors.list + " 'bancheck', 'checkban',");
-fs.writeFileSync(target, src);
 
 const envPath = path.join(path.dirname(path.resolve(target)), '.env');
 let env = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
