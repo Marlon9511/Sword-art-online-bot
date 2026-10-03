@@ -18,7 +18,7 @@ function describeBan(r) {
   else if (/spam/.test(t)) type = '📛 Spam-Ban';
   else if (/mod|moderat|review|violation|tos|terms/.test(t)) type = '🛡️ Mod-Ban';
   else if (/temp|tempor|vor.?übergehend/.test(t)) type = '⏳ Temporärer Ban';
-  return type + (reason ? '\n📝 Grund: ' + reason : '');
+  return type + '\n🧪 Roh: ' + JSON.stringify(r);
 }
 `;
 
