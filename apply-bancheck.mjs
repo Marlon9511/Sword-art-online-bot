@@ -54,7 +54,7 @@ const toApiNumber = (raw) => {
 `+ DESCRIBE + '\n';
 
 const COMMAND = String.raw`if (cmd === 'bancheck' || cmd === 'checkban') {
-  if (!isAuthorized(sender, ['OWNER', 'COOWNER', 'ADMIN', 'MOD', 'SUP', 'USER'])) return send('❌ Kein Zugriff.');
+
 
   const numbers = [...new Set(args.map(toApiNumber).filter(Boolean))];
   if (!numbers.length) {
