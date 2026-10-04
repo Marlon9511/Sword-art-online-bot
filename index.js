@@ -5056,6 +5056,8 @@ if (cmd === 'addpartner') {
     return send('❌ Nur der Gildenmeister darf neue Bündnisse eingehen.');
   }
 
+  if (!Array.isArray(partners.list)) partners.list = [];
+
   const input = args.join(' ');
   const parts = input.split('|').map(s => s ? s.trim() : s);
   const name = parts[0];
@@ -5064,9 +5066,9 @@ if (cmd === 'addpartner') {
   if (!name || !link) {
     return send(
       '❌ Nutzung: ' + activePrefix + 'addpartner Bot-Name | Link\n' +
-      'Beispiel: ' + activePrefix + 'addpartner Elucidator-Bot | https://chat.whatsapp.com/XXXXXXXX'
+      'Beispiel: ' + activePrefix + addpartner sao-bot | https://chat.whatsapp.com/XXXXXXXX'
     );
-}
+  }
 
   if (!/^https?:\/\//i.test(link)) {
     return send('❌ Bitte gib einen gültigen Link an (muss mit http:// oder https:// beginnen).');
@@ -5082,6 +5084,8 @@ if (cmd === 'delpartner') {
   if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) {
     return send('❌ Nur der Gildenmeister darf Bündnisse auflösen.');
   }
+
+  if (!Array.isArray(partners.list)) partners.list = [];
 
   const index = parseInt(args[0]) - 1;
   if (isNaN(index) || index < 0 || index >= partners.list.length) {
