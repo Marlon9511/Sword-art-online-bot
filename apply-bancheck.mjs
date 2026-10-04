@@ -38,7 +38,7 @@ const toApiNumber = (raw) => {
   return digits.length >= 6 ? '+' + digits : null;
 };
 
-function describeBan(r, showRaw) {
+function describeBan(r) {
   if (!r.banned) return '✅ Nicht gebannt';
 
   // Alle Textwerte der Antwort durchsuchen (nicht nur "reason")
@@ -47,16 +47,15 @@ function describeBan(r, showRaw) {
   const flagSpam = Object.entries(r).some(([k, v]) => /spam/i.test(k) && v === true);
   const flagTemp = Object.entries(r).some(([k, v]) => /temp/i.test(k) && v === true);
 
-  let type = '🚫 Gebannt (Art unbekannt)';
-  if (flagPerm || /perm|dauer|forever|lifetime/.test(values)) type = '⛔ Perma-Ban';
-  else if (flagSpam || /spam/.test(values)) type = '📛 Spam-Ban';
-  else if (/mod|moderat|review|violation|tos|terms/.test(values)) type = '🛡️ Mod-Ban';
-  else if (flagTemp || /temp|vor.?übergehend/.test(values)) type = '⏳ Temporärer Ban';
+  if (flagPerm || /perm|dauer|forever|lifetime/.test(values)) return '⛔ Perma-Ban';
+  if (flagSpam || /spam/.test(values)) return '📛 Spam-Ban';
+  if (/mod|moderat|review|violation|tos|terms/.test(values)) return '🛡️ Mod-Ban';
+  if (flagTemp || /temp|vor.?übergehend/.test(values)) return '⏳ Temporärer Ban';
 
-  let out = type;
-  if (r.reason) out += '\n📝 Grund: ' + r.reason;
-  if (showRaw) out += '\n🧪 Roh: ' + JSON.stringify(r);
-  return out;
+  // Unbekannte Art: Wert aus einem Typ-Feld (oder reason) anzeigen, sonst nur "Gebannt"
+  const entry = Object.entries(r).find(([k, v]) => /type|kind|categor|class/i.test(k) && typeof v === 'string' && v.trim());
+  const label = String(entry ? entry[1] : (r.reason || '')).trim().slice(0, 40);
+  return label ? '🚫 Gebannt: ' + label : '🚫 Gebannt';
 }
 
 `;
@@ -78,13 +77,13 @@ const COMMAND = String.raw`if (cmd === 'bancheck' || cmd === 'checkban') {
       return send(
         '📋 *Ban-Check*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n' +
         '📞 ' + numbers[0] + '\n' +
-        describeBan(r, isOwner)
+        describeBan(r)
       );
     }
 
     const results = await apiBulkCheck(numbers);
     const lines = results.map(r =>
-      r.number + ' — ' + describeBan(r, false).replace('\n📝 Grund: ', ' | ')
+      r.number + ' — ' + describeBan(r)
     );
     return send('📋 *Ban-Check (' + results.length + ')*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n' + lines.join('\n'));
   } catch (e) {
