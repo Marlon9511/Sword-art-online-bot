@@ -5039,18 +5039,19 @@ if (cmd === 'showuser') {
   return send(caption, { mentions: [targetJid] });
 }
 if (cmd === 'partner' || cmd === 'partners' || cmd === 'buendnisse') {
-  if (!partners.list || partners.list.length === 0) {
+  if (!Array.isArray(partners.list) || partners.list.length === 0) {
     return send('⚔️ *— GILDEN-BÜNDNISSE —* ⚔️\n\nAktuell bestehen keine Bündnisse mit anderen Gilden.');
   }
 
   const divider = '⚔️┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈⚔️';
   let out = '⚔️ *— GILDEN-BÜNDNISSE —* ⚔️\n' + divider + '\n\n';
   partners.list.forEach((p, i) => {
-    out += '🛡️ *' + p.name + '*\n🔗 ' + p.link + '\n\n';
+    out += '*' + (i + 1) + '.* 🛡️ *' + p.name + '*\n🔗 ' + p.link + '\n\n';
   });
   out += divider + '\n_"Gemeinsam sind wir stärker." — Verbündete Gilden von AINCRAD_';
   return send(out);
 }
+
 if (cmd === 'addpartner') {
   if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) {
     return send('❌ Nur der Gildenmeister darf neue Bündnisse eingehen.');
@@ -5059,14 +5060,14 @@ if (cmd === 'addpartner') {
   if (!Array.isArray(partners.list)) partners.list = [];
 
   const input = args.join(' ');
-  const parts = input.split('|').map(s => s ? s.trim() : s);
+  const parts = input.split('|').map(s => (s ? s.trim() : s));
   const name = parts[0];
   const link = parts[1];
 
   if (!name || !link) {
     return send(
       '❌ Nutzung: ' + activePrefix + 'addpartner Bot-Name | Link\n' +
-      'Beispiel: ' + activePrefix + addpartner sao-bot | https://chat.whatsapp.com/XXXXXXXX'
+      'Beispiel: ' + activePrefix + 'addpartner Elucidator-Bot | https://chat.whatsapp.com/XXXXXXXX'
     );
   }
 
@@ -5087,9 +5088,17 @@ if (cmd === 'delpartner') {
 
   if (!Array.isArray(partners.list)) partners.list = [];
 
-  const index = parseInt(args[0]) - 1;
-  if (isNaN(index) || index < 0 || index >= partners.list.length) {
-    return send('❌ Ungültige Nummer. Nutze ' + activePrefix + 'partner um die Liste mit Nummern zu sehen.');
+  const arg = args.join(' ').trim();
+  if (!arg) {
+    return send('❌ Nutzung: ' + activePrefix + 'delpartner Nummer oder Name');
+  }
+
+  let index = /^\d+$/.test(arg)
+    ? parseInt(arg, 10) - 1
+    : partners.list.findIndex(p => p.name.toLowerCase() === arg.toLowerCase());
+
+  if (index < 0 || index >= partners.list.length) {
+    return send('❌ Nicht gefunden. Nutze ' + activePrefix + 'partner für die Liste mit Nummern.');
   }
 
   const removed = partners.list.splice(index, 1)[0];
