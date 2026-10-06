@@ -5729,6 +5729,85 @@ if (cmd === 'errors' || cmd === 'fehler') {
 
   return send(out);
 }
+if (cmd === 'pp' || cmd === 'profilbild' || cmd === 'getpp') {
+  const ctx = m.message?.extendedTextMessage?.contextInfo;
+  let targetJid = null;
+
+  if (ctx?.mentionedJid?.length) {
+    targetJid = ctx.mentionedJid[0];
+  } else if (ctx?.participant && !args[0]) {
+    targetJid = ctx.participant;
+  } else if (args[0]) {
+    const num = args[0].replace(/[^0-9]/g, '');
+    if (num.length >= 6) targetJid = `${num}@s.whatsapp.net`;
+  }
+
+  if (!targetJid) {
+    return send(
+      `❌ Nutzung:\n${activePrefix}pp <nummer>\n${activePrefix}pp @user\noder als Antwort auf eine Nachricht\n\nBeispiel: ${activePrefix}pp 4915123456789\n(Nummer mit Ländervorwahl, ohne "+")`
+    );
+  }
+
+  targetJid = normalizeJid(targetJid);
+
+  // Bei Nummern prüfen, ob sie überhaupt bei WhatsApp existiert
+  if (targetJid.endsWith('@s.whatsapp.net')) {
+    try {
+      const [check] = await sock.onWhatsApp(targetJid);
+      if (!check?.exists) {
+        return send(`❌ Die Nummer ${targetJid.split('@')[0]} ist nicht bei WhatsApp registriert.`);
+      }
+      targetJid = check.jid || targetJid;
+    } catch (e) {
+      console.error('[pp] onWhatsApp-Check fehlgeschlagen:', e?.message || e);
+    }
+  }
+
+  // Kandidaten: Telefon-JID und LID
+  const candidates = [];
+  const phoneJid = await resolvePhoneJid(targetJid, sock);
+  if (phoneJid) candidates.push(phoneJid);
+  candidates.push(targetJid);
+  const lidJid = await resolveLidJid(targetJid, sock);
+  if (lidJid) candidates.push(lidJid);
+
+  const getPPUrl = async (jid) => {
+    for (const type of ['image', 'preview']) {
+      try {
+        const result = await Promise.race([
+          sock.profilePictureUrl(jid, type),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000))
+        ]);
+        if (result) return result;
+      } catch (e) {}
+    }
+    return null;
+  };
+
+  let ppUrl = null;
+  const tried = new Set();
+  for (const c of candidates) {
+    if (!c || tried.has(c)) continue;
+    tried.add(c);
+    ppUrl = await getPPUrl(c);
+    if (ppUrl) break;
+  }
+
+  if (!ppUrl) {
+    return send('❌ Kein Profilbild gefunden. Die Person hat entweder keins oder es ist per Datenschutzeinstellung versteckt.');
+  }
+
+  try {
+    await sock.sendMessage(from, {
+      image: { url: ppUrl },
+      caption: `🖼️ Profilbild von ${targetJid.split('@')[0]}`
+    }, { quoted: m });
+  } catch (e) {
+    console.error('[pp] Senden fehlgeschlagen:', e?.message || e);
+    return send('❌ Profilbild konnte nicht gesendet werden.');
+  }
+  return;
+}
 const suggestion = findClosestCommand(cmd);
 if (suggestion) {
   return send(
