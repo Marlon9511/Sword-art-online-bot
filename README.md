@@ -1,4 +1,4 @@
-# on terms
+# on termux
 pkg install now
 npm install git
 git clone 
