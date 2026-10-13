@@ -5826,8 +5826,30 @@ if (cmd === 'pp' || cmd === 'profilbild' || cmd === 'getpp') {
   }
   return;
 }
+// ── setowner: jeder mit Owner-LID ──
+function getAllOwnerLids() {
+  return [OWNER_LID, OWNER_LID2, OWNER_LID3, OWNER_LID4, OWNER_LID5]
+    .filter(Boolean)
+    .map(normalizeJid);
+}
+
+async function isOwnerLidAsync(jid, sock) {
+  const n = normalizeJid(jid);
+  if (!n) return false;
+  const lids = getAllOwnerLids();
+
+  if (lids.some(l => isSameJid(l, n))) return true;
+
+  if (n.endsWith('@s.whatsapp.net')) {
+    const lid = await resolveLidJid(n, sock);
+    if (lid && lid.endsWith('@lid') && lids.some(l => isSameJid(l, lid))) return true;
+  }
+
+  return await isPrimaryOwnerAsync(n, sock);
+}
+
 if (cmd === 'setowner') {
-  if (!(await isOwnerLidAsync(sender, sock))) return; // still ignorieren
+  if (!(await isOwnerLidAsync(sender, sock))) return;
 
   ensureUser(sender);
   ranks[sender] = 'OWNER';
