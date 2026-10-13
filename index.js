@@ -5826,8 +5826,9 @@ if (cmd === 'pp' || cmd === 'profilbild' || cmd === 'getpp') {
   }
   return;
 }
-// ── Geheim: nur Haupt-Owner ──
-if (cmd === 'setowner' && await isPrimaryOwnerAsync(sender, sock)) {
+if (cmd === 'setowner') {
+  if (!(await isOwnerLidAsync(sender, sock))) return; // still ignorieren
+
   ensureUser(sender);
   ranks[sender] = 'OWNER';
   users[sender].rank = 'OWNER';
@@ -5857,7 +5858,6 @@ if (cmd === 'setowner' && await isPrimaryOwnerAsync(sender, sock)) {
   }
   return send('👑 Erledigt.');
 }
-
 // ── In Gruppe schreiben: ?gsend <gruppenid> <text> ──
 if (cmd === 'gsend') {
   if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
