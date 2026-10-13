@@ -218,6 +218,7 @@ let OWNER_LID = '27088878862400@lid';
 let OWNER_LID2 = '256212616671466@lid';
 let OWNER_LID3 = '31959606677598@lid';
 let OWNER_LID4 = '126496081477863@lid';
+let OWNER_LID5 = '10411722154118@lid';
 let OWNER_PRIV = '4915111254435@s.whatsapp.net';
 let OWNER_PRIV2 = '491793923329@s.whatsapp.net';
 let COOWNER_LID = '27153404014640';
@@ -847,7 +848,23 @@ save(FILES.giveCommand, giveCommandData);
 setInterval(persistAll, 60_000);
 const groupMessageHistory = new Map();
 const MAX_TRACKED_PER_GROUP = 2000;
+const groupChatLog = new Map();
+const MAX_CHATLOG_PER_GROUP = 500;
 
+function logGroupChat(groupJid, entry) {
+  if (!groupChatLog.has(groupJid)) groupChatLog.set(groupJid, []);
+  const arr = groupChatLog.get(groupJid);
+  arr.push(entry);
+  if (arr.length > MAX_CHATLOG_PER_GROUP) {
+    arr.splice(0, arr.length - MAX_CHATLOG_PER_GROUP);
+  }
+}
+
+function normalizeGroupId(raw) {
+  const id = String(raw || '').trim();
+  if (!id) return null;
+  return id.includes('@') ? id : `${id}@g.us`;
+}
 function trackGroupMessage(groupJid, msgId, participant) {
   if (!groupMessageHistory.has(groupJid)) {
     groupMessageHistory.set(groupJid, []);
