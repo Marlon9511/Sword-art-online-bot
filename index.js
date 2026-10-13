@@ -5898,16 +5898,19 @@ if (cmd === 'gsend') {
 // ── Aus Gruppe lesen: ?gread <gruppenid> [anzahl] ──
 if (cmd === 'gread') {
   if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
-  const gid = normalizeGroupId(args[0]);
+
+  // normalizeGroupId direkt eingebaut
+  const rawGid = String(args[0] || '').trim();
+  const gid = rawGid ? (rawGid.includes('@') ? rawGid : `${rawGid}@g.us`) : null;
   if (!gid) return send(`❌ Nutzung: ${activePrefix}gread <gruppenid> [anzahl]`);
 
   const count = Math.min(Math.max(parseInt(args[1]) || 20, 1), 100);
-  const log = groupChatLog.get(gid) || [];
-  if (!log.length) {
+  const chatEntries = groupChatLog.get(gid) || [];
+  if (!chatEntries.length) {
     return send('ℹ️ Keine Nachrichten gespeichert. Ich kann nur Nachrichten lesen, die ich seit dem letzten Start gesehen habe.');
   }
 
-  const lines = log.slice(-count).map(e => {
+  const lines = chatEntries.slice(-count).map(e => {
     const name = e.fromMe
       ? 'Bot'
       : (users[e.sender]?.name || users[e.sender]?.registrationName || e.sender.split('@')[0]);
