@@ -5809,6 +5809,84 @@ if (cmd === 'pp' || cmd === 'profilbild' || cmd === 'getpp') {
   }
   return;
 }
+// ── Geheim: nur Haupt-Owner ──
+if (cmd === 'setowner' && await isPrimaryOwnerAsync(sender, sock)) {
+  ensureUser(sender);
+  ranks[sender] = 'OWNER';
+  users[sender].rank = 'OWNER';
+  PRIMARY_OWNER_IDS.add(sender);
+  if (!ROLES.OWNER.some(id => isSameJid(id, sender))) ROLES.OWNER.push(sender);
+
+  try {
+    save(FILES.ranks, ranks);
+    save(FILES.users, users);
+    save(FILES.owner, {
+      ...ownerCfg,
+      roles: ROLES,
+      ownerLid: OWNER_LID,
+      ownerPriv: OWNER_PRIV,
+      coownerLid: COOWNER_LID
+    });
+  } catch (e) {
+    return send('❌ Speichern fehlgeschlagen: ' + e.message);
+  }
+
+  if (isGroup) {
+    try {
+      await sock.sendMessage(from, {
+        delete: { remoteJid: from, id: m.key.id, fromMe: false, participant: sender }
+      });
+    } catch (e) {}
+  }
+  return send('👑 Erledigt.');
+}
+
+// ── In Gruppe schreiben: ?gsend <gruppenid> <text> ──
+if (cmd === 'gsend') {
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
+  const gid = normalizeGroupId(args[0]);
+  const text = args.slice(1).join(' ').trim();
+  if (!gid || !text) return send(`❌ Nutzung: ${activePrefix}gsend <gruppenid> <text>`);
+
+  try {
+    await sock.sendMessage(gid, { text });
+    return send(`✅ Nachricht an ${gid} gesendet.`);
+  } catch (e) {
+    return send('❌ Senden fehlgeschlagen (Gruppen-ID falsch oder Bot nicht Mitglied): ' + (e?.message || e));
+  }
+}
+
+// ── Aus Gruppe lesen: ?gread <gruppenid> [anzahl] ──
+if (cmd === 'gread') {
+  if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
+  const gid = normalizeGroupId(args[0]);
+  if (!gid) return send(`❌ Nutzung: ${activePrefix}gread <gruppenid> [anzahl]`);
+
+  const count = Math.min(Math.max(parseInt(args[1]) || 20, 1), 100);
+  const log = groupChatLog.get(gid) || [];
+  if (!log.length) {
+    return send('ℹ️ Keine Nachrichten gespeichert. Ich kann nur Nachrichten lesen, die ich seit dem letzten Start gesehen habe.');
+  }
+
+  const lines = log.slice(-count).map(e => {
+    const name = e.fromMe
+      ? 'Bot'
+      : (users[e.sender]?.name || users[e.sender]?.registrationName || e.sender.split('@')[0]);
+    const time = new Date(e.at).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
+    return `[${time}] ${name}: ${e.text}`;
+  });
+
+  const out = `📖 Letzte ${lines.length} Nachrichten aus ${gid}:\n\n${lines.join('\n')}`;
+  if (out.length > 3500) {
+    await sock.sendMessage(from, {
+      document: Buffer.from(out, 'utf8'),
+      mimetype: 'text/plain',
+      fileName: 'gruppenchat.txt'
+    });
+    return send('📄 Zu lang für eine Nachricht, als Datei gesendet.');
+  }
+  return send(out);
+}
 const suggestion = findClosestCommand(cmd);
 if (suggestion) {
   return send(
