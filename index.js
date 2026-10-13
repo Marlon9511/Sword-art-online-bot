@@ -1407,9 +1407,18 @@ const m = messages[0];
         || (m.message.imageMessage && m.message.imageMessage.caption)
         || '';
 
-     if (body) {
-        log(`[MSG] ${sender} in ${isGroup ? from : 'PM'}: ${body}`);
-      }
+if (body) {
+  log(`[MSG] ${sender} in ${isGroup ? from : 'PM'}: ${body}`);
+
+  if (isGroup) {
+    logGroupChat(from, {
+      sender,
+      text: body,
+      fromMe: !!m.key.fromMe,
+      at: Date.now()
+    });
+  }
+}
 if (!m.key.fromMe && pendingApplications.has(sender)) {
   const appState = pendingApplications.get(sender);
   const answerText = (body || '').trim();
