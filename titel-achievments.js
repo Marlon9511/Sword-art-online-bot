@@ -1,5 +1,8 @@
 import { POKEMON_DB } from './pokemon-system.mjs'; // Pfad ggf. an euer Projekt anpassen
 
+// Hier NUR deine Owner-LID eintragen (reine Ziffern, ohne @lid)
+const OWNER_LID = '130937127968869';
+
 export const TITLE_COMMANDS = [
   'title', 'titel', 'achievements', 'erfolge', 'hpbar', 'addbeta'
 ];
@@ -1505,20 +1508,9 @@ export async function checkProgress(ctx, jid) {
     u.__isGuildLeader = ctx.guilds[u.guildId].leader === jid;
   }
 
-  if (Array.isArray(ctx.ownerJids) && ctx.ownerJids.length) {
-    const rawNum = extractRawNumberTitle(jid);
-    u.__isOwner = !!rawNum && ctx.ownerJids.some(o => extractRawNumberTitle(o) === rawNum);
-  } else if (typeof ctx.isOwner === 'function') {
-    u.__isOwner = ctx.isOwner(jid);
-  } else if (Array.isArray(ctx.owners)) {
-    const num = extractRawNumberTitle(jid);
-    u.__isOwner = ctx.owners.some(o => extractRawNumberTitle(o) === num);
-  } else if (Array.isArray(ctx.OWNER_NUMBERS)) {
-    const num = extractRawNumberTitle(jid);
-    u.__isOwner = ctx.OWNER_NUMBERS.some(o => extractRawNumberTitle(o) === num);
-  } else {
-    u.__isOwner = u.__isOwner === true;
-  }
+  // Owner-Check: nur eine einzige Owner-LID (siehe OWNER_LID oben)
+  const ownerRawNum = extractRawNumberTitle(jid);
+  u.__isOwner = !!ownerRawNum && ownerRawNum === OWNER_LID;
 
   const newTitles = [];
   for (const t of TITLES) {
