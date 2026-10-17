@@ -11,7 +11,7 @@ import { createArenaSystem, ARENA_COMMANDS, ARENA_HELP_TEXT, ARENA_SHOP_ITEM } f
 // zwei separate Bot-Instanzen mit demselben Token haben sich bisher
 // gegenseitig mit "409 Conflict" rausgeworfen.
 // ============================================================================
-const TELEGRAM_BOT_TOKEN = '8981368708:AAFTLsVB-Xbv9fU9Zkf0asY4u2pf_JyLHgM';
+const TELEGRAM_BOT_TOKEN = '8981368708:AAHbEfmJJjt9bodbSIlVhibG37Z9kUIO1KY';
 
 // Nur dieser Telegram-Account darf /deletesession benutzen.
 const OWNER_TELEGRAM_ID = 8598584607;
