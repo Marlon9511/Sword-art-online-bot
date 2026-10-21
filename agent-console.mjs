@@ -18,7 +18,7 @@ import fetch from 'node-fetch';
 
 // ───────────────────────── ANPASSEN (falls das Handbuch anders sagt) ─────────────────────────
 // 👉 HIER deinen API-Key eintragen (zwischen die Anführungszeichen):
-const HARDCODED_API_KEY = '';
+const HARDCODED_API_KEY = 'WAAViU6pxGSMmtoN6ZAZAPZBxC6lRjxcDRsBiPOmZBPw4gfTQwBZB7diZCfGfwTWiWr3MsTb4GCAftOu5BVK86bOzKEBGnQDrJDRZCoEIlA4ktZAwe2BOlxjSHHcZADRQ5LYMrKipgSYZAt8fw7ydY7dUTc9ZCBooir7SIF5d4VOdHPv1xAXSCDCnXEfq';
 
 const BASE_URL = process.env.WHATSAPP_AGENT_BASE_URL || 'https://api.whatsapp.com/agent/v1';
 
