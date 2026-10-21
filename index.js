@@ -32,7 +32,7 @@ import { createJujutsuSystem } from './jujutsu-system.mjs';
 import { createHunterSystem } from './hunterxhunter-system.mjs';
 import { createKingdomHeartsSystem } from './kingdomhearts-system.mjs';
 import { createAincradSystem } from './aincrad-system.mjs';
-
+import { startAgentConsole } from './agent-console.mjs';
 
 
 process.on('unhandledRejection', (reason) => {
@@ -6013,6 +6013,25 @@ const sessionManager = {
 initTelegramBot(sessionManager, {
   users, ranks, bans, save, FILES, ensureUser, isAuthorized, randInt, sleep, DATA_PATH
 });
+
+// ── Kirito Owner-Konsole (WhatsApp Agent) ──
+startAgentConsole({
+  DATA_PATH,
+  BASE_DIR,
+  LOG_FILE,
+  getSock: () => activeSessions.get('default') || [...activeSessions.values()][0],
+  getStats: () => ({
+    users: Object.keys(users).length,
+    registered: Object.values(users).filter(u => u?.registered).length,
+    sessions: activeSessions.size
+  }),
+  groupChatLog,
+  normalizeGroupId,
+  setOffline: (v) => { BOT_OFFLINE = !!v; saveBotState(); },
+  getOffline: () => BOT_OFFLINE,
+  restart: () => process.exit(0)
+});
+
 (async () => {
   let existingSessions = [];
   try {
@@ -6021,13 +6040,11 @@ initTelegramBot(sessionManager, {
       .map(d => d.name);
   } catch (e) {
     existingSessions = [];
-  } 
+  }
 
   if (existingSessions.length === 0) {
-
     await startBot('default');
   } else {
-
     for (const sessionName of existingSessions) {
       await startBot(sessionName);
       await sleep(1000);
