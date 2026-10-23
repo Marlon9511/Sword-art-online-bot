@@ -1600,37 +1600,53 @@ const whatsappLinkRegex = /(https?:\/\/)?(chat\.whatsapp\.com|whatsapp\.com\/cha
                 ].filter(Boolean).map(String);
                 return pids.some(pid => allBotIds.includes(pid));
               });
+              const botIsAdmin = !!(
+                botPart?.admin === 'admin' ||
+                botPart?.admin === 'superadmin' ||
+                botPart?.admin === true ||
+                botPart?.isAdmin === true
+              );
+
               if (botIsAdmin) {
-  const alMode = antilinkSettings.mode || 'kick';
+                const alMode = antilinkSettings.mode || 'kick';
 
-  try {
-    await sock.sendMessage(from, {
-      delete: { remoteJid: from, id: m.key.id, fromMe: false, participant: sender }
-    });
-  } catch (e) { console.error('[antilink] Löschen fehlgeschlagen:', e?.message || e); }
+                try {
+                  await sock.sendMessage(from, {
+                    delete: { remoteJid: from, id: m.key.id, fromMe: false, participant: sender }
+                  });
+                } catch (e) { console.error('[antilink] Löschen fehlgeschlagen:', e?.message || e); }
 
-  if (alMode === 'kick') {
-    try {
-      await sock.sendMessage(from, {
-        text: `🚫 @${sender.split('@')[0]} wurde wegen eines WhatsApp-Links entfernt.`,
-        mentions: [sender]
-      });
-    } catch (e) {}
+                if (alMode === 'kick') {
+                  try {
+                    await sock.sendMessage(from, {
+                      text: `🚫 @${sender.split('@')[0]} wurde wegen eines WhatsApp-Links entfernt.`,
+                      mentions: [sender]
+                    });
+                  } catch (e) {}
 
-    try {
-      await sock.groupParticipantsUpdate(from, [sender], 'remove');
-    } catch (e) { console.error('[antilink] Kick fehlgeschlagen:', e?.message || e); }
-  } else {
-    try {
-      await sock.sendMessage(from, {
-        text: `⚠️ @${sender.split('@')[0]}, WhatsApp-Links sind in dieser Gruppe nicht erlaubt. Deine Nachricht wurde gelöscht.`,
-        mentions: [sender]
-      });
-    } catch (e) {}
-  }
-} else {
-  console.log('[antilink] Bot ist kein Admin, kann Link-Poster nicht entfernen.');
-}
+                  try {
+                    await sock.groupParticipantsUpdate(from, [sender], 'remove');
+                  } catch (e) { console.error('[antilink] Kick fehlgeschlagen:', e?.message || e); }
+                } else {
+                  try {
+                    await sock.sendMessage(from, {
+                      text: `⚠️ @${sender.split('@')[0]}, WhatsApp-Links sind in dieser Gruppe nicht erlaubt. Deine Nachricht wurde gelöscht.`,
+                      mentions: [sender]
+                    });
+                  } catch (e) {}
+                }
+              } else {
+                console.log('[antilink] Bot ist kein Admin, kann Link-Poster nicht entfernen.');
+              }
+
+              return;
+            } else {
+              console.log(`[antilink] ${sender} ist Admin/Team — wird nicht entfernt.`);
+            }
+          }
+        } catch (e) { console.error('[antilink] Fehler:', e); }
+      }
+
       const activePrefix = isGroup ? getGroupPrefix(from) : PREFIX;
 
       if (body && body.trim().toLowerCase() === '@prefix') {
