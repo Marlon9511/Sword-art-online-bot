@@ -4471,7 +4471,7 @@ if (cmd === 'dsgvo') {
   // ?antilink [status|loeschen|kick]
   const sub = (args[0] || 'status').toLowerCase();
 
-  if (['loeschen', 'löschen', 'delete', 'del'].includes(sub)) {
+  if (['löschen', 'löschen', 'delete', 'del'].includes(sub)) {
     al.mode = 'delete';
     save(FILES.groupSettings, groupSettings);
     return send('✅ Anti-Link-Modus: 🗑️ Es wird nur die Nachricht gelöscht, niemand wird gekickt.');
