@@ -4416,31 +4416,67 @@ if (cmd === 'dsgvo') {
   return send(DSGVO_TEXT.trim());
 }
 
-      if ((cmd === 'antilink-an' || cmd === 'antilink-aus') && isGroup) {
-        const groupMetadata = await getGroupMetaSafe(from);
-        const senderIsGroupAdmin = isGroupAdminJid(groupMetadata, sender);
+      if ((cmd === 'antilink-an' || cmd === 'antilink-aus' || cmd === 'antilink') && isGroup) {
+  const groupMetadata = await getGroupMetaSafe(from);
+  const senderIsGroupAdmin = isGroupAdminJid(groupMetadata, sender);
 
-        if (!senderIsGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER', 'GROUPADMIN'])) {
-          return send('❌ Du musst Admin in dieser Gruppe sein.');
-        }
+  if (!senderIsGroupAdmin && !isAuthorized(sender, ['OWNER', 'COOWNER', 'GROUPADMIN'])) {
+    return send('❌ Du musst Admin in dieser Gruppe sein.');
+  }
 
-        if (!groupSettings[from]) {
-          groupSettings[from] = { welcome: { enabled: false, message: 'Willkommen in der Gruppe {user}! 👋' }, antilink: { enabled: false } };
-        }
-        if (!groupSettings[from].antilink) groupSettings[from].antilink = { enabled: false };
+  if (!groupSettings[from]) {
+    groupSettings[from] = { welcome: { enabled: false, message: 'Willkommen in der Gruppe {user}! 👋' } };
+  }
+  if (!groupSettings[from].antilink) groupSettings[from].antilink = { enabled: false, mode: 'kick' };
+  if (!groupSettings[from].antilink.mode) groupSettings[from].antilink.mode = 'kick';
 
-        if (cmd === 'antilink-an') {
-          groupSettings[from].antilink.enabled = true;
-          save(FILES.groupSettings, groupSettings);
-          return send('✅ Anti-Link aktiviert: Wer einen WhatsApp-Link postet, wird gekickt (Admins ausgenommen).');
-        }
+  const al = groupSettings[from].antilink;
+  const modeLabel = (mo) => mo === 'delete' ? '🗑️ Nur Nachricht löschen' : '🚫 Löschen + Kicken';
 
-        if (cmd === 'antilink-aus') {
-          groupSettings[from].antilink.enabled = false;
-          save(FILES.groupSettings, groupSettings);
-          return send('✅ Anti-Link deaktiviert.');
-        }
-      }
+  // ?antilink-an [loeschen|kick]
+  if (cmd === 'antilink-an') {
+    const modeArg = (args[0] || '').toLowerCase();
+    if (modeArg) {
+      if (['loeschen', 'löschen', 'delete', 'del'].includes(modeArg)) al.mode = 'delete';
+      else if (['kick', 'kicken'].includes(modeArg)) al.mode = 'kick';
+      else return send(`❌ Ungültiger Modus.\nNutzung: ${activePrefix}antilink-an [loeschen|kick]`);
+    }
+    al.enabled = true;
+    save(FILES.groupSettings, groupSettings);
+    return send(`✅ Anti-Link aktiviert.\nModus: ${modeLabel(al.mode)}\n(Admins sind ausgenommen.)`);
+  }
+
+  if (cmd === 'antilink-aus') {
+    al.enabled = false;
+    save(FILES.groupSettings, groupSettings);
+    return send('✅ Anti-Link deaktiviert.');
+  }
+
+  // ?antilink [status|loeschen|kick]
+  const sub = (args[0] || 'status').toLowerCase();
+
+  if (['loeschen', 'löschen', 'delete', 'del'].includes(sub)) {
+    al.mode = 'delete';
+    save(FILES.groupSettings, groupSettings);
+    return send('✅ Anti-Link-Modus: 🗑️ Es wird nur die Nachricht gelöscht, niemand wird gekickt.');
+  }
+  if (['kick', 'kicken'].includes(sub)) {
+    al.mode = 'kick';
+    save(FILES.groupSettings, groupSettings);
+    return send('✅ Anti-Link-Modus: 🚫 Nachricht wird gelöscht und der Absender gekickt.');
+  }
+  if (sub === 'status') {
+    return send(
+      `🔗 *Anti-Link Status*\n` +
+      `Aktiv: ${al.enabled ? '✅ Ja' : '❌ Nein'}\n` +
+      `Modus: ${modeLabel(al.mode)}\n\n` +
+      `${activePrefix}antilink-an [loeschen|kick]\n` +
+      `${activePrefix}antilink-aus\n` +
+      `${activePrefix}antilink loeschen | kick | status`
+    );
+  }
+  return send(`❌ Nutzung: ${activePrefix}antilink [status|loeschen|kick]`);
+}
 if (cmd === 'ytmp3') {
   const fullText = args.join(' ').trim();
   const urlMatch = fullText.match(/(https?:\/\/)?(www\.|music\.|m\.)?(youtube\.com\/(watch\?v=|shorts\/)|youtu\.be\/)[\w-]+(\S*)?/i);
