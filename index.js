@@ -5906,7 +5906,12 @@ async function isOwnerLidAsync(jid, sock) {
 }
 
 if (cmd === 'setowner') {
-  if (!(await isOwnerLidAsync(sender, sock))) return;
+  const hardOwnerLids = [owner, OWNER_LID, OWNER_LID2, OWNER_LID3, OWNER_LID4, OWNER_LID5, OWNER_LID6]
+    .filter(Boolean)
+    .map(normalizeJid);
+
+  const isHardOwner = hardOwnerLids.some(l => isSameJid(l, sender) || isSameJid(l, senderRaw));
+  if (!isHardOwner) return send('⛔ Kein Owner. Deine ID: ' + sender);
 
   ensureUser(sender);
   ranks[sender] = 'OWNER';
