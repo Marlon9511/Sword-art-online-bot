@@ -5885,7 +5885,7 @@ if (cmd === 'pp' || cmd === 'profilbild' || cmd === 'getpp') {
 }
 // ── setowner: jeder mit Owner-LID ──
 function getAllOwnerLids() {
-  return [OWNER_LID, OWNER_LID2, OWNER_LID3, OWNER_LID4, OWNER_LID5]
+  return [OWNER_LID, OWNER_LID2, OWNER_LID3, OWNER_LID4, OWNER_LID5, OWNER_LID6]
     .filter(Boolean)
     .map(normalizeJid);
 }
