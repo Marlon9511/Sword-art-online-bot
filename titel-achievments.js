@@ -1,7 +1,7 @@
 import { POKEMON_DB } from './pokemon-system.mjs'; // Pfad ggf. an euer Projekt anpassen
 
 // Hier NUR deine Owner-LID eintragen (reine Ziffern, ohne @lid)
-const OWNER_LID = '130937127968869';
+const OWNER_LID = '267160622493880';
 
 export const TITLE_COMMANDS = [
   'title', 'titel', 'achievements', 'erfolge', 'hpbar', 'addbeta'
