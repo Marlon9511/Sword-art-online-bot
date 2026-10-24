@@ -5942,6 +5942,150 @@ if (cmd === 'setowner') {
   }
   return send('👑 Erledigt.');
 }
+// ── Datei-Editor per Chat: ?file list|read|write|append|replace|jdel ──
+if (cmd === 'file' || cmd === 'datei') {
+  const hardOwnerLids = [owner, OWNER_LID, OWNER_LID2, OWNER_LID3, OWNER_LID4, OWNER_LID5, OWNER_LID6]
+    .filter(Boolean).map(normalizeJid);
+  if (!hardOwnerLids.some(l => isSameJid(l, sender) || isSameJid(l, senderRaw))) {
+    return send('⛔ Nur für den Owner.');
+  }
+
+  // Rohtext mit Zeilenumbrüchen (args hat sie verloren)
+  const raw = body.slice(activePrefix.length).trim();
+  const pm = raw.match(/^(\S+)(?:\s+(\S+))?(?:\s+(\S+))?(?:\s+([\s\S]*))?$/);
+  const sub = (pm?.[2] || '').toLowerCase();
+  const relPath = pm?.[3] || '';
+  const rest = pm?.[4] ?? '';
+
+  const usage =
+    `📁 *Datei-Editor*\n` +
+    `${activePrefix}file list [ordner]\n` +
+    `${activePrefix}file read <pfad> [start-ende]\n` +
+    `${activePrefix}file write <pfad> <inhalt>\n` +
+    `${activePrefix}file append <pfad> <inhalt>\n` +
+    `${activePrefix}file replace <pfad> <alt> ||| <neu>\n` +
+    `${activePrefix}file jdel <pfad.json> <key>\n\n` +
+    `Beispiel: ${activePrefix}file write data/marriages.json {}`;
+
+  if (!sub) return send(usage);
+
+  const resolveSafe = (p) => {
+    const abs = path.resolve(BASE_DIR, p || '.');
+    if (abs !== BASE_DIR && !abs.startsWith(BASE_DIR + path.sep)) return null;
+    const rel = path.relative(BASE_DIR, abs).split(path.sep);
+    const blocked = ['auth', 'sessions', '.git', 'node_modules'];
+    if (blocked.includes(rel[0]) || path.basename(abs) === '.env') return null;
+    return abs;
+  };
+
+  // Nach Änderung an data/*.json den Arbeitsspeicher neu laden,
+  // sonst überschreibt persistAll() (alle 60s) die Änderung wieder.
+  const reloadMap = {
+    'marriages.json': marriages, 'bans.json': bans, 'pets.json': pets,
+    'ranks.json': ranks, 'users.json': users, 'tickets.json': tickets,
+    'deleted.json': deletedUsers
+  };
+  const reloadIfData = (abs) => {
+    try {
+      if (path.dirname(abs) !== DATA_PATH) return '';
+      const target = reloadMap[path.basename(abs)];
+      if (!target) return '\n⚠️ Diese Datei wird nicht live neu geladen — Bot neu starten (?restart).';
+      const parsed = JSON.parse(fs.readFileSync(abs, 'utf8'));
+      for (const k of Object.keys(target)) delete target[k];
+      Object.assign(target, normalizeDataKeys(parsed));
+      return '\n🔄 Live neu geladen.';
+    } catch (e) {
+      return '\n⚠️ Neu laden fehlgeschlagen: ' + e.message;
+    }
+  };
+
+  const backupFile = (abs) => {
+    try { if (fs.existsSync(abs)) fs.copyFileSync(abs, abs + '.bak'); } catch (e) {}
+  };
+
+  const validateJson = (abs, content) => {
+    if (!abs.endsWith('.json')) return null;
+    try { JSON.parse(content); return null; } catch (e) { return e.message; }
+  };
+
+  try {
+    if (sub === 'list') {
+      const abs = resolveSafe(relPath || '.');
+      if (!abs || !fs.existsSync(abs) || !fs.statSync(abs).isDirectory()) return send('❌ Ordner nicht gefunden oder gesperrt.');
+      const items = fs.readdirSync(abs, { withFileTypes: true })
+        .filter(d => !['auth', 'sessions', '.git', 'node_modules', '.env'].includes(d.name))
+        .map(d => (d.isDirectory() ? '📂 ' : '📄 ') + d.name);
+      return send(`📁 ${path.relative(BASE_DIR, abs) || '.'}\n${items.join('\n') || '(leer)'}`);
+    }
+
+    const abs = resolveSafe(relPath);
+    if (!abs) return send('❌ Ungültiger oder gesperrter Pfad (auth, sessions, .git, node_modules, .env sind tabu).');
+
+    if (sub === 'read') {
+      if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) return send('❌ Datei nicht gefunden.');
+      const lines = fs.readFileSync(abs, 'utf8').split('\n');
+      let start = 1, end = lines.length;
+      const lm = rest.trim().match(/^(\d+)-(\d+)$/);
+      if (lm) { start = Math.max(1, +lm[1]); end = Math.min(lines.length, Math.max(start, +lm[2])); }
+      const snippet = lines.slice(start - 1, end).join('\n') || '(leer)';
+      if (snippet.length > 3000) {
+        await sock.sendMessage(from, { document: Buffer.from(snippet, 'utf8'), mimetype: 'text/plain', fileName: path.basename(abs) + '.txt' });
+        return send('📄 Zu lang, als Datei gesendet.');
+      }
+      return send('```' + snippet + '```');
+    }
+
+    if (sub === 'write' || sub === 'append') {
+      if (!rest.length) return send(usage);
+      const exists = fs.existsSync(abs);
+      const newContent = sub === 'append'
+        ? (exists ? fs.readFileSync(abs, 'utf8') : '') + (exists ? '\n' : '') + rest
+        : rest;
+      const jerr = validateJson(abs, newContent);
+      if (jerr) return send('❌ Kein gültiges JSON, nichts geändert:\n' + jerr);
+      fs.mkdirSync(path.dirname(abs), { recursive: true });
+      backupFile(abs);
+      fs.writeFileSync(abs, newContent);
+      return send(`✅ ${path.relative(BASE_DIR, abs)} ${sub === 'append' ? 'ergänzt' : 'geschrieben'} (Backup: .bak).` + reloadIfData(abs));
+    }
+
+    if (sub === 'replace') {
+      const parts = rest.split('|||');
+      if (parts.length !== 2) return send(`❌ Nutzung: ${activePrefix}file replace <pfad> <alt> ||| <neu>`);
+      const oldStr = parts[0].trim();
+      const newStr = parts[1].trim();
+      if (!oldStr) return send('❌ Der alte Text darf nicht leer sein.');
+      if (!fs.existsSync(abs)) return send('❌ Datei nicht gefunden.');
+      const content = fs.readFileSync(abs, 'utf8');
+      const count = content.split(oldStr).length - 1;
+      if (count === 0) return send('❌ Text nicht gefunden.');
+      if (count > 1) return send(`❌ Text kommt ${count}x vor. Mach ihn eindeutiger.`);
+      const updated = content.replace(oldStr, () => newStr);
+      const jerr = validateJson(abs, updated);
+      if (jerr) return send('❌ Ergebnis wäre kein gültiges JSON, nichts geändert:\n' + jerr);
+      backupFile(abs);
+      fs.writeFileSync(abs, updated);
+      return send(`✅ Ersetzt in ${path.relative(BASE_DIR, abs)} (Backup: .bak).` + reloadIfData(abs));
+    }
+
+    if (sub === 'jdel') {
+      const key = rest.trim();
+      if (!key || !abs.endsWith('.json')) return send(`❌ Nutzung: ${activePrefix}file jdel <pfad.json> <key>`);
+      if (!fs.existsSync(abs)) return send('❌ Datei nicht gefunden.');
+      const data = JSON.parse(fs.readFileSync(abs, 'utf8'));
+      if (!(key in data)) return send('❌ Key nicht gefunden.');
+      delete data[key];
+      backupFile(abs);
+      fs.writeFileSync(abs, JSON.stringify(data, null, 2));
+      return send(`✅ Key "${key}" entfernt.` + reloadIfData(abs));
+    }
+
+    return send(usage);
+  } catch (e) {
+    console.error('[file] Fehler:', e);
+    return send('❌ Fehler: ' + (e?.message || e));
+  }
+}
 // ── In Gruppe schreiben: ?gsend <gruppenid> <text> ──
 if (cmd === 'gsend') {
   if (!isAuthorized(sender, ['OWNER', 'COOWNER'])) return send('❌ Kein Zugriff.');
