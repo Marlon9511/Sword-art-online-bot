@@ -1,12 +1,11 @@
-// apply-bancheck.mjs (v3) — baut den ?bancheck-Befehl komplett in deine Bot-Datei ein.
-// Nutzung:  node apply-bancheck.mjs ./index.js
-// Funktioniert für frische Dateien und überschreibt eine frühere Version sauber.
-// Legt vorher ein Backup (<datei>.bak) an und trägt den API-Key in die .env ein.
+// apply-bancheck.mjs (v4) — baut ?bancheck, ?einspruch und ?einspruchstatus komplett in deine Bot-Datei ein.
+// Nutzung:  node apply-bancheck.mjs ./index.js [API-KEY]
+// Der API-Key ist optional: Steht er schon in der .env, brauchst du ihn nicht anzugeben.
+// Funktioniert für frische Dateien und überschreibt frühere Versionen (auch apply-appeal.mjs) sauber.
+// Legt vorher ein Backup (<datei>.bak) an.
 
 import fs from 'fs';
 import path from 'path';
-
-const API_KEY = 'bk_v1_LEQw72qWid0k6g11t232I-Ga6qcTX6OugSk0OnAeuGc-TNgZ7R68TjBrvGq0WIFYEqsxE0zPIPIIRaj9xgOmV_XHmU8NBJBMilMFSLpQclHt3gsHZK3x72dII4mk9lpNfZZByY7vLd95eOdRaBhxVVNe42Wn5donWCUt7wYBeisDZLEzqmp38G62Zg9wTOpVyY_Urlz6H5fgaSVkEPHsdkhvhcEjd2clgDwzgzFwqIrLSdiBYHTdgjwSFpr33dU244H2yThWlPt962raD3jCHAn8c9cAtJDpEFmu9wGxUbZtr5uAecZ6RHECWGkdvQyA20n0eJxRiioHE67bYIh5wTVOt_mfxUMRgqJTprocFNjTAPsF6JrmrlleoJj74P_HJwXD_WBBRCNTLKf6JZwGluNGJU1ipPgHpYJ2PJOlPZ0uOm2D646XmhJB5ImgO_rXACrvudJCB3yXPAY60qS16ha-0e_5bU_eeNNUAuwcP6ztAkVEusd6B_txP-vA_RfkLC-P7rcKHKwxWZt0lLGtV_GwKRV53RL_lz7fUwFE9-_SN2hdOpotVgQny1s7Z5KeTT1WAnhN3aVaAw';
 
 const FUNCS = String.raw`const BANCHECK_API_BASE = 'https://baron0.com';
 
@@ -21,6 +20,18 @@ async function bancheckRequest(endpoint, payload) {
   const body = await res.json();
   if (!res.ok) throw new Error(body.detail || body.title || ('HTTP ' + res.status));
   console.log('[bancheck] API-Antwort:', JSON.stringify(body));
+  return body;
+}
+
+async function bancheckGet(endpoint, params) {
+  const apiKey = process.env.BANCHECK_API_KEY;
+  if (!apiKey) throw new Error('BANCHECK_API_KEY fehlt in der .env');
+  const url = new URL(BANCHECK_API_BASE + endpoint);
+  for (const [k, v] of Object.entries(params || {})) url.searchParams.set(k, v);
+  const res = await fetch(url.toString(), { method: 'GET', headers: { Authorization: 'Bearer ' + apiKey } });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.detail || body.title || ('HTTP ' + res.status));
+  console.log('[appeal] API-Antwort:', JSON.stringify(body));
   return body;
 }
 
@@ -58,9 +69,59 @@ function describeBan(r) {
   return label ? '🚫 Gebannt: ' + label : '🚫 Gebannt';
 }
 
+function describeAppeal(r) {
+  const keys = ['status', 'state', 'result', 'message', 'detail', 'info'];
+  const parts = keys
+    .filter(k => r && r[k] !== undefined && r[k] !== null && typeof r[k] !== 'object')
+    .map(k => k + ': ' + r[k]);
+  return parts.length ? parts.join('\n') : JSON.stringify(r).slice(0, 300);
+}
+
 `;
 
-const COMMAND = String.raw`if (cmd === 'bancheck' || cmd === 'checkban') {
+const COMMAND = String.raw`if (cmd === 'einspruch' || cmd === 'appeal') {
+  if (!isOwner) return send('❌ Nur Owner/CoOwner dürfen Einsprüche einreichen.');
+  const number = toApiNumber(args[0]);
+  if (!number) {
+    return send('❌ Nutzung: ' + activePrefix + 'einspruch <nummer>\nBeispiel: ' + activePrefix + 'einspruch 491701234567');
+  }
+
+  await send('📨 Reiche Einspruch ein für ' + number + '...');
+
+  try {
+    const r = await bancheckRequest('/api/v2/appeal-submit', { number });
+    return send(
+      '📨 *Einspruch eingereicht*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n' +
+      '📞 ' + number + '\n' +
+      describeAppeal(r)
+    );
+  } catch (e) {
+    console.error('[appeal] Fehler:', e?.message || e);
+    return send('❌ Einspruch fehlgeschlagen: ' + (e?.message || 'Unbekannter Fehler'));
+  }
+}
+
+if (cmd === 'einspruchstatus' || cmd === 'appealstatus') {
+  if (!isTeamMember) return send('❌ Nur für das Team.');
+  const number = toApiNumber(args[0]);
+  if (!number) {
+    return send('❌ Nutzung: ' + activePrefix + 'einspruchstatus <nummer>\nBeispiel: ' + activePrefix + 'einspruchstatus 491701234567');
+  }
+
+  try {
+    const r = await bancheckGet('/api/v2/appeal-status', { number });
+    return send(
+      '📋 *Einspruchsstatus*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n' +
+      '📞 ' + number + '\n' +
+      describeAppeal(r)
+    );
+  } catch (e) {
+    console.error('[appeal] Status-Fehler:', e?.message || e);
+    return send('❌ Status-Abfrage fehlgeschlagen: ' + (e?.message || 'Unbekannter Fehler'));
+  }
+}
+
+if (cmd === 'bancheck' || cmd === 'checkban') {
   const numbers = [...new Set(args.map(toApiNumber).filter(Boolean))].slice(0, isTeamMember ? 20 : 1);
   if (!numbers.length) {
     return send('❌ Nutzung: ' + activePrefix + 'bancheck <nummer> [nummer2 ...]\nBeispiel: ' + activePrefix + 'bancheck 491701234567');
@@ -94,20 +155,26 @@ const COMMAND = String.raw`if (cmd === 'bancheck' || cmd === 'checkban') {
 `;
 
 const FUNCS_ANCHOR = 'const randInt = (min, max)';
+const SLEEP_ANCHOR = 'const sleep = ms =>';
 const FUNCS_START = 'const BANCHECK_API_BASE';
+const OLD_APPEAL_FUNCS = 'async function bancheckGet';
 const CMD_ANCHOR = 'const lidHandled = await lidSystem.handle(';
-const CMD_START = "if (cmd === 'bancheck' || cmd === 'checkban') {";
+const CMD_STARTS = [
+  "if (cmd === 'einspruch' || cmd === 'appeal') {",
+  "if (cmd === 'bancheck' || cmd === 'checkban') {"
+];
 const LIST_ANCHOR = "'bitchkick', 'givecommand',";
 
 const target = process.argv[2];
+const argKey = process.argv[3];
 if (!target || !fs.existsSync(target)) {
-  console.error('Nutzung: node apply-bancheck.mjs <pfad-zur-bot-datei>');
+  console.error('Nutzung: node apply-bancheck.mjs <pfad-zur-bot-datei> [API-KEY]');
   process.exit(1);
 }
 
 let src = fs.readFileSync(target, 'utf8');
 
-for (const [name, a] of [['randInt', FUNCS_ANCHOR], ['lidHandled', CMD_ANCHOR], ['ALL_COMMANDS', LIST_ANCHOR]]) {
+for (const [name, a] of [['randInt', FUNCS_ANCHOR], ['sleep', SLEEP_ANCHOR], ['lidHandled', CMD_ANCHOR], ['ALL_COMMANDS', LIST_ANCHOR]]) {
   if (!src.includes(a)) {
     console.error('Abbruch: Einfüge-Stelle "' + name + '" nicht gefunden (' + a + ').');
     console.error('Bist du sicher, dass das die Datei ist, die ./start-termux.sh startet?');
@@ -117,6 +184,18 @@ for (const [name, a] of [['randInt', FUNCS_ANCHOR], ['lidHandled', CMD_ANCHOR], 
 
 fs.copyFileSync(target, target + '.bak');
 
+// 0) Alte, separat eingebaute Einspruch-Funktionen (apply-appeal.mjs) entfernen,
+//    damit nichts doppelt deklariert wird.
+{
+  const rI = src.indexOf(FUNCS_ANCHOR);
+  const oldG = src.indexOf(OLD_APPEAL_FUNCS);
+  const sI = src.indexOf(SLEEP_ANCHOR);
+  if (oldG !== -1 && oldG > rI && sI > oldG) {
+    src = src.slice(0, oldG) + src.slice(sI);
+    console.log('Alte Einspruch-Funktionen (apply-appeal) entfernt.');
+  }
+}
+
 // 1) Hilfsfunktionen: alte Version ersetzen oder neu einfügen
 const fStart = src.indexOf(FUNCS_START);
 const fAnchor = src.indexOf(FUNCS_ANCHOR);
@@ -124,43 +203,51 @@ if (fStart !== -1 && fStart < fAnchor) {
   src = src.slice(0, fStart) + FUNCS + src.slice(fAnchor);
   console.log('Hilfsfunktionen aktualisiert.');
 } else if (fStart === -1) {
-  src = src.replace(FUNCS_ANCHOR, FUNCS + FUNCS_ANCHOR);
+  src = src.replace(FUNCS_ANCHOR, () => FUNCS + FUNCS_ANCHOR);
   console.log('Hilfsfunktionen eingefügt.');
 } else {
   console.error('Abbruch: Alte Hilfsfunktionen stehen an unerwarteter Stelle.');
   process.exit(1);
 }
 
-// 2) Befehl: alte Version ersetzen oder neu einfügen
-const cStart = src.indexOf(CMD_START);
+// 2) Befehle: alte Version(en) ersetzen oder neu einfügen
 const cAnchor = src.indexOf(CMD_ANCHOR);
+const cStarts = CMD_STARTS.map(s => src.indexOf(s)).filter(i => i !== -1);
+const cStart = cStarts.length ? Math.min(...cStarts) : -1;
 if (cStart !== -1 && cStart < cAnchor) {
   src = src.slice(0, cStart) + COMMAND + src.slice(cAnchor);
-  console.log('Befehl aktualisiert.');
+  console.log('Befehle aktualisiert.');
 } else if (cStart === -1) {
-  src = src.replace(CMD_ANCHOR, COMMAND + CMD_ANCHOR);
-  console.log('Befehl eingefügt.');
+  src = src.replace(CMD_ANCHOR, () => COMMAND + CMD_ANCHOR);
+  console.log('Befehle eingefügt.');
 } else {
-  console.error('Abbruch: Alter Befehl steht an unerwarteter Stelle.');
+  console.error('Abbruch: Alte Befehle stehen an unerwarteter Stelle.');
   process.exit(1);
 }
 
 // 3) Befehlsliste (für den Tippfehler-Vorschlag)
 if (!src.includes("'bancheck', 'checkban'")) {
-  src = src.replace(LIST_ANCHOR, LIST_ANCHOR + " 'bancheck', 'checkban',");
+  src = src.replace(LIST_ANCHOR, () => LIST_ANCHOR + " 'bancheck', 'checkban',");
+}
+if (!src.includes("'einspruch', 'appeal'")) {
+  src = src.replace("'bancheck', 'checkban',", () => "'bancheck', 'checkban', 'einspruch', 'appeal', 'einspruchstatus', 'appealstatus',");
 }
 
 fs.writeFileSync(target, src);
 
-// 4) API-Key in die .env
+// 4) API-Key in die .env (nur wenn angegeben oder noch nicht vorhanden)
 const envPath = path.join(path.dirname(path.resolve(target)), '.env');
 let env = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
-if (!/^BANCHECK_API_KEY=/m.test(env)) {
+const hasKey = /^BANCHECK_API_KEY=/m.test(env);
+if (argKey) {
+  env = env.replace(/^BANCHECK_API_KEY=.*\r?\n?/m, '');
   if (env && !env.endsWith('\n')) env += '\n';
-  fs.writeFileSync(envPath, env + 'BANCHECK_API_KEY=' + API_KEY + '\n');
+  fs.writeFileSync(envPath, env + 'BANCHECK_API_KEY=' + argKey + '\n');
   console.log('API-Key in ' + envPath + ' eingetragen.');
+} else if (hasKey) {
+  console.log('.env enthält schon BANCHECK_API_KEY — nicht angefasst.');
 } else {
-  console.log('.env enthält schon BANCHECK_API_KEY — nicht überschrieben.');
+  console.log('⚠️ In der .env fehlt BANCHECK_API_KEY. Führe das Skript nochmal aus mit: node apply-bancheck.mjs ' + target + ' DEIN_KEY');
 }
 
 console.log('Fertig. Backup: ' + target + '.bak — Bot neu starten, dann: ?bancheck 491701234567');
