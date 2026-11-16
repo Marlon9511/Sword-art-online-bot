@@ -1,4 +1,6 @@
-import TelegramBot from 'node-telegram-bot-api';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const TelegramBot = require('node-telegram-bot-api');
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
