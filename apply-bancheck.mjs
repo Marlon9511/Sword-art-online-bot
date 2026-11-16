@@ -1,13 +1,28 @@
-// apply-bancheck.mjs (v4) — baut ?bancheck, ?einspruch und ?einspruchstatus komplett in deine Bot-Datei ein.
+// apply-bancheck.mjs (v5) — baut ?bancheck, ?einspruch und ?einspruchstatus komplett in deine Bot-Datei ein.
 // Nutzung:  node apply-bancheck.mjs ./index.js [API-KEY]
 // Der API-Key ist optional: Steht er schon in der .env, brauchst du ihn nicht anzugeben.
 // Funktioniert für frische Dateien und überschreibt frühere Versionen (auch apply-appeal.mjs) sauber.
 // Legt vorher ein Backup (<datei>.bak) an.
+// v5: Bei API-Fehlern wird die komplette Antwort geloggt und im Chat der echte Grund angezeigt.
 
 import fs from 'fs';
 import path from 'path';
 
 const FUNCS = String.raw`const BANCHECK_API_BASE = 'https://baron0.com';
+
+function bancheckErrorText(status, body) {
+  if (body && typeof body === 'object') {
+    const msg = body.detail || body.title || body.error || body.message;
+    if (msg) return typeof msg === 'string' ? msg : JSON.stringify(msg);
+    return 'HTTP ' + status + ' — ' + JSON.stringify(body).slice(0, 300);
+  }
+  return 'HTTP ' + status + (body ? ' — ' + String(body).slice(0, 300) : '');
+}
+
+async function bancheckParse(res) {
+  const text = await res.text();
+  try { return JSON.parse(text); } catch { return text; }
+}
 
 async function bancheckRequest(endpoint, payload) {
   const apiKey = process.env.BANCHECK_API_KEY;
@@ -17,8 +32,11 @@ async function bancheckRequest(endpoint, payload) {
     headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });
-  const body = await res.json();
-  if (!res.ok) throw new Error(body.detail || body.title || ('HTTP ' + res.status));
+  const body = await bancheckParse(res);
+  if (!res.ok) {
+    console.error('[bancheck] HTTP', res.status, endpoint, JSON.stringify(body));
+    throw new Error(bancheckErrorText(res.status, body));
+  }
   console.log('[bancheck] API-Antwort:', JSON.stringify(body));
   return body;
 }
@@ -29,8 +47,11 @@ async function bancheckGet(endpoint, params) {
   const url = new URL(BANCHECK_API_BASE + endpoint);
   for (const [k, v] of Object.entries(params || {})) url.searchParams.set(k, v);
   const res = await fetch(url.toString(), { method: 'GET', headers: { Authorization: 'Bearer ' + apiKey } });
-  const body = await res.json();
-  if (!res.ok) throw new Error(body.detail || body.title || ('HTTP ' + res.status));
+  const body = await bancheckParse(res);
+  if (!res.ok) {
+    console.error('[appeal] HTTP', res.status, endpoint, JSON.stringify(body));
+    throw new Error(bancheckErrorText(res.status, body));
+  }
   console.log('[appeal] API-Antwort:', JSON.stringify(body));
   return body;
 }
