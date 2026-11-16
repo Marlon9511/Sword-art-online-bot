@@ -1,5 +1,7 @@
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
+const TelegramBotModule = require('node-telegram-bot-api');
+const TelegramBot = TelegramBotModule.default || TelegramBotModule.TelegramBot || TelegramBotModule;
 const TelegramBot = require('node-telegram-bot-api');
 import fs from 'fs';
 import path from 'path';
