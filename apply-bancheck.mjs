@@ -13,7 +13,7 @@ const FUNCS = String.raw`const BANCHECK_API_BASE = 'https://baron0.com';
 
 // Feldname für den Einspruchstext in der API (laut baron0.com-Doku anpassen: message / text / reason)
 const APPEAL_FIELD = 'message';
-const APPEAL_TEXT = 'Hallo WhatsApp-Supportteam, meine Nummer wurde versehentlich gesperrt. Ich habe vergessen, die Funktion „Wer kann mich zu Gruppen hinzufügen“ zu deaktivieren und sie nur auf meine Kontakte zu beschränken. Dann haben mich anonyme Personen zu Gruppen hinzugefügt und mich zum Moderator gemacht, ohne dass ich das wollte oder sogar ohne meine Zustimmung zum Hinzufügen  Ich habe mich in diese Gruppen aufgenommen, und diese anonymen Personen haben Pornobilder und Pornovideos gepostet. Danach haben sie die Gruppen gemeldet, bis WhatsApp meine digitalen Nummern ohne meine Zustimmung aus dem Dienst verbannt hat. Anonymous verwendet gefälschte Nummern, die nicht echt sind, wie SIM-Karten. Das bitten wir Sie  Ich verstehe, was passiert ist, denn ich wollte nie zu diesen Pornogruppen hinzugefügt werden. Bitte entsperren Sie meine Nummer von WhatsApp, damit ich die Funktion „Wer kann mich zu Gruppen hinzufügen“ aktivieren und sie nur zu meinen Kontakten machen und auch WhatsApp verwenden und mit meiner Familie kommunizieren können. Ein Mann  hatte mir mit einem Verbot gedroht und dieses wurde offenbar umgesetzt.  Sie können eine Nachricht mit einem modifizierten WhatsApp per Fake-Chat schreiben und melden.  Ich habe das auf YouTube gefunden und ich denke, dass viele Leute das auch umsetzen... Bitte entsperren Sie mein Konto ;)Meine Nummer ist: {NUMMER}';
+const APPEAL_TEXT = 'Hallo WhatsApp-Supportteam, meine Nummer wurde versehentlich gesperrt. Ich habe vergessen, die Funktion „Wer kann mich zu Gruppen hinzufügen“ zu deaktivieren und sie nur auf meine Kontakte zu beschränken. Dann haben mich anonyme Personen zu Gruppen hinzugefügt und mich zum Moderator gemacht, ohne dass ich das wollte oder sogar ohne meine Zustimmung zum Hinzufügen  Ich habe mich in diese Gruppen aufgenommen, und diese anonymen Personen haben Pornobilder und Pornovideos gepostet. Danach haben sie die Gruppen gemeldet, bis WhatsApp meine digitalen Nummern ohne meine Zustimmung aus dem Dienst verbannt hat. Anonymous verwendet gefälschte Nummern, die nicht echt sind, wie SIM-Karten. Das bitten wir Sie  Ich verstehe, was passiert ist, denn ich wollte nie zu diesen Pornogruppen hinzugefügt werden. Bitte entsperren Sie meine Nummer von WhatsApp, damit ich die Funktion „Wer kann mich zu Gruppen hinzufügen“ aktivieren und sie nur zu meinen Kontakten machen und auch WhatsApp verwenden und mit meiner Familie kommunizieren können. Ein Mann  hatte mir mit einem Verbot gedroht und dieses wurde offenbar umgesetzt.  Sie können eine Nachricht mit einem modifizierten WhatsApp per Fake-Chat schreiben und melden.  Ich habe das auf YouTube gefunden und ich denke, dass viele Leute das auch umsetzen... Bitte entsperren Sie mein Konto ;)Meine Nummer ist: {NUMBER}';
 
 function bancheckErrorText(status, body) {
   if (body && typeof body === 'object') {
@@ -116,6 +116,7 @@ const COMMAND = String.raw`if (cmd === 'einspruch' || cmd === 'appeal') {
 
   try {
     const r = await bancheckRequest('/api/v2/appeal-submit', {
+      phone: number,
       number,
       [APPEAL_FIELD]: APPEAL_TEXT.replace('{NUMBER}', number)
     });
