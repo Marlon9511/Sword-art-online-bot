@@ -1,14 +1,19 @@
-// apply-bancheck.mjs (v5) — baut ?bancheck, ?einspruch und ?einspruchstatus komplett in deine Bot-Datei ein.
+// apply-bancheck.mjs (v6) — baut ?bancheck, ?einspruch und ?einspruchstatus komplett in deine Bot-Datei ein.
 // Nutzung:  node apply-bancheck.mjs ./index.js [API-KEY]
 // Der API-Key ist optional: Steht er schon in der .env, brauchst du ihn nicht anzugeben.
 // Funktioniert für frische Dateien und überschreibt frühere Versionen (auch apply-appeal.mjs) sauber.
 // Legt vorher ein Backup (<datei>.bak) an.
 // v5: Bei API-Fehlern wird die komplette Antwort geloggt und im Chat der echte Grund angezeigt.
+// v6: ?einspruch sendet jetzt einen Einspruchstext (APPEAL_TEXT) mit. Feldname über APPEAL_FIELD änderbar.
 
 import fs from 'fs';
 import path from 'path';
 
 const FUNCS = String.raw`const BANCHECK_API_BASE = 'https://baron0.com';
+
+// Feldname für den Einspruchstext in der API (laut baron0.com-Doku anpassen: message / text / reason)
+const APPEAL_FIELD = 'message';
+const APPEAL_TEXT = 'Hallo WhatsApp-Supportteam, meine Nummer wurde versehentlich gesperrt. Ich habe vergessen, die Funktion „Wer kann mich zu Gruppen hinzufügen“ zu deaktivieren und sie nur auf meine Kontakte zu beschränken. Dann haben mich anonyme Personen zu Gruppen hinzugefügt und mich zum Moderator gemacht, ohne dass ich das wollte oder sogar ohne meine Zustimmung zum Hinzufügen  Ich habe mich in diese Gruppen aufgenommen, und diese anonymen Personen haben Pornobilder und Pornovideos gepostet. Danach haben sie die Gruppen gemeldet, bis WhatsApp meine digitalen Nummern ohne meine Zustimmung aus dem Dienst verbannt hat. Anonymous verwendet gefälschte Nummern, die nicht echt sind, wie SIM-Karten. Das bitten wir Sie  Ich verstehe, was passiert ist, denn ich wollte nie zu diesen Pornogruppen hinzugefügt werden. Bitte entsperren Sie meine Nummer von WhatsApp, damit ich die Funktion „Wer kann mich zu Gruppen hinzufügen“ aktivieren und sie nur zu meinen Kontakten machen und auch WhatsApp verwenden und mit meiner Familie kommunizieren können. Ein Mann  hatte mir mit einem Verbot gedroht und dieses wurde offenbar umgesetzt.  Sie können eine Nachricht mit einem modifizierten WhatsApp per Fake-Chat schreiben und melden.  Ich habe das auf YouTube gefunden und ich denke, dass viele Leute das auch umsetzen... Bitte entsperren Sie mein Konto ;)Meine Nummer ist: {NUMMER}';
 
 function bancheckErrorText(status, body) {
   if (body && typeof body === 'object') {
@@ -110,7 +115,10 @@ const COMMAND = String.raw`if (cmd === 'einspruch' || cmd === 'appeal') {
   await send('📨 Reiche Einspruch ein für ' + number + '...');
 
   try {
-    const r = await bancheckRequest('/api/v2/appeal-submit', { number });
+    const r = await bancheckRequest('/api/v2/appeal-submit', {
+      number,
+      [APPEAL_FIELD]: APPEAL_TEXT.replace('{NUMBER}', number)
+    });
     return send(
       '📨 *Einspruch eingereicht*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n' +
       '📞 ' + number + '\n' +
