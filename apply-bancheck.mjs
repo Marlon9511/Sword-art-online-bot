@@ -5,6 +5,7 @@
 // Legt vorher ein Backup (<datei>.bak) an.
 // v5: Bei API-Fehlern wird die komplette Antwort geloggt und im Chat der echte Grund angezeigt.
 // v6: ?einspruch sendet jetzt einen Einspruchstext (APPEAL_TEXT) mit. Feldname über APPEAL_FIELD änderbar.
+// v7: Einspruch-Antworten im SAO-Style statt rohem JSON.
 
 import fs from 'fs';
 import path from 'path';
@@ -13,7 +14,7 @@ const FUNCS = String.raw`const BANCHECK_API_BASE = 'https://baron0.com';
 
 // Feldname für den Einspruchstext in der API (laut baron0.com-Doku anpassen: message / text / reason)
 const APPEAL_FIELD = 'message';
-const APPEAL_TEXT = '{NUMBER}';
+const APPEAL_TEXT = 'Hallo WhatsApp-Supportteam, meine Nummer wurde versehentlich gesperrt. Ich habe vergessen, die Funktion „Wer kann mich zu Gruppen hinzufügen“ zu deaktivieren und sie nur auf meine Kontakte zu beschränken. Dann haben mich anonyme Personen zu Gruppen hinzugefügt und mich zum Moderator gemacht, ohne dass ich das wollte oder sogar ohne meine Zustimmung zum Hinzufügen  Ich habe mich in diese Gruppen aufgenommen, und diese anonymen Personen haben Pornobilder und Pornovideos gepostet. Danach haben sie die Gruppen gemeldet, bis WhatsApp meine digitalen Nummern ohne meine Zustimmung aus dem Dienst verbannt hat. Anonymous verwendet gefälschte Nummern, die nicht echt sind, wie SIM-Karten. Das bitten wir Sie  Ich verstehe, was passiert ist, denn ich wollte nie zu diesen Pornogruppen hinzugefügt werden. Bitte entsperren Sie meine Nummer von WhatsApp, damit ich die Funktion „Wer kann mich zu Gruppen hinzufügen“ aktivieren und sie nur zu meinen Kontakten machen und auch WhatsApp verwenden und mit meiner Familie kommunizieren können. Ein Mann  hatte mir mit einem Verbot gedroht und dieses wurde offenbar umgesetzt.  Sie können eine Nachricht mit einem modifizierten WhatsApp per Fake-Chat schreiben und melden.  Ich habe das auf YouTube gefunden und ich denke, dass viele Leute das auch umsetzen... Bitte entsperren Sie mein Konto ;)Meine Nummer ist: {NUMBER}';
 
 function bancheckErrorText(status, body) {
   if (body && typeof body === 'object') {
@@ -95,12 +96,33 @@ function describeBan(r) {
   return label ? '🚫 Gebannt: ' + label : '🚫 Gebannt';
 }
 
+const SAO_LINE = '━━━━━━━━━━━━━━━━━━';
+
+function appealStatusLabel(s) {
+  const v = String(s || '').toUpperCase();
+  if (/IN_REVIEW|REVIEW/.test(v)) return '🔍 In Prüfung';
+  if (/PENDING|SUBMIT|QUEUE|WAIT/.test(v)) return '⏳ Eingereicht – wartet';
+  if (/REJECT|DENIED|DECLIN|FAIL/.test(v)) return '❌ Abgelehnt';
+  if (/APPROV|ACCEPT|UNBAN|GRANT|SUCCESS/.test(v)) return '✅ Entsperrt';
+  return v ? '📡 ' + v : '❔ Unbekannt';
+}
+
 function describeAppeal(r) {
-  const keys = ['status', 'state', 'result', 'message', 'detail', 'info'];
-  const parts = keys
-    .filter(k => r && r[k] !== undefined && r[k] !== null && typeof r[k] !== 'object')
-    .map(k => k + ': ' + r[k]);
-  return parts.length ? parts.join('\n') : JSON.stringify(r).slice(0, 300);
+  const res = (r && typeof r.result === 'object' && r.result) ? r.result : (r || {});
+  const lines = ['⚔️ *Status:* ' + appealStatusLabel(res.status || res.state)];
+  if (res.ticket_id) lines.push('🎫 *Ticket:* ' + res.ticket_id);
+  if (res.reason) lines.push('📜 *Grund:* ' + res.reason);
+  if (res.reason_url) lines.push('🔗 ' + res.reason_url);
+  return lines.join('\n');
+}
+
+function saoAppealBox(title, number, r, footer) {
+  return '⚔️ *SWORD ART ONLINE · SYSTEM* ⚔️\n' + SAO_LINE + '\n' +
+    title + '\n' +
+    '📞 ' + number + '\n\n' +
+    describeAppeal(r) + '\n' +
+    SAO_LINE + '\n' +
+    '_' + footer + '_';
 }
 
 `;
@@ -112,7 +134,7 @@ const COMMAND = String.raw`if (cmd === 'einspruch' || cmd === 'appeal') {
     return send('❌ Nutzung: ' + activePrefix + 'einspruch <nummer>\nBeispiel: ' + activePrefix + 'einspruch 491701234567');
   }
 
-  await send('📨 Reiche Einspruch ein für ' + number + '...');
+  await send('⚔️ _[System] Sende Anfrage an die Game Master für ' + number + '..._');
 
   try {
     const r = await bancheckRequest('/api/v2/appeal-submit', {
@@ -122,11 +144,7 @@ const COMMAND = String.raw`if (cmd === 'einspruch' || cmd === 'appeal') {
       appeal_text: APPEAL_TEXT.replace('{NUMBER}', number),
       [APPEAL_FIELD]: APPEAL_TEXT.replace('{NUMBER}', number)
     });
-    return send(
-      '📨 *Einspruch eingereicht*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n' +
-      '📞 ' + number + '\n' +
-      describeAppeal(r)
-    );
+    return send(saoAppealBox('📨 *Einspruch eingereicht*', number, r, '[System] Anfrage an die Game Master übermittelt.'));
   } catch (e) {
     console.error('[appeal] Fehler:', e?.message || e);
     return send('❌ Einspruch fehlgeschlagen: ' + (e?.message || 'Unbekannter Fehler'));
@@ -142,11 +160,7 @@ if (cmd === 'einspruchstatus' || cmd === 'appealstatus') {
 
   try {
     const r = await bancheckGet('/api/v2/appeal-status', { number });
-    return send(
-      '📋 *Einspruchsstatus*\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n' +
-      '📞 ' + number + '\n' +
-      describeAppeal(r)
-    );
+    return send(saoAppealBox('📋 *Einspruchsstatus*', number, r, '[System] Abfrage abgeschlossen.'));
   } catch (e) {
     console.error('[appeal] Status-Fehler:', e?.message || e);
     return send('❌ Status-Abfrage fehlgeschlagen: ' + (e?.message || 'Unbekannter Fehler'));
